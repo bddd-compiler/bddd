@@ -17,4 +17,3 @@ IncludeBlocks: Regroup
 IndentPPDirectives: AfterHash
 BreakBeforeBinaryOperators: All
 BreakBeforeTernaryOperators: true
-...

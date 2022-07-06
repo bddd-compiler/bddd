@@ -1,373 +1,270 @@
-#ifndef AST_H
-#define AST_H
+#ifndef BDDD_AST_H
+#define BDDD_AST_H
 
-#include <memory>
-#include <string>
-#include <vector>
-#include <variant>
 #include <map>
+#include <memory>
 #include <ostream>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
-using std::string;
-using std::vector;
-
+/* operators defined in SysY, also used as type indicator of ExprAST instance */
 enum class Op {
-    POSITIVE,
-    NEGATIVE,
+  // Arithmetic unary operators
+  POSITIVE,
+  NEGATIVE,
 
-    PLUS,
-    MINUS,
-    MULT,
-    DIV,
-    MOD,
+  // Arithmetic binary operators
+  PLUS,
+  MINUS,
+  MULTI,
+  DIV,
+  MOD,
 
-    LE,
-    LEQ,
-    GE,
-    GEQ,
-    EQ,
-    NEQ,
+  // relational binary operators
+  LE,
+  LEQ,
+  GE,
+  GEQ,
+  EQ,
+  NEQ,
 
-    AND,
-    OR,
-    NOT,
+  // Logical binary operators
+  AND,
+  OR,
 
-    CONST_INT,
-    CONST_FLOAT,
-    LVAL,
-    FuncCall
+  // Logical unary operators
+  NOT,
+
+  // Special indicator
+  CONST_INT,
+  CONST_FLOAT,
+  LVAL,
+  FuncCall,
 };
 
 enum class VarType {
-    INT,
-    FLOAT,
-    VOID,
+  INT,
+  FLOAT,
+  VOID,
 };
 
 class Node {
 public:
-    virtual ~Node() = default;
-    virtual std::string codegen() = 0;
-    virtual bool typecheck() = 0;
+  virtual ~Node() = default;
 };
 
 class StmtAST : public Node {};
 
+class DeclAST;
+
+class ExprAST;
+
+class InitVal : public Node {
+public:
+  std::unique_ptr<ExprAST> expr;
+  std::vector<std::unique_ptr<InitVal>> vals;
+  explicit InitVal() : expr(nullptr), vals() {}
+
+  explicit InitVal(std::unique_ptr<ExprAST> expr) : expr(std::move(expr)), vals() {}
+
+  explicit InitVal(std::unique_ptr<InitVal> val) : expr(nullptr), vals() { vals.push_back(std::move(val)); }
+
+  void appendVal(std::unique_ptr<InitVal> val) { vals.push_back(std::move(val)); }
+};
+
 class LVal : public Node {
 public:
-    string name;
+  std::unique_ptr<DeclAST> decl;
+  std::string name;
+  std::vector<std::unique_ptr<ExprAST>> dimensions;
 
-    explicit LVal(const string& name):
-        name(name) {}
+  explicit LVal(std::string name) : name(std::move(name)), decl(nullptr), dimensions() {}
 
-    std::string codegen() override;
+  explicit LVal(std::unique_ptr<DeclAST> decl) : decl(std::move(decl)), name(), dimensions() {}
 
-    bool typecheck() override;
+  void addDimension(int x);
+
+  void addDimension(std::unique_ptr<ExprAST> expr);
 };
 
 class FuncCall;
 
 class ExprAST : public Node {
 public:
-    enum class EvalType {
-        INT,
-        FLOAT,
-        BOOL,
-        ERROR
-    };
+  enum class EvalType { INT, FLOAT, BOOL, ERROR };
 
-    Op op;
-    ExprAST* lhs;
-    ExprAST* rhs;
-    FuncCall* funcCall;
-    int intVal;
-    float floatVal;
-    LVal* lval;
+  Op op;
+  std::unique_ptr<ExprAST> lhs;
+  std::unique_ptr<ExprAST> rhs;
+  std::unique_ptr<FuncCall> func_call;
+  int int_val;
+  float float_val;
+  std::unique_ptr<LVal> lval;
 
-    explicit ExprAST(Op op, ExprAST* lhs, ExprAST* rhs = nullptr)
-        : op(op), lhs(lhs), rhs(rhs), funcCall(nullptr), intVal(0), floatVal(0.0), lval(nullptr) {}
+  explicit ExprAST(Op op, std::unique_ptr<ExprAST> lhs, std::unique_ptr<ExprAST> rhs = nullptr)
+      : op(op),
+        lhs(std::move(lhs)),
+        rhs(std::move(rhs)),
+        func_call(nullptr),
+        int_val(0),
+        float_val(0.0),
+        lval(nullptr) {}
 
-    explicit ExprAST(FuncCall* funcCall) 
-        : op(Op::FuncCall), lhs(nullptr), rhs(nullptr), funcCall(funcCall), intVal(0), floatVal(0.0), lval(nullptr) {}  
-    
-    explicit ExprAST(int val)
-        : op(Op::CONST_INT), lhs(nullptr), rhs(nullptr), funcCall(nullptr), intVal(val), floatVal(0.0), lval(nullptr) {}
+  explicit ExprAST(std::unique_ptr<FuncCall> func_call)
+      : op(Op::FuncCall),
+        lhs(nullptr),
+        rhs(nullptr),
+        func_call(std::move(func_call)),
+        int_val(0),
+        float_val(0.0),
+        lval(nullptr) {}
 
-    explicit ExprAST(float val)
-        : op(Op::CONST_FLOAT), lhs(nullptr), rhs(nullptr), funcCall(nullptr), intVal(0), floatVal(val), lval(nullptr) {}
+  explicit ExprAST(int val)
+      : op(Op::CONST_INT),
+        lhs(nullptr),
+        rhs(nullptr),
+        func_call(nullptr),
+        int_val(val),
+        float_val(0.0),
+        lval(nullptr) {}
 
-    explicit ExprAST(LVal* lval)
-        : op(Op::LVAL), lhs(nullptr), rhs(nullptr), funcCall(nullptr), intVal(0), floatVal(0.0), lval(lval) {}
-        
-    ~ExprAST();
+  explicit ExprAST(float val)
+      : op(Op::CONST_FLOAT),
+        lhs(nullptr),
+        rhs(nullptr),
+        func_call(nullptr),
+        int_val(0),
+        float_val(val),
+        lval(nullptr) {}
 
-    std::pair<EvalType, std::variant<int, float, bool>> evaluate();
-
-    std::string codegen() override;
-
-    bool typecheck() override;
+  explicit ExprAST(std::unique_ptr<LVal> lval)
+      : op(Op::LVAL),
+        lhs(nullptr),
+        rhs(nullptr),
+        func_call(nullptr),
+        int_val(0),
+        float_val(0.0),
+        lval(std::move(lval)) {}
 };
 
 class DeclAST : public Node {
 public:
-    bool isConst;
-    VarType type;
-    string varName;
-    ExprAST* rhs;
-    explicit DeclAST(const string& varName, ExprAST* rhs = nullptr):
-        isConst(false), type(VarType::INT), varName(varName), rhs(rhs) {}
+  bool is_const;
+  VarType type;
+  std::string varname;
+  std::unique_ptr<InitVal> initval;
+  std::vector<std::unique_ptr<ExprAST>> dimensions;
+  explicit DeclAST(std::string varname, std::unique_ptr<InitVal> initval = nullptr)
+      : is_const(false), type(VarType::INT), varname(std::move(varname)), initval(std::move(initval)) {}
 
-    ~DeclAST() {
-        delete rhs;
-    }
-
-    std::string codegen() override;
-    
-    bool typecheck() override;
+  void addDimension(std::unique_ptr<ExprAST> expr);
 };
 
 class FuncCall : public Node {
 public:
-    string callName;
-    vector<ExprAST*> params;
+  std::string callname;
+  std::vector<std::unique_ptr<ExprAST>> params;
 
-    explicit FuncCall(const string& callName):
-        callName(callName), params() {}
-    
-    ~FuncCall() {
-        for (auto it : params) {
-            delete it;
-        }
-    }
-
-    std::string codegen() override;
-
-    bool typecheck() override;
+  explicit FuncCall(std::string callname) : callname(std::move(callname)), params() {}
 };
-
 
 class Cond : public Node {
 public:
-    ExprAST* expr;
+  std::unique_ptr<ExprAST> expr;
 
-    explicit Cond(ExprAST* expr = nullptr):
-        expr(expr) {}
-    
-    ~Cond() {
-        delete expr;
-    }
-
-    std::string codegen() override;
-
-    bool typecheck() override;
+  explicit Cond(std::unique_ptr<ExprAST> expr = nullptr) : expr(std::move(expr)) {}
 };
 
 class FuncFParam : public Node {
 public:
-    VarType type;
-    string name;
+  VarType type;
+  std::string name;
+  std::vector<std::unique_ptr<ExprAST>> dimensions;
 
-    explicit FuncFParam(VarType type, const string& name):
-        type(type), name(name) {}
+  explicit FuncFParam(VarType type, std::string name) : type(type), name(std::move(name)), dimensions() {}
 
-    std::string codegen() override;
+  void addDimension(int x);
 
-    bool typecheck() override;
+  void addDimension(std::unique_ptr<ExprAST> expr);
 };
 
 class BlockAST : public StmtAST {
 public:
-    vector<Node*> nodes;
+  std::vector<std::unique_ptr<Node>> nodes;
 
-    ~BlockAST() {
-        for (auto it : nodes) {
-            delete it;
-        }
-    }
-
-    void appendNodes(vector<Node*> _nodes) {
-        nodes.insert(std::end(nodes), std::begin(_nodes), std::end(_nodes));
-    }
-
-    std::string codegen() override;
-
-    bool typecheck() override;
+  void appendNodes(std::vector<std::unique_ptr<Node>> appended_nodes);
 };
 
 class FuncDefAST : public Node {
 public:
-    VarType returnType;
-    string funcName;
-    vector<FuncFParam*> fParams;
-    BlockAST* block;
+  VarType returnType;
+  std::string funcName;
+  std::vector<std::unique_ptr<FuncFParam>> fParams;
+  std::unique_ptr<BlockAST> block;
 
-    explicit FuncDefAST(VarType returnType, const string& funcName, vector<FuncFParam*> fParams, BlockAST* block):
-        returnType(returnType), funcName(funcName), fParams(fParams), block(block) {}
+  explicit FuncDefAST(VarType returnType, std::string funcName, std::vector<std::unique_ptr<FuncFParam>> fParams,
+                      std::unique_ptr<BlockAST> block)
+      : returnType(returnType), funcName(std::move(funcName)), fParams(std::move(fParams)), block(std::move(block)) {}
 
-    explicit FuncDefAST(VarType returnType, const string& funcName, BlockAST* block):
-        returnType(returnType), funcName(funcName), fParams(), block(block) {}
-
-    ~FuncDefAST() {
-        for (auto it : fParams) {
-            delete it;
-        }
-        delete block;
-    }
-
-    std::string codegen() override;
-
-    bool typecheck() override;
+  explicit FuncDefAST(VarType returnType, std::string funcName, std::unique_ptr<BlockAST> block)
+      : returnType(returnType), funcName(std::move(funcName)), fParams(), block(std::move(block)) {}
 };
 
 class AssignStmtAST : public StmtAST {
 public:
-    LVal* lval;
-    ExprAST* rhs;
+  std::unique_ptr<LVal> lval;
+  std::unique_ptr<ExprAST> rhs;
 
-    explicit AssignStmtAST(LVal* lval, ExprAST* rhs):
-        lval(lval), rhs(rhs) {}
-    
-    ~AssignStmtAST() {
-        delete lval;
-        delete rhs;
-    }
-
-    std::string codegen() override;
-
-    bool typecheck() override;
+  explicit AssignStmtAST(std::unique_ptr<LVal> lval, std::unique_ptr<ExprAST> rhs)
+      : lval(std::move(lval)), rhs(std::move(rhs)) {}
 };
 
 class EvalStmtAST : public StmtAST {
 public:
-    ExprAST* expr;
+  std::unique_ptr<ExprAST> expr;
 
-    explicit EvalStmtAST(ExprAST* expr = nullptr):
-        expr(expr) {}
-    
-    ~EvalStmtAST() {
-        delete expr;
-    }
-
-    std::string codegen() override;
-
-    bool typecheck() override;
+  explicit EvalStmtAST(std::unique_ptr<ExprAST> expr = nullptr) : expr(std::move(expr)) {}
 };
 
 class IfStmtAST : public StmtAST {
 public:
-    Cond* cond;
-    StmtAST* _then;
-    StmtAST* _else;
+  std::unique_ptr<Cond> cond;
+  std::unique_ptr<StmtAST> then_stmt;
+  std::unique_ptr<StmtAST> else_stmt;
 
-    explicit IfStmtAST(Cond* cond, StmtAST* _then, StmtAST* _else = nullptr):
-        cond(cond), _then(_then), _else(_else) {}
-    
-    ~IfStmtAST() {
-        delete cond;
-        delete _then;
-        delete _else;
-    }
-    
-    std::string codegen() override;
-
-    bool typecheck() override;
+  explicit IfStmtAST(std::unique_ptr<Cond> cond, std::unique_ptr<StmtAST> then_stmt,
+                     std::unique_ptr<StmtAST> else_stmt = nullptr)
+      : cond(std::move(cond)), then_stmt(std::move(then_stmt)), else_stmt(std::move(else_stmt)) {}
 };
 
 class ReturnStmtAST : public StmtAST {
 public:
-    ExprAST* ret;
+  std::unique_ptr<ExprAST> ret;
 
-    explicit ReturnStmtAST(ExprAST* ret = nullptr):
-        ret(ret) {}
-
-    ~ReturnStmtAST() {
-        delete ret;
-    }
-
-    std::string codegen() override;
-
-    bool typecheck() override;
+  explicit ReturnStmtAST(std::unique_ptr<ExprAST> ret = nullptr) : ret(std::move(ret)) {}
 };
 
 class WhileStmtAST : public StmtAST {
 public:
-    Cond* cond;
-    StmtAST* stmt;
+  std::unique_ptr<Cond> cond;
+  std::unique_ptr<StmtAST> stmt;
 
-    explicit WhileStmtAST(Cond* cond, StmtAST* stmt):
-        cond(cond), stmt(stmt) {}
-    
-    ~WhileStmtAST() {
-        delete cond;
-        delete stmt;
-    }
-
-    std::string codegen() override;
-
-    bool typecheck() override;
+  explicit WhileStmtAST(std::unique_ptr<Cond> cond, std::unique_ptr<StmtAST> stmt)
+      : cond(std::move(cond)), stmt(std::move(stmt)) {}
 };
 
-class BreakStmtAST : public StmtAST {
-public:
-    std::string codegen() override;
-    bool typecheck() override;
-};
+class BreakStmtAST : public StmtAST {};
 
-class ContinueStmtAST : public StmtAST {
-public:
-    std::string codegen() override;
-    bool typecheck() override;
-};
+class ContinueStmtAST : public StmtAST {};
 
 class CompUnit : public Node {
 public:
-    vector<Node*> nodes;
-    void appendDecls(vector<DeclAST*> decls);
+  std::vector<std::unique_ptr<Node>> nodes;
+  void appendDecls(std::vector<std::unique_ptr<DeclAST>> decls);
 
-    void appendFuncDef(FuncDefAST* funcDef);
-
-    std::string codegen() override;
-    bool typecheck() override;
+  void appendFuncDef(std::unique_ptr<FuncDefAST> funcDef);
 };
 
-class SymbolTable {
-private:
-    std::map<std::string, int> intVals;
-    std::map<std::string, float> floatVals;
-    std::map<std::string, FuncDefAST*> funcDefs;
-public:
-    enum class ElemType {
-        INT,
-        FLOAT,
-        FUNC,
-
-        NOT_FOUND,
-    };
-    ElemType lookup(std::string name);
-
-    bool insert(std::string name, ElemType type, std::variant<int, float, FuncDefAST*> val);
-
-    bool remove(std::string name);
-
-    bool check(std::string name, ElemType type);
-
-    std::pair<ElemType, std::variant<int, float>> getValue(std::string name);
-};
-
-class GrammarException : public std::exception {
-private:
-  std::string msg;
-public:
-  explicit GrammarException(const std::string& msg) : msg(msg) {}
-
-  const std::string& getMsg() const { return msg; }
-
-  friend std::ostream& operator << (std::ostream& out, GrammarException e) {
-    out << "[grammar error] ";
-    out << ": " << e.getMsg() << std::endl;
-    return out;
-  }
-};
-
-
-#endif //AST_H
+#endif  // BDDD_AST_H

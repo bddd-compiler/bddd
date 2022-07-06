@@ -61,7 +61,7 @@ HexFloatConst2 "0"[xX][0-9a-fA-F]+"."?"p"[+-]?[0-9]+
 
 "+"        return yy::parser::make_PLUS(loc);
 "-"        return yy::parser::make_MINUS(loc);
-"*"        return yy::parser::make_MULT(loc);
+"*"        return yy::parser::make_MULTI(loc);
 "/"        return yy::parser::make_DIV(loc);
 "%"        return yy::parser::make_MOD(loc);
 ">"        return yy::parser::make_GE(loc);
@@ -81,17 +81,17 @@ HexFloatConst2 "0"[xX][0-9a-fA-F]+"."?"p"[+-]?[0-9]+
 <SINGLE_COMMENT>. {}
 
 {DecConst}   {
-  long long n = strtoll (yytext, NULL, 10);
+  long long n = strtoll(yytext, NULL, 10);
   return yy::parser::make_INTCONST(n, loc);
 }
 
 {HexConst}   {
-  long long n = strtoll (yytext, NULL, 0);
+  long long n = strtoll(yytext, NULL, 0);
   return yy::parser::make_INTCONST(n, loc);
 }
 
 {OctConst}   {
-  long long n = strtoll (yytext, NULL, 0);
+  long long n = strtoll(yytext, NULL, 0);
   return yy::parser::make_INTCONST(n, loc);
 }
 
