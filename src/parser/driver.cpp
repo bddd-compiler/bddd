@@ -1,6 +1,8 @@
 #include "parser/driver.h"
 
-Driver::Driver() : trace_scanning(false), trace_parsing(false) { compUnit = std::make_unique<CompUnit>(); }
+Driver::Driver() : trace_scanning(false), trace_parsing(false) {
+  comp_unit = std::make_unique<CompUnit>();
+}
 
 int Driver::parse(const std::string &f) {
   file = f;

@@ -7,7 +7,7 @@ IndentWidth: 2
 TabWidth: 2
 UseTab: Never
 NamespaceIndentation: None
-ColumnLimit: 120
+ColumnLimit: 80
 
 AllowAllParametersOfDeclarationOnNextLine: false
 AlwaysBreakTemplateDeclarations: No

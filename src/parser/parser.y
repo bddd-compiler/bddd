@@ -7,7 +7,7 @@
 %define parse.assert
 %code requires
 {
-#include "ast.h"
+#include "ast/ast.h"
 #include <string>
 #include <memory>
 using std::string;
@@ -119,10 +119,10 @@ TOK_WHILE: "while" { /* printf("(keyword, while)\n"); */ };
 TOK_BREAK: "break" { /* printf("(keyword, break)\n"); */ };
 TOK_CONTINUE: "continue" { /* printf("(keyword, continue)\n"); */ };
 
-CompUnit: CompUnit Decl { driver.compUnit->appendDecls(std::move($2)); }
-        | CompUnit FuncDef { driver.compUnit->appendFuncDef(std::move($2)); }
-        | Decl { driver.compUnit->appendDecls(std::move($1)); }
-        | FuncDef { driver.compUnit->appendFuncDef(std::move($1)); }
+CompUnit: CompUnit Decl { driver.comp_unit->AppendDecls(std::move($2)); }
+        | CompUnit FuncDef { driver.comp_unit->AppendFuncDef(std::move($2)); }
+        | Decl { driver.comp_unit->AppendDecls(std::move($1)); }
+        | FuncDef { driver.comp_unit->AppendFuncDef(std::move($1)); }
         ;
 
 Decl: ConstDecl TOK_SEMICOLON { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); }
@@ -133,11 +133,11 @@ BType: "int" { $$ = VarType::INT; /* printf("(keyword, int)\n"); */ }
      | "float" { $$ = VarType::FLOAT; /* printf("(keyword, float)\n"); */ }
      ;
 
-ConstDecl: TOK_CONST BType ConstDef { $3->is_const = true; $3->type = $2; $$.push_back(std::move($3)); }
-         | ConstDecl TOK_COMMA ConstDef { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $3->is_const = true; $$.push_back(std::move($3)); }
+ConstDecl: TOK_CONST BType ConstDef { $3->setIsConst(true); $3->setVarType($2); $$.push_back(std::move($3)); }
+         | ConstDecl TOK_COMMA ConstDef { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $3->setIsConst(true); $$.push_back(std::move($3)); }
          ;
 
-VarDecl: BType VarDef { $2->type = $1; $$.push_back(std::move($2)); }
+VarDecl: BType VarDef { $2->setVarType($1); $$.push_back(std::move($2)); }
        | VarDecl TOK_COMMA VarDef { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $$.push_back(std::move($3)); }
        ;
 
@@ -147,12 +147,12 @@ VarDef: VarDefSingle { $$ = std::move($1); }
 VarDefSingle: IDENT TOK_ASSIGN InitVal { $$ = std::make_unique<DeclAST>(std::move($1), std::move($3)); }
             | IDENT { $$ = std::make_unique<DeclAST>(std::move($1)); }
             ;
-VarDefArray: DefArrayBody TOK_ASSIGN InitValArray { $$ = std::move($1); $$->initval = std::move($3); }
+VarDefArray: DefArrayBody TOK_ASSIGN InitValArray { $$ = std::move($1); $$->setInitVal(std::move($3)); }
            | DefArrayBody { $$ = std::move($1); }
            ;
 
-DefArrayBody: DefArrayBody TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->addDimension(std::move($3)); }
-     | IDENT TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::make_unique<DeclAST>($1); $$->addDimension(std::move($3)); }
+DefArrayBody: DefArrayBody TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->AddDimension(std::move($3)); }
+     | IDENT TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::make_unique<DeclAST>($1); $$->AddDimension(std::move($3)); }
      ;
 
 ConstDef: ConstDefSingle { $$ = std::move($1); }
@@ -162,7 +162,7 @@ ConstDef: ConstDefSingle { $$ = std::move($1); }
 ConstDefSingle: IDENT TOK_ASSIGN InitVal { $$ = std::make_unique<DeclAST>(std::move($1), std::move($3)); }
               ;
 
-ConstDefArray: DefArrayBody TOK_ASSIGN InitValArray { $$ = std::move($1); $$->initval = std::move($3); }
+ConstDefArray: DefArrayBody TOK_ASSIGN InitValArray { $$ = std::move($1); $$->setInitVal(std::move($3)); }
              ;
 
 InitVal: AddExp { $$ = std::make_unique<InitVal>(std::move($1)); };
@@ -171,8 +171,8 @@ InitValArray: TOK_LBRACE InitValArrayBody TOK_RBRACE { $$ = std::move($2); }
             | TOK_LBRACE TOK_RBRACE { $$ = std::make_unique<InitVal>(); }
             ;
 
-InitValArrayBody: InitValArrayBody TOK_COMMA InitValArray { $$ = std::move($1); $$->appendVal(std::move($3)); }
-                | InitValArrayBody TOK_COMMA InitVal { $$ = std::move($1); $$->appendVal(std::move($3)); }
+InitValArrayBody: InitValArrayBody TOK_COMMA InitValArray { $$ = std::move($1); $$->AppendVal(std::move($3)); }
+                | InitValArrayBody TOK_COMMA InitVal { $$ = std::move($1); $$->AppendVal(std::move($3)); }
                 | InitValArray { $$ = std::make_unique<InitVal>(std::move($1)); }
                 | InitVal { $$ = std::make_unique<InitVal>(std::move($1)); }
                 ;
@@ -209,7 +209,7 @@ UnaryExp: PrimaryExp { $$ = std::move($1); }
         | UnaryOp UnaryExp { $$ = std::make_unique<ExprAST>($1, std::move($2)); }
         ;
 
-FuncCall: IDENT TOK_LPAREN FuncRParams TOK_RPAREN { $$ = std::make_unique<FuncCall>(std::move($1)); $$->params.assign(std::make_move_iterator(std::begin($3)), std::make_move_iterator(std::end($3))); $3.clear(); }
+FuncCall: IDENT TOK_LPAREN FuncRParams TOK_RPAREN { $$ = std::make_unique<FuncCall>(std::move($1)); $$->assignParams(std::move($3)); }
         | IDENT TOK_LPAREN TOK_RPAREN { $$ = std::make_unique<FuncCall>(std::move($1)); }
         ;
 
@@ -218,7 +218,7 @@ PrimaryExp: TOK_LPAREN Exp TOK_RPAREN { $$ = std::move($2); }
           | Number { $$ = std::move($1); }
           ;
 
-LVal: LVal TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->addDimension(std::move($3)); }
+LVal: LVal TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->AddDimension(std::move($3)); }
     | IDENT { $$ = std::make_unique<LVal>(std::move($1)); }
     ;
 
@@ -242,16 +242,16 @@ FuncFParam: FuncFParamSingle { $$ = std::move($1); }
 
 FuncFParamSingle: BType IDENT { $$ = std::make_unique<FuncFParam>($1, std::move($2)); };
 
-FuncFParamArray: BType IDENT TOK_LBRACKET TOK_RBRACKET { $$ = std::make_unique<FuncFParam>($1, std::move($2)); $$->addDimension(0); }
-               | FuncFParamArray TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->addDimension(std::move($3)); }
+FuncFParamArray: BType IDENT TOK_LBRACKET TOK_RBRACKET { $$ = std::make_unique<FuncFParam>($1, std::move($2)); $$->AddDimension(0); }
+               | FuncFParamArray TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->AddDimension(std::move($3)); }
                ;
 
 Block: TOK_LBRACE TOK_RBRACE { $$ = std::make_unique<BlockAST>(); }
      | TOK_LBRACE BlockItems TOK_RBRACE { $$ = std::move($2); }
      ;
 
-BlockItems: BlockItem { $$ = std::make_unique<BlockAST>(); $$->appendNodes(std::move($1)); }
-          | BlockItems BlockItem { $$ = std::move($1); $$->appendNodes(std::move($2)); }
+BlockItems: BlockItem { $$ = std::make_unique<BlockAST>(); $$->AppendNodes(std::move($1)); }
+          | BlockItems BlockItem { $$ = std::move($1); $$->AppendNodes(std::move($2)); }
           ;
 
 BlockItem: Decl { $$.insert(std::end($$), std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); }

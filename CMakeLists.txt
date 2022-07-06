@@ -10,7 +10,7 @@ FIND_PACKAGE(FLEX)
 BISON_TARGET(MyParser
   src/parser/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.cpp
   DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/parser.hh
-)
+  )
 
 FLEX_TARGET(
   MyScanner
@@ -20,15 +20,11 @@ FLEX_TARGET(
 
 ADD_FLEX_BISON_DEPENDENCY(MyScanner MyParser)
 
-SET(PARSER_SRCS
-    ${BISON_MyParser_OUTPUTS} ${FLEX_MyScanner_OUTPUTS}
-    src/parser/driver.cpp
-)
-
 add_executable(bddd
-    src/main.cpp
-    ${PARSER_SRCS}
-    src/ast.cpp
-)
+  src/main.cpp
+
+  ${BISON_MyParser_OUTPUTS} ${FLEX_MyScanner_OUTPUTS} src/parser/driver.cpp
+  src/ast/ast.cpp
+  )
 
 target_include_directories(bddd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
