@@ -37,7 +37,7 @@ class Driver;
 %token <string> IDENTIFIER "identifier"
 
 %token
-    END 0  "end of file"
+    END 0 "end of file"
     CONST "const"
     INT "int"
     FLOAT "float"
@@ -242,7 +242,7 @@ FuncFParam: FuncFParamSingle { $$ = std::move($1); }
 
 FuncFParamSingle: BType IDENT { $$ = std::make_unique<FuncFParam>($1, std::move($2)); };
 
-FuncFParamArray: BType IDENT TOK_LBRACKET TOK_RBRACKET { $$ = std::make_unique<FuncFParam>($1, std::move($2)); $$->AddDimension(0); }
+FuncFParamArray: BType IDENT TOK_LBRACKET TOK_RBRACKET { $$ = std::make_unique<FuncFParam>($1, std::move($2)); $$->AddDimension(-1); }
                | FuncFParamArray TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->AddDimension(std::move($3)); }
                ;
 

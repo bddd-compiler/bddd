@@ -1,12 +1,12 @@
 #ifndef BDDD_AST_H
 #define BDDD_AST_H
 
+#include <fstream>
 #include <map>
 #include <memory>
 #include <ostream>
 #include <string>
 #include <utility>
-#include <variant>
 #include <vector>
 
 /* operators defined in SysY, also used as var_type indicator of ExprAST
@@ -43,7 +43,7 @@ enum class Op {
   CONST_INT,
   CONST_FLOAT,
   LVAL,
-  FuncCall,
+  FUNC_CALL,
 };
 
 enum class VarType {
@@ -56,6 +56,7 @@ enum class VarType {
 class Node {
 public:
   virtual ~Node() = default;
+  virtual void Debug(std::ofstream &ofs, int depth) = 0;
 };
 
 class StmtAST : public Node {};
@@ -64,6 +65,10 @@ class DeclAST;
 
 class ExprAST;
 
+/**
+ * expr != nullptr, vals == {}: single expression
+ * expr == nullptr, vals != {}: array of items
+ */
 class InitVal : public Node {
 private:
   std::unique_ptr<ExprAST> expr;
@@ -82,28 +87,45 @@ public:
   void AppendVal(std::unique_ptr<InitVal> val) {
     vals.push_back(std::move(val));
   }
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
+/**
+ * name cannot be empty
+ * optional: dimensions
+ * -1 might appear in dimensions
+ */
 class LVal : public Node {
 private:
-  std::unique_ptr<DeclAST> decl;
+  // std::unique_ptr<DeclAST> decl;
   std::string name;
   std::vector<std::unique_ptr<ExprAST>> dimensions;
 
 public:
-  explicit LVal(std::string name)
-      : name(std::move(name)), decl(nullptr), dimensions() {}
+  explicit LVal(std::string name) : name(std::move(name)), dimensions() {}
 
-  explicit LVal(std::unique_ptr<DeclAST> decl)
-      : decl(std::move(decl)), name(), dimensions() {}
+  // explicit LVal(std::unique_ptr<DeclAST> decl)
+  //     : decl(std::move(decl)), name(), dimensions() {}
 
   void AddDimension(int x);
 
   void AddDimension(std::unique_ptr<ExprAST> expr);
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 class FuncCall;
 
+/**
+ * op indicates the type of expression
+ * unary operators only have lhs
+ * binary operators have both lhs and rhs
+ * int_val meaningful only if op == CONST_INT
+ * float_val meaningful only if op == CONST_FLOAT
+ * func_call meaningful only if op == FUNC_CALL
+ * lval meaningful only if op == LVAL
+ */
 class ExprAST : public Node {
 private:
   Op op;
@@ -126,7 +148,7 @@ public:
         lval(nullptr) {}
 
   explicit ExprAST(std::unique_ptr<FuncCall> func_call)
-      : op(Op::FuncCall),
+      : op(Op::FUNC_CALL),
         lhs(nullptr),
         rhs(nullptr),
         func_call(std::move(func_call)),
@@ -160,25 +182,27 @@ public:
         int_val(0),
         float_val(0.0),
         lval(std::move(lval)) {}
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
+/**
+ * is_const indicates whether it is a const declaration
+ * var_type only can be INT or FLOAT
+ */
 class DeclAST : public Node {
 private:
   bool is_const;
   VarType var_type;
+  std::unique_ptr<InitVal> init_val;
 
 public:
   void setIsConst(bool isConst);
   void setVarType(VarType varType);
-
-private:
-  std::string varname;
-  std::unique_ptr<InitVal> init_val;
-
-public:
   void setInitVal(std::unique_ptr<InitVal> initVal);
 
 private:
+  std::string varname;
   std::vector<std::unique_ptr<ExprAST>> dimensions;
 
 public:
@@ -190,6 +214,8 @@ public:
         init_val(std::move(initval)) {}
 
   void AddDimension(std::unique_ptr<ExprAST> expr);
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 class FuncCall : public Node {
@@ -206,6 +232,8 @@ public:
                         std::make_move_iterator(params.end()));
     params.clear();
   }
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 class Cond : public Node {
@@ -213,8 +241,9 @@ private:
   std::unique_ptr<ExprAST> expr;
 
 public:
-  explicit Cond(std::unique_ptr<ExprAST> expr = nullptr)
-      : expr(std::move(expr)) {}
+  explicit Cond(std::unique_ptr<ExprAST> expr) : expr(std::move(expr)) {}
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 class FuncFParam : public Node {
@@ -230,6 +259,8 @@ public:
   void AddDimension(int x);
 
   void AddDimension(std::unique_ptr<ExprAST> expr);
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 class BlockAST : public StmtAST {
@@ -238,6 +269,8 @@ private:
 
 public:
   void AppendNodes(std::vector<std::unique_ptr<Node>> appendedNodes);
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 class FuncDefAST : public Node {
@@ -268,6 +301,8 @@ public:
                         std::make_move_iterator(params.end()));
     params.clear();
   }
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 class AssignStmtAST : public StmtAST {
@@ -279,6 +314,8 @@ public:
   explicit AssignStmtAST(std::unique_ptr<LVal> lval,
                          std::unique_ptr<ExprAST> rhs)
       : lval(std::move(lval)), rhs(std::move(rhs)) {}
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 class EvalStmtAST : public StmtAST {
@@ -288,6 +325,8 @@ private:
 public:
   explicit EvalStmtAST(std::unique_ptr<ExprAST> expr = nullptr)
       : expr(std::move(expr)) {}
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 class IfStmtAST : public StmtAST {
@@ -303,6 +342,8 @@ public:
       : cond(std::move(cond)),
         then_stmt(std::move(then_stmt)),
         else_stmt(std::move(else_stmt)) {}
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 class ReturnStmtAST : public StmtAST {
@@ -312,6 +353,8 @@ private:
 public:
   explicit ReturnStmtAST(std::unique_ptr<ExprAST> ret = nullptr)
       : ret(std::move(ret)) {}
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 class WhileStmtAST : public StmtAST {
@@ -323,11 +366,19 @@ public:
   explicit WhileStmtAST(std::unique_ptr<Cond> cond,
                         std::unique_ptr<StmtAST> stmt)
       : cond(std::move(cond)), stmt(std::move(stmt)) {}
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
-class BreakStmtAST : public StmtAST {};
+class BreakStmtAST : public StmtAST {
+public:
+  void Debug(std::ofstream &ofs, int depth) override;
+};
 
-class ContinueStmtAST : public StmtAST {};
+class ContinueStmtAST : public StmtAST {
+public:
+  void Debug(std::ofstream &ofs, int depth) override;
+};
 
 class CompUnit : public Node {
 private:
@@ -337,6 +388,8 @@ public:
   void AppendDecls(std::vector<std::unique_ptr<DeclAST>> decls);
 
   void AppendFuncDef(std::unique_ptr<FuncDefAST> funcDef);
+
+  void Debug(std::ofstream &ofs, int depth) override;
 };
 
 #endif  // BDDD_AST_H
