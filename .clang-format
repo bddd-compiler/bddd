@@ -1,6 +1,6 @@
 ---
 Language: Cpp
-BasedOnStyle: LLVM
+BasedOnStyle: Google
 AccessModifierOffset: -4 # -2
 AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments: Consecutive
@@ -48,8 +48,8 @@ ColumnLimit:     120
 CommentPragmas:  '^ IWYU pragma:'
 CompactNamespaces: false
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
-ConstructorInitializerIndentWidth: 4
-ContinuationIndentWidth: 4
+ConstructorInitializerIndentWidth: 2
+ContinuationIndentWidth: 2
 Cpp11BracedListStyle: true
 DerivePointerAlignment: false
 DisableFormat:   false
@@ -70,7 +70,7 @@ IncludeCategories:
 IncludeIsMainRegex: '(Test)?$'
 IndentCaseLabels: true # false
 IndentPPDirectives: None
-IndentWidth:   4  #2
+IndentWidth:   2  #4
 IndentWrappedFunctionNames: false
 JavaScriptQuotes: Leave
 JavaScriptWrapImports: true
@@ -105,6 +105,6 @@ SpacesInCStyleCastParentheses: false
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
 Standard: c++17
-TabWidth: 4
+TabWidth: 2
 UseTab: Never
 ...
