@@ -51,11 +51,13 @@ enum class VarType {
   UNKNOWN,
 };
 
-class AST {
+class SymbolTable;
+
+class AST : public std::enable_shared_from_this<AST> {
 public:
   virtual ~AST() = default;
   virtual void Debug(std::ofstream &ofs, int depth) = 0;
-  // virtual void TypeCheck() = 0;
+  virtual void TypeCheck(SymbolTable &symbolTable) = 0;
 };
 
 class StmtAST : public AST {};
@@ -65,21 +67,28 @@ class DeclAST;
 class ExprAST;
 
 /**
- * expr != nullptr, vals == {}: single expression
- * expr == nullptr, vals != {}: array of items
+ * @expr not null when single expression, this time vals is null
+ * @vals not null when array of items, this time expr is null
+ * @is_const available in typechecking
  */
 class InitValAST : public AST {
 private:
   std::unique_ptr<ExprAST> expr;
   std::vector<std::unique_ptr<InitValAST>> vals;
+  bool is_const;
 
 public:
-  explicit InitValAST() : expr(nullptr), vals() {}
+  [[nodiscard]] bool isConst() const { return is_const; }
+  void setIsConst(bool isConst) { is_const = isConst; }
+
+public:
+  explicit InitValAST() : expr(nullptr), vals(), is_const(false) {}
 
   explicit InitValAST(std::unique_ptr<ExprAST> expr)
-      : expr(std::move(expr)), vals() {}
+      : expr(std::move(expr)), vals(), is_const(false) {}
 
-  explicit InitValAST(std::unique_ptr<InitValAST> val) : expr(nullptr), vals() {
+  explicit InitValAST(std::unique_ptr<InitValAST> val)
+      : expr(nullptr), vals(), is_const(false) {
     vals.push_back(std::move(val));
   }
 
@@ -88,6 +97,8 @@ public:
   }
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 /**
@@ -97,21 +108,19 @@ public:
  */
 class LValAST : public AST {
 private:
-  // std::unique_ptr<DeclAST> decl;
   std::string name;
   std::vector<std::unique_ptr<ExprAST>> dimensions;
 
 public:
   explicit LValAST(std::string name) : name(std::move(name)), dimensions() {}
 
-  // explicit LValAST(std::unique_ptr<DeclAST> decl)
-  //     : decl(std::move(decl)), name(), dimensions() {}
-
   void AddDimension(int x);
 
   void AddDimension(std::unique_ptr<ExprAST> expr);
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class FuncCallAST;
@@ -124,6 +133,7 @@ class FuncCallAST;
  * @float_val meaningful only if op == CONST_FLOAT
  * @func_call meaningful only if op == FUNC_CALL
  * @lval meaningful only if op == LVAL
+ * @is_const available when typechecking
  */
 class ExprAST : public AST {
 private:
@@ -134,6 +144,10 @@ private:
   int int_val;
   float float_val;
   std::unique_ptr<LValAST> lval;
+  bool is_const;
+
+public:
+  [[nodiscard]] bool isConst() const { return is_const; }
 
 public:
   explicit ExprAST(Op op, std::unique_ptr<ExprAST> lhs,
@@ -144,7 +158,8 @@ public:
         func_call(nullptr),
         int_val(0),
         float_val(0.0),
-        lval(nullptr) {}
+        lval(nullptr),
+        is_const(false) {}
 
   explicit ExprAST(std::unique_ptr<FuncCallAST> func_call)
       : op(Op::FUNC_CALL),
@@ -153,7 +168,8 @@ public:
         func_call(std::move(func_call)),
         int_val(0),
         float_val(0.0),
-        lval(nullptr) {}
+        lval(nullptr),
+        is_const(false) {}
 
   explicit ExprAST(int val)
       : op(Op::CONST_INT),
@@ -162,7 +178,8 @@ public:
         func_call(nullptr),
         int_val(val),
         float_val(0.0),
-        lval(nullptr) {}
+        lval(nullptr),
+        is_const(true) {}
 
   explicit ExprAST(float val)
       : op(Op::CONST_FLOAT),
@@ -171,7 +188,8 @@ public:
         func_call(nullptr),
         int_val(0),
         float_val(val),
-        lval(nullptr) {}
+        lval(nullptr),
+        is_const(true) {}
 
   explicit ExprAST(std::unique_ptr<LValAST> lval)
       : op(Op::LVAL),
@@ -180,34 +198,43 @@ public:
         func_call(nullptr),
         int_val(0),
         float_val(0.0),
-        lval(std::move(lval)) {}
+        lval(std::move(lval)),
+        is_const(false) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 /**
  * @is_const indicates whether it is a const declaration
+ * @is_global used in typechecking
  * @var_type only can be INT or FLOAT
  */
 class DeclAST : public AST {
 private:
   bool is_const;
+  bool is_global;
   VarType var_type;
   std::unique_ptr<InitValAST> init_val;
 
-public:
-  void setIsConst(bool isConst);
-  void setVarType(VarType varType);
-  void setInitVal(std::unique_ptr<InitValAST> initVal);
-
-private:
   std::string varname;
   std::vector<std::unique_ptr<ExprAST>> dimensions;
 
 public:
+  void setIsConst(bool isConst) { is_const = isConst; }
+  void setIsGlobal(bool isGlobal) { is_global = isGlobal; }
+  void setVarType(VarType varType) { var_type = varType; }
+  void setInitVal(std::unique_ptr<InitValAST> initVal) {
+    init_val = std::move(initVal);
+  }
+
+  size_t dimensionsSize() { return dimensions.size(); }
+
   explicit DeclAST(std::string varname,
                    std::unique_ptr<InitValAST> initval = nullptr)
       : is_const(false),
+        is_global(false),
         var_type(VarType::UNKNOWN),
         varname(std::move(varname)),
         init_val(std::move(initval)) {}
@@ -215,16 +242,29 @@ public:
   void AddDimension(std::unique_ptr<ExprAST> expr);
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
+/**
+ * @func_name the name of called function
+ * @params the parameters of function call
+ * @return_type the return type of function call, initially unknown
+ */
 class FuncCallAST : public AST {
 private:
   std::string func_name;
   std::vector<std::unique_ptr<ExprAST>> params;
+  VarType return_type;
+
+public:
+  [[nodiscard]] size_t paramsSize() const { return params.size(); }
 
 public:
   explicit FuncCallAST(std::string func_name)
-      : func_name(std::move(func_name)), params() {}
+      : func_name(std::move(func_name)),
+        params(),
+        return_type(VarType::UNKNOWN) {}
 
   void assignParams(std::vector<std::unique_ptr<ExprAST>> _params) {
     params.assign(std::make_move_iterator(_params.begin()),
@@ -233,6 +273,8 @@ public:
   }
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class CondAST : public AST {
@@ -243,8 +285,13 @@ public:
   explicit CondAST(std::unique_ptr<ExprAST> expr) : expr(std::move(expr)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
+/**
+ * @dimensions not null when param is array, the first element should be -1
+ */
 class FuncFParamAST : public AST {
 private:
   VarType type;
@@ -260,16 +307,20 @@ public:
   void AddDimension(std::unique_ptr<ExprAST> expr);
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class BlockAST : public StmtAST {
 private:
-  std::vector<std::unique_ptr<AST>> nodes;
+  std::vector<std::shared_ptr<AST>> nodes;
 
 public:
   void AppendNodes(std::vector<std::unique_ptr<AST>> appendedNodes);
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class FuncDefAST : public AST {
@@ -278,6 +329,11 @@ private:
   std::string func_name;
   std::vector<std::unique_ptr<FuncFParamAST>> params;
   std::unique_ptr<BlockAST> block;
+
+public:
+  size_t paramsSize() const { return params.size(); }
+  VarType returnType() const { return return_type; }
+  std::string funcName() const { return func_name; }
 
 public:
   explicit FuncDefAST(VarType return_type, std::string func_name,
@@ -295,13 +351,15 @@ public:
         params(),
         block(std::move(block)) {}
 
-  void assignParams(std::vector<std::unique_ptr<FuncFParamAST>> params) {
-    this->params.assign(std::make_move_iterator(params.begin()),
-                        std::make_move_iterator(params.end()));
-    params.clear();
+  void assignParams(std::vector<std::unique_ptr<FuncFParamAST>> _params) {
+    params.assign(std::make_move_iterator(_params.begin()),
+                  std::make_move_iterator(_params.end()));
+    _params.clear();
   }
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class AssignStmtAST : public StmtAST {
@@ -315,6 +373,8 @@ public:
       : lval(std::move(lval)), rhs(std::move(rhs)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class EvalStmtAST : public StmtAST {
@@ -322,10 +382,11 @@ private:
   std::unique_ptr<ExprAST> expr;
 
 public:
-  explicit EvalStmtAST(std::unique_ptr<ExprAST> expr = nullptr)
-      : expr(std::move(expr)) {}
+  explicit EvalStmtAST(std::unique_ptr<ExprAST> expr) : expr(std::move(expr)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class IfStmtAST : public StmtAST {
@@ -343,6 +404,8 @@ public:
         else_stmt(std::move(else_stmt)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class ReturnStmtAST : public StmtAST {
@@ -354,6 +417,8 @@ public:
       : ret(std::move(ret)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class WhileStmtAST : public StmtAST {
@@ -367,21 +432,27 @@ public:
       : cond(std::move(cond)), stmt(std::move(stmt)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class BreakStmtAST : public StmtAST {
 public:
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class ContinueStmtAST : public StmtAST {
 public:
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 class CompUnitAST : public AST {
 private:
-  std::vector<std::unique_ptr<AST>> nodes;
+  std::vector<std::shared_ptr<AST>> nodes;
 
 public:
   void AppendDecls(std::vector<std::unique_ptr<DeclAST>> decls);
@@ -389,6 +460,8 @@ public:
   void AppendFuncDef(std::unique_ptr<FuncDefAST> funcDef);
 
   void Debug(std::ofstream &ofs, int depth) override;
+
+  void TypeCheck(SymbolTable &symbolTable) override;
 };
 
 #endif  // BDDD_AST_H

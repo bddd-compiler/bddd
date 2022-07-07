@@ -2,32 +2,42 @@
 #define BDDD_SYMBOL_TABLE_H
 
 #include <memory>
-#include <stack>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
-class AST;
-class DeclAST;
-class FuncDefAST;
+#include "ast/ast.h"
+
+enum class ScopeType {
+  GLOBAL,
+  FUNC,
+  LOOP,
+  BLOCK,
+};
 
 class SymbolTable {
 private:
-  std::stack<std::unordered_map<std::string, std::shared_ptr<AST>>> tables;
+  std::vector<std::unordered_map<std::string, std::shared_ptr<AST>>> tables;
+  std::vector<ScopeType> scopes;
 
 public:
-  bool InsertDecl(std::string name, std::shared_ptr<DeclAST> decl);
+  explicit SymbolTable();
 
-  bool InsertFuncDef(std::string name, std::shared_ptr<FuncDefAST> funcDef);
+  bool Insert(const std::string& name, const std::shared_ptr<AST>& ast);
 
-  std::shared_ptr<DeclAST> GetDecl(std::string name);
+  std::shared_ptr<DeclAST> GetDecl(const std::string& name);
 
-  std::shared_ptr<FuncDefAST> GetFuncDef(std::string name);
+  std::shared_ptr<FuncDefAST> GetFuncDef(const std::string& name);
 
-  void InitializeScope();
+  void InitializeScope(ScopeType scope);
 
   bool FinalizeScope();
 
   [[nodiscard]] size_t size() const;
+
+  // ScopeType currentScope();
+
+  bool existScope(ScopeType scope);
 };
 
 #endif  // BDDD_SYMBOL_TABLE_H

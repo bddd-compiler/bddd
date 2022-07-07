@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include "ast/symbol-table.h"
+#include "exceptions.h"
 #include "parser/driver.h"
 
 int main() {
@@ -16,6 +18,14 @@ int main() {
 
   std::ofstream ofs("ast.out");
   driver.comp_unit->Debug(ofs, 0);
+
+  try {
+    SymbolTable symbol_table;
+    driver.comp_unit->TypeCheck(symbol_table);
+  } catch (MyException &e) {
+    std::cerr << "exception encountered: " << e.getMsg() << std::endl;
+    return 1;
+  }
 
   std::cout << "res: " << res << std::endl;
   return 0;
