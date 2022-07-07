@@ -21,11 +21,11 @@
 //     {Op::NOT, "!"}
 // };
 
-void LVal::AddDimension(int x) {
+void LValAST::AddDimension(int x) {
   dimensions.push_back(std::make_unique<ExprAST>(x));
 }
 
-void LVal::AddDimension(std::unique_ptr<ExprAST> expr) {
+void LValAST::AddDimension(std::unique_ptr<ExprAST> expr) {
   dimensions.push_back(std::move(expr));
 }
 void DeclAST::AddDimension(std::unique_ptr<ExprAST> expr) {
@@ -33,48 +33,49 @@ void DeclAST::AddDimension(std::unique_ptr<ExprAST> expr) {
 }
 void DeclAST::setIsConst(bool isConst) { is_const = isConst; }
 void DeclAST::setVarType(VarType varType) { var_type = varType; }
-void DeclAST::setInitVal(std::unique_ptr<InitVal> initVal) {
+void DeclAST::setInitVal(std::unique_ptr<InitValAST> initVal) {
   init_val = std::move(initVal);
 }
-void FuncFParam::AddDimension(int x) {
+void FuncFParamAST::AddDimension(int x) {
   dimensions.push_back(std::make_unique<ExprAST>(x));
 }
-void FuncFParam::AddDimension(std::unique_ptr<ExprAST> expr) {
+void FuncFParamAST::AddDimension(std::unique_ptr<ExprAST> expr) {
   dimensions.push_back(std::move(expr));
 }
-void BlockAST::AppendNodes(std::vector<std::unique_ptr<Node>> appendedNodes) {
+void BlockAST::AppendNodes(std::vector<std::unique_ptr<AST>> appendedNodes) {
   nodes.insert(nodes.end(), std::make_move_iterator(appendedNodes.begin()),
                std::make_move_iterator(appendedNodes.end()));
   appendedNodes.clear();
 }
 
-void CompUnit::AppendDecls(std::vector<std::unique_ptr<DeclAST>> decls) {
+void CompUnitAST::AppendDecls(std::vector<std::unique_ptr<DeclAST>> decls) {
   nodes.insert(nodes.end(), std::make_move_iterator(decls.begin()),
                std::make_move_iterator(decls.end()));
   decls.clear();
 }
-void CompUnit::AppendFuncDef(std::unique_ptr<FuncDefAST> funcDef) {
+void CompUnitAST::AppendFuncDef(std::unique_ptr<FuncDefAST> funcDef) {
   nodes.push_back(std::move(funcDef));
 }
 // debug
-void InitVal::Debug(std::ofstream& ofs, int depth) {
+void InitValAST::Debug(std::ofstream& ofs, int depth) {
   if (expr) {
-    ofs << std::string(depth * 2, ' ') << "InitVal (single):" << std::endl;
+    ofs << std::string(depth * 2, ' ') << "InitValAST (single):" << std::endl;
     expr->Debug(ofs, depth + 1);
   } else {
-    ofs << std::string(depth * 2, ' ') << "InitVal (array): {" << std::endl;
+    ofs << std::string(depth * 2, ' ') << "InitValAST (array): {" << std::endl;
     for (auto& val : vals) {
       val->Debug(ofs, depth + 1);
     }
     ofs << std::string(depth * 2, ' ') << "}" << std::endl;
   }
 }
-void LVal::Debug(std::ofstream& ofs, int depth) {
+void LValAST::Debug(std::ofstream& ofs, int depth) {
   if (dimensions.empty()) {
-    ofs << std::string(depth * 2, ' ') << "LVal (single): " << name
+    ofs << std::string(depth * 2, ' ') << "LValAST (single): " << name
         << std::endl;
   } else {
-    ofs << std::string(depth * 2, ' ') << "LVal (array): " << name << std::endl;
+    ofs << std::string(depth * 2, ' ') << "LValAST (array): " << name
+        << std::endl;
     for (auto& dimension : dimensions) {
       dimension->Debug(ofs, depth + 1);
     }
@@ -200,20 +201,20 @@ void DeclAST::Debug(std::ofstream& ofs, int depth) {
       exit(-1);
   }
 }
-void FuncCall::Debug(std::ofstream& ofs, int depth) {
-  ofs << std::string(depth * 2, ' ') << "FuncCall " << callname << " ("
+void FuncCallAST::Debug(std::ofstream& ofs, int depth) {
+  ofs << std::string(depth * 2, ' ') << "FuncCallAST " << func_name << " ("
       << std::endl;
   for (auto& param : params) {
     param->Debug(ofs, depth + 1);
   }
   ofs << ")" << std::endl;
 }
-void Cond::Debug(std::ofstream& ofs, int depth) {
-  ofs << std::string(depth * 2, ' ') << "Cond" << std::endl;
+void CondAST::Debug(std::ofstream& ofs, int depth) {
+  ofs << std::string(depth * 2, ' ') << "CondAST" << std::endl;
   expr->Debug(ofs, depth + 1);
 }
-void FuncFParam::Debug(std::ofstream& ofs, int depth) {
-  ofs << std::string(depth * 2, ' ') << "FuncFParam";
+void FuncFParamAST::Debug(std::ofstream& ofs, int depth) {
+  ofs << std::string(depth * 2, ' ') << "FuncFParamAST";
   switch (type) {
     case VarType::INT:
       ofs << " (int)";
@@ -222,7 +223,7 @@ void FuncFParam::Debug(std::ofstream& ofs, int depth) {
       ofs << " (float)";
       break;
     default:
-      std::cerr << "unexpected var_type in FuncFParam" << std::endl;
+      std::cerr << "unexpected var_type in FuncFParamAST" << std::endl;
       exit(-1);
   }
   ofs << " " << name;
@@ -304,8 +305,8 @@ void BreakStmtAST::Debug(std::ofstream& ofs, int depth) {
 void ContinueStmtAST::Debug(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ') << "ContinueStmtAST" << std::endl;
 }
-void CompUnit::Debug(std::ofstream& ofs, int depth) {
-  ofs << std::string(depth * 2, ' ') << "CompUnit:" << std::endl;
+void CompUnitAST::Debug(std::ofstream& ofs, int depth) {
+  ofs << std::string(depth * 2, ' ') << "CompUnitAST:" << std::endl;
   for (auto& node : nodes) {
     node->Debug(ofs, depth + 1);
   }

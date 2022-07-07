@@ -9,9 +9,7 @@
 #include <utility>
 #include <vector>
 
-/* operators defined in SysY, also used as var_type indicator of ExprAST
- * instance
- */
+/* used as var_type indicator of ExprAST instance */
 enum class Op {
   // Arithmetic unary operators
   POSITIVE,
@@ -53,13 +51,14 @@ enum class VarType {
   UNKNOWN,
 };
 
-class Node {
+class AST {
 public:
-  virtual ~Node() = default;
+  virtual ~AST() = default;
   virtual void Debug(std::ofstream &ofs, int depth) = 0;
+  // virtual void TypeCheck() = 0;
 };
 
-class StmtAST : public Node {};
+class StmtAST : public AST {};
 
 class DeclAST;
 
@@ -69,22 +68,22 @@ class ExprAST;
  * expr != nullptr, vals == {}: single expression
  * expr == nullptr, vals != {}: array of items
  */
-class InitVal : public Node {
+class InitValAST : public AST {
 private:
   std::unique_ptr<ExprAST> expr;
-  std::vector<std::unique_ptr<InitVal>> vals;
+  std::vector<std::unique_ptr<InitValAST>> vals;
 
 public:
-  explicit InitVal() : expr(nullptr), vals() {}
+  explicit InitValAST() : expr(nullptr), vals() {}
 
-  explicit InitVal(std::unique_ptr<ExprAST> expr)
+  explicit InitValAST(std::unique_ptr<ExprAST> expr)
       : expr(std::move(expr)), vals() {}
 
-  explicit InitVal(std::unique_ptr<InitVal> val) : expr(nullptr), vals() {
+  explicit InitValAST(std::unique_ptr<InitValAST> val) : expr(nullptr), vals() {
     vals.push_back(std::move(val));
   }
 
-  void AppendVal(std::unique_ptr<InitVal> val) {
+  void AppendVal(std::unique_ptr<InitValAST> val) {
     vals.push_back(std::move(val));
   }
 
@@ -96,16 +95,16 @@ public:
  * optional: dimensions
  * -1 might appear in dimensions
  */
-class LVal : public Node {
+class LValAST : public AST {
 private:
   // std::unique_ptr<DeclAST> decl;
   std::string name;
   std::vector<std::unique_ptr<ExprAST>> dimensions;
 
 public:
-  explicit LVal(std::string name) : name(std::move(name)), dimensions() {}
+  explicit LValAST(std::string name) : name(std::move(name)), dimensions() {}
 
-  // explicit LVal(std::unique_ptr<DeclAST> decl)
+  // explicit LValAST(std::unique_ptr<DeclAST> decl)
   //     : decl(std::move(decl)), name(), dimensions() {}
 
   void AddDimension(int x);
@@ -115,26 +114,26 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 };
 
-class FuncCall;
+class FuncCallAST;
 
 /**
- * op indicates the type of expression
- * unary operators only have lhs
- * binary operators have both lhs and rhs
- * int_val meaningful only if op == CONST_INT
- * float_val meaningful only if op == CONST_FLOAT
- * func_call meaningful only if op == FUNC_CALL
- * lval meaningful only if op == LVAL
+ * @op indicates the type of expression
+ * @lhs meaningful when op is unary or binary operator
+ * @rhs meaningful only if op is binary operator
+ * @int_val meaningful only if op == CONST_INT
+ * @float_val meaningful only if op == CONST_FLOAT
+ * @func_call meaningful only if op == FUNC_CALL
+ * @lval meaningful only if op == LVAL
  */
-class ExprAST : public Node {
+class ExprAST : public AST {
 private:
   Op op;
   std::unique_ptr<ExprAST> lhs;
   std::unique_ptr<ExprAST> rhs;
-  std::unique_ptr<FuncCall> func_call;
+  std::unique_ptr<FuncCallAST> func_call;
   int int_val;
   float float_val;
-  std::unique_ptr<LVal> lval;
+  std::unique_ptr<LValAST> lval;
 
 public:
   explicit ExprAST(Op op, std::unique_ptr<ExprAST> lhs,
@@ -147,7 +146,7 @@ public:
         float_val(0.0),
         lval(nullptr) {}
 
-  explicit ExprAST(std::unique_ptr<FuncCall> func_call)
+  explicit ExprAST(std::unique_ptr<FuncCallAST> func_call)
       : op(Op::FUNC_CALL),
         lhs(nullptr),
         rhs(nullptr),
@@ -174,7 +173,7 @@ public:
         float_val(val),
         lval(nullptr) {}
 
-  explicit ExprAST(std::unique_ptr<LVal> lval)
+  explicit ExprAST(std::unique_ptr<LValAST> lval)
       : op(Op::LVAL),
         lhs(nullptr),
         rhs(nullptr),
@@ -187,19 +186,19 @@ public:
 };
 
 /**
- * is_const indicates whether it is a const declaration
- * var_type only can be INT or FLOAT
+ * @is_const indicates whether it is a const declaration
+ * @var_type only can be INT or FLOAT
  */
-class DeclAST : public Node {
+class DeclAST : public AST {
 private:
   bool is_const;
   VarType var_type;
-  std::unique_ptr<InitVal> init_val;
+  std::unique_ptr<InitValAST> init_val;
 
 public:
   void setIsConst(bool isConst);
   void setVarType(VarType varType);
-  void setInitVal(std::unique_ptr<InitVal> initVal);
+  void setInitVal(std::unique_ptr<InitValAST> initVal);
 
 private:
   std::string varname;
@@ -207,7 +206,7 @@ private:
 
 public:
   explicit DeclAST(std::string varname,
-                   std::unique_ptr<InitVal> initval = nullptr)
+                   std::unique_ptr<InitValAST> initval = nullptr)
       : is_const(false),
         var_type(VarType::UNKNOWN),
         varname(std::move(varname)),
@@ -218,42 +217,42 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 };
 
-class FuncCall : public Node {
+class FuncCallAST : public AST {
 private:
-  std::string callname;
+  std::string func_name;
   std::vector<std::unique_ptr<ExprAST>> params;
 
 public:
-  explicit FuncCall(std::string callname)
-      : callname(std::move(callname)), params() {}
+  explicit FuncCallAST(std::string func_name)
+      : func_name(std::move(func_name)), params() {}
 
-  void assignParams(std::vector<std::unique_ptr<ExprAST>> params) {
-    this->params.assign(std::make_move_iterator(params.begin()),
-                        std::make_move_iterator(params.end()));
-    params.clear();
+  void assignParams(std::vector<std::unique_ptr<ExprAST>> _params) {
+    params.assign(std::make_move_iterator(_params.begin()),
+                  std::make_move_iterator(_params.end()));
+    _params.clear();
   }
 
   void Debug(std::ofstream &ofs, int depth) override;
 };
 
-class Cond : public Node {
+class CondAST : public AST {
 private:
   std::unique_ptr<ExprAST> expr;
 
 public:
-  explicit Cond(std::unique_ptr<ExprAST> expr) : expr(std::move(expr)) {}
+  explicit CondAST(std::unique_ptr<ExprAST> expr) : expr(std::move(expr)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
 };
 
-class FuncFParam : public Node {
+class FuncFParamAST : public AST {
 private:
   VarType type;
   std::string name;
   std::vector<std::unique_ptr<ExprAST>> dimensions;
 
 public:
-  explicit FuncFParam(VarType type, std::string name)
+  explicit FuncFParamAST(VarType type, std::string name)
       : type(type), name(std::move(name)), dimensions() {}
 
   void AddDimension(int x);
@@ -265,24 +264,24 @@ public:
 
 class BlockAST : public StmtAST {
 private:
-  std::vector<std::unique_ptr<Node>> nodes;
+  std::vector<std::unique_ptr<AST>> nodes;
 
 public:
-  void AppendNodes(std::vector<std::unique_ptr<Node>> appendedNodes);
+  void AppendNodes(std::vector<std::unique_ptr<AST>> appendedNodes);
 
   void Debug(std::ofstream &ofs, int depth) override;
 };
 
-class FuncDefAST : public Node {
+class FuncDefAST : public AST {
 private:
   VarType return_type;
   std::string func_name;
-  std::vector<std::unique_ptr<FuncFParam>> params;
+  std::vector<std::unique_ptr<FuncFParamAST>> params;
   std::unique_ptr<BlockAST> block;
 
 public:
   explicit FuncDefAST(VarType return_type, std::string func_name,
-                      std::vector<std::unique_ptr<FuncFParam>> params,
+                      std::vector<std::unique_ptr<FuncFParamAST>> params,
                       std::unique_ptr<BlockAST> block)
       : return_type(return_type),
         func_name(std::move(func_name)),
@@ -296,7 +295,7 @@ public:
         params(),
         block(std::move(block)) {}
 
-  void assignParams(std::vector<std::unique_ptr<FuncFParam>> params) {
+  void assignParams(std::vector<std::unique_ptr<FuncFParamAST>> params) {
     this->params.assign(std::make_move_iterator(params.begin()),
                         std::make_move_iterator(params.end()));
     params.clear();
@@ -307,11 +306,11 @@ public:
 
 class AssignStmtAST : public StmtAST {
 private:
-  std::unique_ptr<LVal> lval;
+  std::unique_ptr<LValAST> lval;
   std::unique_ptr<ExprAST> rhs;
 
 public:
-  explicit AssignStmtAST(std::unique_ptr<LVal> lval,
+  explicit AssignStmtAST(std::unique_ptr<LValAST> lval,
                          std::unique_ptr<ExprAST> rhs)
       : lval(std::move(lval)), rhs(std::move(rhs)) {}
 
@@ -331,12 +330,12 @@ public:
 
 class IfStmtAST : public StmtAST {
 private:
-  std::unique_ptr<Cond> cond;
+  std::unique_ptr<CondAST> cond;
   std::unique_ptr<StmtAST> then_stmt;
   std::unique_ptr<StmtAST> else_stmt;
 
 public:
-  explicit IfStmtAST(std::unique_ptr<Cond> cond,
+  explicit IfStmtAST(std::unique_ptr<CondAST> cond,
                      std::unique_ptr<StmtAST> then_stmt,
                      std::unique_ptr<StmtAST> else_stmt = nullptr)
       : cond(std::move(cond)),
@@ -359,11 +358,11 @@ public:
 
 class WhileStmtAST : public StmtAST {
 private:
-  std::unique_ptr<Cond> cond;
+  std::unique_ptr<CondAST> cond;
   std::unique_ptr<StmtAST> stmt;
 
 public:
-  explicit WhileStmtAST(std::unique_ptr<Cond> cond,
+  explicit WhileStmtAST(std::unique_ptr<CondAST> cond,
                         std::unique_ptr<StmtAST> stmt)
       : cond(std::move(cond)), stmt(std::move(stmt)) {}
 
@@ -380,9 +379,9 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 };
 
-class CompUnit : public Node {
+class CompUnitAST : public AST {
 private:
-  std::vector<std::unique_ptr<Node>> nodes;
+  std::vector<std::unique_ptr<AST>> nodes;
 
 public:
   void AppendDecls(std::vector<std::unique_ptr<DeclAST>> decls);

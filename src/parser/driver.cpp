@@ -1,7 +1,7 @@
 #include "parser/driver.h"
 
 Driver::Driver() : trace_scanning(false), trace_parsing(false) {
-  comp_unit = std::make_unique<CompUnit>();
+  comp_unit = std::make_unique<CompUnitAST>();
 }
 
 int Driver::parse(const std::string &f) {

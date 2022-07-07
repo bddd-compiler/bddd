@@ -13,7 +13,7 @@ public:
   Driver();
 
   // Final AST
-  std::unique_ptr<CompUnit> comp_unit;
+  std::unique_ptr<CompUnitAST> comp_unit;
   // Handling the scanner.
   void scan_begin();
   void scan_end();

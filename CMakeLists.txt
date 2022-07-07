@@ -19,12 +19,11 @@ FLEX_TARGET(
 )
 
 ADD_FLEX_BISON_DEPENDENCY(MyScanner MyParser)
-
 add_executable(bddd
   src/main.cpp
 
   ${BISON_MyParser_OUTPUTS} ${FLEX_MyScanner_OUTPUTS} src/parser/driver.cpp
-  src/ast/ast.cpp
+  src/ast/ast.cpp src/ast/symbol-table.cpp
   )
 
 target_include_directories(bddd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

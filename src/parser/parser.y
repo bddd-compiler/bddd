@@ -74,26 +74,26 @@ class Driver;
 %type <vector<unique_ptr<DeclAST>>> Decl ConstDecl VarDecl
 %type <VarType> BType
 %type <unique_ptr<DeclAST>> VarDef ConstDef VarDefSingle VarDefArray DefArrayBody ConstDefSingle ConstDefArray
-%type <unique_ptr<InitVal>> InitVal InitValArray InitValArrayBody
+%type <unique_ptr<InitValAST>> InitValAST InitValArray InitValArrayBody
 %type <unique_ptr<ExprAST>> Exp LOrExp LAndExp EqExp RelExp AddExp MulExp UnaryExp PrimaryExp Number
-%type <unique_ptr<FuncCall>> FuncCall
-%type <unique_ptr<LVal>> LVal
+%type <unique_ptr<FuncCallAST>> FuncCallAST
+%type <unique_ptr<LValAST>> LValAST
 %type <unique_ptr<FuncDefAST>> FuncDef
-%type <vector<unique_ptr<FuncFParam>>> FuncFParams
-%type <unique_ptr<FuncFParam>> FuncFParam FuncFParamSingle FuncFParamArray
+%type <vector<unique_ptr<FuncFParamAST>>> FuncFParams
+%type <unique_ptr<FuncFParamAST>> FuncFParamAST FuncFParamSingle FuncFParamArray
 %type <vector<unique_ptr<ExprAST>>> FuncRParams
 %type <unique_ptr<BlockAST>> Block BlockItems
-%type <vector<unique_ptr<Node>>> BlockItem
+%type <vector<unique_ptr<AST>>> BlockItem
 %type <unique_ptr<StmtAST>> Stmt
 %type <unique_ptr<IfStmtAST>> IfStmt
 %type <unique_ptr<ReturnStmtAST>> ReturnStmt
 %type <unique_ptr<WhileStmtAST>>  WhileStmt
 %type <unique_ptr<BreakStmtAST>> BreakStmt
 %type <unique_ptr<ContinueStmtAST>> ContinueStmt
-%type <unique_ptr<Cond>> Cond
+%type <unique_ptr<CondAST>> CondAST
 %type <Op> AddOp MulOp UnaryOp RelOp
 %type <string> IDENT
-%start CompUnit
+%start CompUnitAST
 
 %%
 
@@ -119,8 +119,8 @@ TOK_WHILE: "while" { /* printf("(keyword, while)\n"); */ };
 TOK_BREAK: "break" { /* printf("(keyword, break)\n"); */ };
 TOK_CONTINUE: "continue" { /* printf("(keyword, continue)\n"); */ };
 
-CompUnit: CompUnit Decl { driver.comp_unit->AppendDecls(std::move($2)); }
-        | CompUnit FuncDef { driver.comp_unit->AppendFuncDef(std::move($2)); }
+CompUnitAST: CompUnitAST Decl { driver.comp_unit->AppendDecls(std::move($2)); }
+        | CompUnitAST FuncDef { driver.comp_unit->AppendFuncDef(std::move($2)); }
         | Decl { driver.comp_unit->AppendDecls(std::move($1)); }
         | FuncDef { driver.comp_unit->AppendFuncDef(std::move($1)); }
         ;
@@ -144,7 +144,7 @@ VarDecl: BType VarDef { $2->setVarType($1); $$.push_back(std::move($2)); }
 VarDef: VarDefSingle { $$ = std::move($1); }
       | VarDefArray { $$ = std::move($1); }
       ;
-VarDefSingle: IDENT TOK_ASSIGN InitVal { $$ = std::make_unique<DeclAST>(std::move($1), std::move($3)); }
+VarDefSingle: IDENT TOK_ASSIGN InitValAST { $$ = std::make_unique<DeclAST>(std::move($1), std::move($3)); }
             | IDENT { $$ = std::make_unique<DeclAST>(std::move($1)); }
             ;
 VarDefArray: DefArrayBody TOK_ASSIGN InitValArray { $$ = std::move($1); $$->setInitVal(std::move($3)); }
@@ -159,22 +159,22 @@ ConstDef: ConstDefSingle { $$ = std::move($1); }
         | ConstDefArray { $$ = std::move($1); }
         ;
 
-ConstDefSingle: IDENT TOK_ASSIGN InitVal { $$ = std::make_unique<DeclAST>(std::move($1), std::move($3)); }
+ConstDefSingle: IDENT TOK_ASSIGN InitValAST { $$ = std::make_unique<DeclAST>(std::move($1), std::move($3)); }
               ;
 
 ConstDefArray: DefArrayBody TOK_ASSIGN InitValArray { $$ = std::move($1); $$->setInitVal(std::move($3)); }
              ;
 
-InitVal: AddExp { $$ = std::make_unique<InitVal>(std::move($1)); };
+InitValAST: AddExp { $$ = std::make_unique<InitValAST>(std::move($1)); };
 
 InitValArray: TOK_LBRACE InitValArrayBody TOK_RBRACE { $$ = std::move($2); }
-            | TOK_LBRACE TOK_RBRACE { $$ = std::make_unique<InitVal>(); }
+            | TOK_LBRACE TOK_RBRACE { $$ = std::make_unique<InitValAST>(); }
             ;
 
 InitValArrayBody: InitValArrayBody TOK_COMMA InitValArray { $$ = std::move($1); $$->AppendVal(std::move($3)); }
-                | InitValArrayBody TOK_COMMA InitVal { $$ = std::move($1); $$->AppendVal(std::move($3)); }
-                | InitValArray { $$ = std::make_unique<InitVal>(std::move($1)); }
-                | InitVal { $$ = std::make_unique<InitVal>(std::move($1)); }
+                | InitValArrayBody TOK_COMMA InitValAST { $$ = std::move($1); $$->AppendVal(std::move($3)); }
+                | InitValArray { $$ = std::make_unique<InitValAST>(std::move($1)); }
+                | InitValAST { $$ = std::make_unique<InitValAST>(std::move($1)); }
                 ;
 
 Exp: AddExp { $$ = std::move($1); };
@@ -205,21 +205,21 @@ MulExp: UnaryExp { $$ = std::move($1); }
       ;
 
 UnaryExp: PrimaryExp { $$ = std::move($1); }
-        | FuncCall { $$ = std::make_unique<ExprAST>(std::move($1)); }
+        | FuncCallAST { $$ = std::make_unique<ExprAST>(std::move($1)); }
         | UnaryOp UnaryExp { $$ = std::make_unique<ExprAST>($1, std::move($2)); }
         ;
 
-FuncCall: IDENT TOK_LPAREN FuncRParams TOK_RPAREN { $$ = std::make_unique<FuncCall>(std::move($1)); $$->assignParams(std::move($3)); }
-        | IDENT TOK_LPAREN TOK_RPAREN { $$ = std::make_unique<FuncCall>(std::move($1)); }
+FuncCallAST: IDENT TOK_LPAREN FuncRParams TOK_RPAREN { $$ = std::make_unique<FuncCallAST>(std::move($1)); $$->assignParams(std::move($3)); }
+        | IDENT TOK_LPAREN TOK_RPAREN { $$ = std::make_unique<FuncCallAST>(std::move($1)); }
         ;
 
 PrimaryExp: TOK_LPAREN Exp TOK_RPAREN { $$ = std::move($2); }
-          | LVal { $$ = std::make_unique<ExprAST>(std::move($1)); }
+          | LValAST { $$ = std::make_unique<ExprAST>(std::move($1)); }
           | Number { $$ = std::move($1); }
           ;
 
-LVal: LVal TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->AddDimension(std::move($3)); }
-    | IDENT { $$ = std::make_unique<LVal>(std::move($1)); }
+LValAST: LValAST TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->AddDimension(std::move($3)); }
+    | IDENT { $$ = std::make_unique<LValAST>(std::move($1)); }
     ;
 
 FuncDef: TOK_VOID IDENT TOK_LPAREN FuncFParams TOK_RPAREN Block { $$ = std::make_unique<FuncDefAST>(VarType::VOID, std::move($2), std::move($4), std::move($6)); }
@@ -228,21 +228,21 @@ FuncDef: TOK_VOID IDENT TOK_LPAREN FuncFParams TOK_RPAREN Block { $$ = std::make
        | BType IDENT TOK_LPAREN TOK_RPAREN Block { $$ = std::make_unique<FuncDefAST>($1, std::move($2), std::move($5)); }
        ;
 
-FuncFParams: FuncFParams TOK_COMMA FuncFParam { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $$.push_back(std::move($3)); }
-           | FuncFParam { $$.push_back(std::move($1)); }
+FuncFParams: FuncFParams TOK_COMMA FuncFParamAST { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $$.push_back(std::move($3)); }
+           | FuncFParamAST { $$.push_back(std::move($1)); }
            ;
 
 FuncRParams: FuncRParams TOK_COMMA AddExp { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $$.push_back(std::move($3)); }
            | AddExp { $$.push_back(std::move($1)); }
            ;
 
-FuncFParam: FuncFParamSingle { $$ = std::move($1); }
+FuncFParamAST: FuncFParamSingle { $$ = std::move($1); }
           | FuncFParamArray { $$ = std::move($1); }
           ;
 
-FuncFParamSingle: BType IDENT { $$ = std::make_unique<FuncFParam>($1, std::move($2)); };
+FuncFParamSingle: BType IDENT { $$ = std::make_unique<FuncFParamAST>($1, std::move($2)); };
 
-FuncFParamArray: BType IDENT TOK_LBRACKET TOK_RBRACKET { $$ = std::make_unique<FuncFParam>($1, std::move($2)); $$->AddDimension(-1); }
+FuncFParamArray: BType IDENT TOK_LBRACKET TOK_RBRACKET { $$ = std::make_unique<FuncFParamAST>($1, std::move($2)); $$->AddDimension(-1); }
                | FuncFParamArray TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->AddDimension(std::move($3)); }
                ;
 
@@ -258,7 +258,7 @@ BlockItem: Decl { $$.insert(std::end($$), std::make_move_iterator(std::begin($1)
          | Stmt { $$.push_back(std::move($1)); }
          ;
 
-Stmt: LVal TOK_ASSIGN Exp TOK_SEMICOLON { $$ = std::make_unique<AssignStmtAST>(std::move($1), std::move($3)); }
+Stmt: LValAST TOK_ASSIGN Exp TOK_SEMICOLON { $$ = std::make_unique<AssignStmtAST>(std::move($1), std::move($3)); }
     | Exp TOK_SEMICOLON { $$ = std::make_unique<EvalStmtAST>(std::move($1)); }
     | TOK_SEMICOLON { $$ = std::make_unique<BlockAST>(); }
     | Block { $$ = std::move($1); }
@@ -269,21 +269,21 @@ Stmt: LVal TOK_ASSIGN Exp TOK_SEMICOLON { $$ = std::make_unique<AssignStmtAST>(s
     | ReturnStmt { $$ = std::move($1); }
     ;
 
-IfStmt: TOK_IF TOK_LPAREN Cond TOK_RPAREN Stmt TOK_ELSE Stmt { $$ = std::make_unique<IfStmtAST>(std::move($3), std::move($5), std::move($7)); }
-      | TOK_IF TOK_LPAREN Cond TOK_RPAREN Stmt { $$ = std::make_unique<IfStmtAST>(std::move($3), std::move($5)); } %prec "then"
+IfStmt: TOK_IF TOK_LPAREN CondAST TOK_RPAREN Stmt TOK_ELSE Stmt { $$ = std::make_unique<IfStmtAST>(std::move($3), std::move($5), std::move($7)); }
+      | TOK_IF TOK_LPAREN CondAST TOK_RPAREN Stmt { $$ = std::make_unique<IfStmtAST>(std::move($3), std::move($5)); } %prec "then"
       ;
 
 ReturnStmt: TOK_RETURN Exp TOK_SEMICOLON { $$ = std::make_unique<ReturnStmtAST>(std::move($2)); }
           | TOK_RETURN TOK_SEMICOLON { $$ = std::make_unique<ReturnStmtAST>(); }
           ;
 
-WhileStmt: TOK_WHILE TOK_LPAREN Cond TOK_RPAREN Stmt { $$ = std::make_unique<WhileStmtAST>(std::move($3), std::move($5)); };
+WhileStmt: TOK_WHILE TOK_LPAREN CondAST TOK_RPAREN Stmt { $$ = std::make_unique<WhileStmtAST>(std::move($3), std::move($5)); };
 
 BreakStmt: TOK_BREAK TOK_SEMICOLON { $$ = std::make_unique<BreakStmtAST>(); };
 
 ContinueStmt: TOK_CONTINUE TOK_SEMICOLON { $$ = std::make_unique<ContinueStmtAST>(); }
 
-Cond: LOrExp { $$ = std::make_unique<Cond>(std::move($1)); };
+CondAST: LOrExp { $$ = std::make_unique<CondAST>(std::move($1)); };
 
 Number: INTCONST { $$ = std::make_unique<ExprAST>($1); /* printf("(intconst, %d)\n", $1); */ }
     | FLOATCONST { $$ = std::make_unique<ExprAST>($1); /* printf("(floatconst, %f)\n", $1); */ }
