@@ -15,15 +15,16 @@
 - enum类型里面的variant用全大写，单词之间用下划线分隔（类似`FUNC_CALL`这种）
 - 方法名称要用驼峰式命名，用于多个类之间交互的重要方法第一个单词开头也大写
 - 变量不要用驼峰式命名，用全小写，下划线分隔
-  - 类里面的成员变量在遵守以上的命名规范同时，在最后再加一个下划线（类似`params_`这种）
 
 ## 注释规范
 
 - 写TODO注释的时候，把自己的名字也标上去，自己的TODO自己补锅（）
 
+> ```cpp
 > // TODO(kl@gmail.com): Use a "*" here for concatenation operator.
 > // TODO(Zeke) change this to use relations.
 > // TODO(bug 12345): remove the "Last visitors" feature
+> ```
 
 - 如果一个变量可能有特殊值，需要在注释加以说明（比如-1表示找不到就要顺手写进注释）
 - 实现过程的注释暂时不做要求吧

@@ -7,6 +7,7 @@
 #include <ostream>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 class Value;
@@ -78,15 +79,16 @@ class ExprAST;
  */
 class InitValAST : public AST {
 private:
-  std::unique_ptr<ExprAST> expr;
-  std::vector<std::unique_ptr<InitValAST>> vals;
-  bool is_const;
+  bool is_const;  // true => expr is const or all sub-init-vals are const
 
 public:
   [[nodiscard]] bool isConst() const { return is_const; }
   void setIsConst(bool isConst) { is_const = isConst; }
 
 public:
+  std::shared_ptr<ExprAST> expr;
+  std::vector<std::unique_ptr<InitValAST>> vals;
+
   explicit InitValAST() : expr(nullptr), vals(), is_const(false) {}
 
   explicit InitValAST(std::unique_ptr<ExprAST> expr)
@@ -123,17 +125,24 @@ public:
   explicit LValAST(std::string name)
       : name(std::move(name)), dimensions(), decl(nullptr) {}
 
+  // methods used in AST construction
   void AddDimension(int x);
 
   void AddDimension(std::unique_ptr<ExprAST> expr);
 
   void Debug(std::ofstream &ofs, int depth) override;
 
+  bool isArray();
+
+  // methods used in typechecking
+
   void TypeCheck(SymbolTable &symbolTable) override;
 
-  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
+  // called only when is_const is true and not an array
+  std::variant<int, float> Evaluate();
 
-  bool isArray();
+  // methods used in codegen
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 
   std::shared_ptr<Value> CodeGenGEP(IRBuilder &builder);
 };
@@ -159,12 +168,22 @@ private:
   int int_val;
   float float_val;
   std::unique_ptr<LValAST> lval;
-  bool is_const;
+  bool is_const;  // true => can get value from int_val or float_val
 
 public:
   [[nodiscard]] bool isConst() const { return is_const; }
   int intVal() const { return int_val; }
   float floatVal() const { return float_val; }
+  void setIsConst(bool isConst) { is_const = isConst; }
+
+public:
+  enum class EvalType {
+    INT,
+    FLOAT,
+    BOOL,
+    VAR,
+    ERROR,
+  };
 
 public:
   explicit ExprAST(Op op, std::unique_ptr<ExprAST> lhs,
@@ -222,6 +241,8 @@ public:
 
   void TypeCheck(SymbolTable &symbolTable) override;
 
+  std::pair<EvalType, std::variant<int, float>> Evaluate();
+
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
   std::shared_ptr<Value> CodeGenAnd(IRBuilder &builder);
   std::shared_ptr<Value> CodeGenOr(IRBuilder &builder);
@@ -234,15 +255,19 @@ public:
  */
 class DeclAST : public AST {
 private:
-  bool is_const;
+  bool is_const;  // true => init_val is also const
   bool is_global;
   VarType var_type;
-  std::unique_ptr<InitValAST> init_val;
 
   std::string varname;
-  std::vector<std::unique_ptr<ExprAST>> dimensions;
+
+  void fillFlattenVals(int n, int offset, const std::vector<int> &sizes);
 
 public:
+  std::vector<std::unique_ptr<ExprAST>> dimensions;
+  std::unique_ptr<InitValAST> init_val;
+  std::vector<std::shared_ptr<ExprAST>> flatten_vals;
+
   void setIsConst(bool isConst) { is_const = isConst; }
   void setIsGlobal(bool isGlobal) { is_global = isGlobal; }
   void setVarType(VarType varType) { var_type = varType; }
@@ -250,8 +275,10 @@ public:
     init_val = std::move(initVal);
   }
 
-  size_t dimensionsSize() { return dimensions.size(); }
+  size_t dimensionsSize() const { return dimensions.size(); }
   bool isGlobal() const { return is_global; }
+  bool isConst() const { return is_const; }
+  VarType varType() const { return var_type; }
 
   explicit DeclAST(std::string varname,
                    std::unique_ptr<InitValAST> initval = nullptr)
@@ -259,13 +286,18 @@ public:
         is_global(false),
         var_type(VarType::UNKNOWN),
         varname(std::move(varname)),
-        init_val(std::move(initval)) {}
+        init_val(std::move(initval)),
+        flatten_vals() {}
 
   void AddDimension(std::unique_ptr<ExprAST> expr);
 
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+
+  // called only when is_const = true and flatten_vals is constructed
+  std::variant<int, float> Evaluate(int n);
+
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
