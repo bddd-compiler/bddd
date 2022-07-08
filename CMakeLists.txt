@@ -23,6 +23,8 @@ add_executable(bddd
   src/main.cpp
 
   ${BISON_MyParser_OUTPUTS} ${FLEX_MyScanner_OUTPUTS} src/parser/driver.cpp
-  src/ast/ast.cpp src/ast/symbol-table.cpp src/ast/type-check.cpp src/ast/debug.cpp)
+  src/ast/ast.cpp src/ast/symbol-table.cpp src/ast/type-check.cpp src/ast/debug.cpp src/ast/codegen.cpp
+  src/ir/ir.cpp 
+  )
 
 target_include_directories(bddd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

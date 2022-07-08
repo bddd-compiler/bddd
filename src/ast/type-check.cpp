@@ -26,7 +26,7 @@ void LValAST::TypeCheck(SymbolTable& symbolTable) {
   }
 }
 void ExprAST::TypeCheck(SymbolTable& symbolTable) {
-  // TODO: ExprAST::TypeCheck
+  // TODO(garen): ExprAST::TypeCheck
 }
 void DeclAST::TypeCheck(SymbolTable& symbolTable) {
   if (var_type != VarType::INT && var_type != VarType::FLOAT)
@@ -39,7 +39,7 @@ void DeclAST::TypeCheck(SymbolTable& symbolTable) {
   if (is_const && init_val && !init_val->isConst())
     throw MyException("const declaration with non-const init val");
 
-  // TODO: DeclAST::TypeCheck array items and multipliers
+  // TODO(garen): DeclAST::TypeCheck array items and multipliers
 
   if (!symbolTable.Insert(varname, shared_from_this()))
     throw MyException("declaration defined multiple times");
@@ -60,7 +60,7 @@ void CondAST::TypeCheck(SymbolTable& symbolTable) {
   expr->TypeCheck(symbolTable);
 }
 void FuncFParamAST::TypeCheck(SymbolTable& symbolTable) {
-  // TODO: FuncFParamAST::TypeCheck
+  // TODO(garen): FuncFParamAST::TypeCheck
 }
 void BlockAST::TypeCheck(SymbolTable& symbolTable) {
   symbolTable.InitializeScope(ScopeType::BLOCK);

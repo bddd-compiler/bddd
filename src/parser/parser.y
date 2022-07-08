@@ -242,7 +242,7 @@ FuncFParamAST: FuncFParamSingle { $$ = std::move($1); }
 
 FuncFParamSingle: BType IDENT { $$ = std::make_unique<FuncFParamAST>($1, std::move($2)); };
 
-FuncFParamArray: BType IDENT TOK_LBRACKET TOK_RBRACKET { $$ = std::make_unique<FuncFParamAST>($1, std::move($2)); $$->AddDimension(-1); }
+FuncFParamArray: BType IDENT TOK_LBRACKET TOK_RBRACKET { $$ = std::make_unique<FuncFParamAST>($1, std::move($2)); $$->AddDimension(nullptr); }
                | FuncFParamArray TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->AddDimension(std::move($3)); }
                ;
 

@@ -9,6 +9,10 @@
 #include <utility>
 #include <vector>
 
+class Value;
+
+class IRBuilder;
+
 /* used as var_type indicator of ExprAST instance */
 enum class Op {
   // Arithmetic unary operators
@@ -58,6 +62,7 @@ public:
   virtual ~AST() = default;
   virtual void Debug(std::ofstream &ofs, int depth) = 0;
   virtual void TypeCheck(SymbolTable &symbolTable) = 0;
+  virtual std::shared_ptr<Value> CodeGen(IRBuilder &builder) = 0;
 };
 
 class StmtAST : public AST {};
@@ -99,12 +104,14 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 /**
- * name cannot be empty
- * optional: dimensions
- * -1 might appear in dimensions
+ * @name cannot be empty
+ * @dimensions optional (nullptr might appear in dimensions)
+ * @decl available after typechecking
  */
 class LValAST : public AST {
 private:
@@ -112,7 +119,9 @@ private:
   std::vector<std::unique_ptr<ExprAST>> dimensions;
 
 public:
-  explicit LValAST(std::string name) : name(std::move(name)), dimensions() {}
+  std::shared_ptr<DeclAST> decl;
+  explicit LValAST(std::string name)
+      : name(std::move(name)), dimensions(), decl(nullptr) {}
 
   void AddDimension(int x);
 
@@ -121,6 +130,12 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
+
+  bool isArray();
+
+  std::shared_ptr<Value> CodeGenGEP(IRBuilder &builder);
 };
 
 class FuncCallAST;
@@ -148,6 +163,8 @@ private:
 
 public:
   [[nodiscard]] bool isConst() const { return is_const; }
+  int intVal() const { return int_val; }
+  float floatVal() const { return float_val; }
 
 public:
   explicit ExprAST(Op op, std::unique_ptr<ExprAST> lhs,
@@ -204,6 +221,10 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
+  std::shared_ptr<Value> CodeGenAnd(IRBuilder &builder);
+  std::shared_ptr<Value> CodeGenOr(IRBuilder &builder);
 };
 
 /**
@@ -230,6 +251,7 @@ public:
   }
 
   size_t dimensionsSize() { return dimensions.size(); }
+  bool isGlobal() const { return is_global; }
 
   explicit DeclAST(std::string varname,
                    std::unique_ptr<InitValAST> initval = nullptr)
@@ -244,6 +266,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 /**
@@ -275,6 +298,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class CondAST : public AST {
@@ -287,6 +311,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 /**
@@ -302,6 +327,14 @@ public:
   explicit FuncFParamAST(VarType type, std::string name)
       : type(type), name(std::move(name)), dimensions() {}
 
+  explicit FuncFParamAST(VarType type, std::string name,
+                         std::unique_ptr<ExprAST> dimension)
+      : type(type), name(std::move(name)), dimensions() {
+    dimensions.push_back(std::move(dimension));
+  }
+
+  void AddDimension();
+
   void AddDimension(int x);
 
   void AddDimension(std::unique_ptr<ExprAST> expr);
@@ -309,6 +342,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class BlockAST : public StmtAST {
@@ -321,6 +355,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class FuncDefAST : public AST {
@@ -360,6 +395,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class AssignStmtAST : public StmtAST {
@@ -375,6 +411,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class EvalStmtAST : public StmtAST {
@@ -387,6 +424,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class IfStmtAST : public StmtAST {
@@ -406,6 +444,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class ReturnStmtAST : public StmtAST {
@@ -419,6 +458,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class WhileStmtAST : public StmtAST {
@@ -434,6 +474,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class BreakStmtAST : public StmtAST {
@@ -441,6 +482,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class ContinueStmtAST : public StmtAST {
@@ -448,6 +490,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class CompUnitAST : public AST {
@@ -462,6 +505,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbolTable) override;
+  std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 #endif  // BDDD_AST_H

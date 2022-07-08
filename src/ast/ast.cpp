@@ -28,6 +28,9 @@ void LValAST::AddDimension(int x) {
 void LValAST::AddDimension(std::unique_ptr<ExprAST> expr) {
   dimensions.push_back(std::move(expr));
 }
+
+bool LValAST::isArray() { return decl->dimensionsSize() > dimensions.size(); }
+
 void DeclAST::AddDimension(std::unique_ptr<ExprAST> expr) {
   dimensions.push_back(std::move(expr));
 }
