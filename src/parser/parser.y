@@ -133,11 +133,11 @@ BType: "int" { $$ = VarType::INT; /* printf("(keyword, int)\n"); */ }
      | "float" { $$ = VarType::FLOAT; /* printf("(keyword, float)\n"); */ }
      ;
 
-ConstDecl: TOK_CONST BType ConstDef { $3->setIsConst(true); $3->setVarType($2); $$.push_back(std::move($3)); }
-         | ConstDecl TOK_COMMA ConstDef { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $3->setIsConst(true); $$.push_back(std::move($3)); }
+ConstDecl: TOK_CONST BType ConstDef { $3->SetIsConst(true); $3->SetVarType($2); $$.push_back(std::move($3)); }
+         | ConstDecl TOK_COMMA ConstDef { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $3->SetIsConst(true); $$.push_back(std::move($3)); }
          ;
 
-VarDecl: BType VarDef { $2->setVarType($1); $$.push_back(std::move($2)); }
+VarDecl: BType VarDef { $2->SetVarType($1); $$.push_back(std::move($2)); }
        | VarDecl TOK_COMMA VarDef { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $$.push_back(std::move($3)); }
        ;
 
@@ -147,7 +147,7 @@ VarDef: VarDefSingle { $$ = std::move($1); }
 VarDefSingle: IDENT TOK_ASSIGN InitVal { $$ = std::make_unique<DeclAST>(std::move($1), std::move($3)); }
             | IDENT { $$ = std::make_unique<DeclAST>(std::move($1)); }
             ;
-VarDefArray: DefArrayBody TOK_ASSIGN InitValArray { $$ = std::move($1); $$->setInitVal(std::move($3)); }
+VarDefArray: DefArrayBody TOK_ASSIGN InitValArray { $$ = std::move($1); $$->SetInitVal(std::move($3)); }
            | DefArrayBody { $$ = std::move($1); }
            ;
 
@@ -162,7 +162,7 @@ ConstDef: ConstDefSingle { $$ = std::move($1); }
 ConstDefSingle: IDENT TOK_ASSIGN InitVal { $$ = std::make_unique<DeclAST>(std::move($1), std::move($3)); }
               ;
 
-ConstDefArray: DefArrayBody TOK_ASSIGN InitValArray { $$ = std::move($1); $$->setInitVal(std::move($3)); }
+ConstDefArray: DefArrayBody TOK_ASSIGN InitValArray { $$ = std::move($1); $$->SetInitVal(std::move($3)); }
              ;
 
 InitVal: AddExp { $$ = std::make_unique<InitValAST>(std::move($1)); };
@@ -209,7 +209,7 @@ UnaryExp: PrimaryExp { $$ = std::move($1); }
         | UnaryOp UnaryExp { $$ = std::make_unique<ExprAST>($1, std::move($2)); }
         ;
 
-FuncCall: IDENT TOK_LPAREN FuncRParams TOK_RPAREN { $$ = std::make_unique<FuncCallAST>(std::move($1)); $$->assignParams(std::move($3)); }
+FuncCall: IDENT TOK_LPAREN FuncRParams TOK_RPAREN { $$ = std::make_unique<FuncCallAST>(std::move($1)); $$->AssignParams(std::move($3)); }
         | IDENT TOK_LPAREN TOK_RPAREN { $$ = std::make_unique<FuncCallAST>(std::move($1)); }
         ;
 

@@ -62,7 +62,7 @@ class AST : public std::enable_shared_from_this<AST> {
 public:
   virtual ~AST() = default;
   virtual void Debug(std::ofstream &ofs, int depth) = 0;
-  virtual void TypeCheck(SymbolTable &symbolTable) = 0;
+  virtual void TypeCheck(SymbolTable &symbol_table) = 0;
   virtual std::shared_ptr<Value> CodeGen(IRBuilder &builder) = 0;
 };
 
@@ -79,35 +79,37 @@ class ExprAST;
  */
 class InitValAST : public AST {
 private:
-  bool is_const;  // true => expr is const or all sub-init-vals are const
+  bool m_is_const;  // true => expr is const or all sub-init-vals are const
+  std::shared_ptr<ExprAST> m_expr;
 
 public:
-  [[nodiscard]] bool isConst() const { return is_const; }
-  void setIsConst(bool isConst) { is_const = isConst; }
+  [[nodiscard]] bool IsConst() const { return m_is_const; }
+  void SetIsConst(bool is_const) { m_is_const = is_const; }
 
 public:
-  std::shared_ptr<ExprAST> expr;
-  std::vector<std::unique_ptr<InitValAST>> vals;
+  std::vector<std::unique_ptr<InitValAST>> m_vals;
 
-  explicit InitValAST() : expr(nullptr), vals(), is_const(false) {}
+  explicit InitValAST() : m_expr(nullptr), m_vals(), m_is_const(false) {}
 
   explicit InitValAST(std::unique_ptr<ExprAST> expr)
-      : expr(std::move(expr)), vals(), is_const(false) {}
+      : m_expr(std::move(expr)), m_vals(), m_is_const(false) {}
 
   explicit InitValAST(std::unique_ptr<InitValAST> val)
-      : expr(nullptr), vals(), is_const(false) {
-    vals.push_back(std::move(val));
+      : m_expr(nullptr), m_vals(), m_is_const(false) {
+    m_vals.push_back(std::move(val));
   }
 
   void AppendVal(std::unique_ptr<InitValAST> val) {
-    vals.push_back(std::move(val));
+    m_vals.push_back(std::move(val));
   }
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
 
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
+
+  friend class DeclAST;
 };
 
 /**
@@ -117,14 +119,15 @@ public:
  */
 class LValAST : public AST {
 private:
-  std::string name;
-  std::vector<std::unique_ptr<ExprAST>> dimensions;
+  std::string m_name;
+  std::vector<std::unique_ptr<ExprAST>> m_dimensions;
 
 public:
-  std::string getName() const { return name; }
-  std::shared_ptr<DeclAST> decl;
+  std::shared_ptr<DeclAST> m_decl;
+  std::string Name() const { return m_name; }
+
   explicit LValAST(std::string name)
-      : name(std::move(name)), dimensions(), decl(nullptr) {}
+      : m_name(std::move(name)), m_dimensions(), m_decl(nullptr) {}
 
   // methods used in AST construction
   void AddDimension(int x);
@@ -133,14 +136,14 @@ public:
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  bool isArray();
+  bool IsArray();
 
   // methods used in typechecking
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
 
   // called only when is_const is true and not an array
-  std::variant<int, float> Evaluate(SymbolTable &SymbolTable);
+  std::variant<int, float> Evaluate(SymbolTable &symbol_table);
 
   // methods used in codegen
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
@@ -162,20 +165,20 @@ class FuncCallAST;
  */
 class ExprAST : public AST {
 private:
-  Op op;
-  std::unique_ptr<ExprAST> lhs;
-  std::unique_ptr<ExprAST> rhs;
-  std::unique_ptr<FuncCallAST> func_call;
-  int int_val;
-  float float_val;
-  std::unique_ptr<LValAST> lval;
-  bool is_const;  // true => can get value from int_val or float_val
+  Op m_op;
+  std::unique_ptr<ExprAST> m_lhs;
+  std::unique_ptr<ExprAST> m_rhs;
+  std::unique_ptr<FuncCallAST> m_func_call;
+  int m_int_val;
+  float m_float_val;
+  std::unique_ptr<LValAST> m_lval;
+  bool m_is_const;  // true => can get value from int_val or float_val
 
 public:
-  [[nodiscard]] bool isConst() const { return is_const; }
-  int intVal() const { return int_val; }
-  float floatVal() const { return float_val; }
-  void setIsConst(bool isConst) { is_const = isConst; }
+  [[nodiscard]] bool IsConst() const { return m_is_const; }
+  int IntVal() const { return m_int_val; }
+  float FloatVal() const { return m_float_val; }
+  void SetIsConst(bool is_const) { m_is_const = is_const; }
 
 public:
   enum class EvalType {
@@ -189,61 +192,61 @@ public:
 public:
   explicit ExprAST(Op op, std::unique_ptr<ExprAST> lhs,
                    std::unique_ptr<ExprAST> rhs = nullptr)
-      : op(op),
-        lhs(std::move(lhs)),
-        rhs(std::move(rhs)),
-        func_call(nullptr),
-        int_val(0),
-        float_val(0.0),
-        lval(nullptr),
-        is_const(false) {}
+      : m_op(op),
+        m_lhs(std::move(lhs)),
+        m_rhs(std::move(rhs)),
+        m_func_call(nullptr),
+        m_int_val(0),
+        m_float_val(0.0),
+        m_lval(nullptr),
+        m_is_const(false) {}
 
   explicit ExprAST(std::unique_ptr<FuncCallAST> func_call)
-      : op(Op::FUNC_CALL),
-        lhs(nullptr),
-        rhs(nullptr),
-        func_call(std::move(func_call)),
-        int_val(0),
-        float_val(0.0),
-        lval(nullptr),
-        is_const(false) {}
+      : m_op(Op::FUNC_CALL),
+        m_lhs(nullptr),
+        m_rhs(nullptr),
+        m_func_call(std::move(func_call)),
+        m_int_val(0),
+        m_float_val(0.0),
+        m_lval(nullptr),
+        m_is_const(false) {}
 
   explicit ExprAST(int val)
-      : op(Op::CONST_INT),
-        lhs(nullptr),
-        rhs(nullptr),
-        func_call(nullptr),
-        int_val(val),
-        float_val(0.0),
-        lval(nullptr),
-        is_const(true) {}
+      : m_op(Op::CONST_INT),
+        m_lhs(nullptr),
+        m_rhs(nullptr),
+        m_func_call(nullptr),
+        m_int_val(val),
+        m_float_val(0.0),
+        m_lval(nullptr),
+        m_is_const(true) {}
 
   explicit ExprAST(float val)
-      : op(Op::CONST_FLOAT),
-        lhs(nullptr),
-        rhs(nullptr),
-        func_call(nullptr),
-        int_val(0),
-        float_val(val),
-        lval(nullptr),
-        is_const(true) {}
+      : m_op(Op::CONST_FLOAT),
+        m_lhs(nullptr),
+        m_rhs(nullptr),
+        m_func_call(nullptr),
+        m_int_val(0),
+        m_float_val(val),
+        m_lval(nullptr),
+        m_is_const(true) {}
 
   explicit ExprAST(std::unique_ptr<LValAST> lval)
-      : op(Op::LVAL),
-        lhs(nullptr),
-        rhs(nullptr),
-        func_call(nullptr),
-        int_val(0),
-        float_val(0.0),
-        lval(std::move(lval)),
-        is_const(false) {}
+      : m_op(Op::LVAL),
+        m_lhs(nullptr),
+        m_rhs(nullptr),
+        m_func_call(nullptr),
+        m_int_val(0),
+        m_float_val(0.0),
+        m_lval(std::move(lval)),
+        m_is_const(false) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
 
   std::pair<EvalType, std::variant<int, float>> Evaluate(
-      SymbolTable &symbolTable);
+      SymbolTable &symbol_table);
 
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
   std::shared_ptr<Value> CodeGenAnd(IRBuilder &builder);
@@ -257,48 +260,48 @@ public:
  */
 class DeclAST : public AST {
 private:
-  bool is_const;  // true => init_val is also const
-  bool is_global;
-  VarType var_type;
+  bool m_is_const;  // true => init_val is also const
+  bool m_is_global;
+  VarType m_var_type;
 
-  std::string varname;
+  std::string m_varname;
 
-  void fillFlattenVals(int n, int offset, const std::vector<int> &sizes);
+  void FillFlattenVals(int n, int offset, const std::vector<int> &sizes);
 
 public:
-  std::vector<std::unique_ptr<ExprAST>> dimensions;
-  std::unique_ptr<InitValAST> init_val;
-  std::vector<std::shared_ptr<ExprAST>> flatten_vals;
+  std::vector<std::unique_ptr<ExprAST>> m_dimensions;
+  std::unique_ptr<InitValAST> m_init_val;
+  std::vector<std::shared_ptr<ExprAST>> m_flatten_vals;
 
-  void setIsConst(bool isConst) { is_const = isConst; }
-  void setIsGlobal(bool isGlobal) { is_global = isGlobal; }
-  void setVarType(VarType varType) { var_type = varType; }
-  void setInitVal(std::unique_ptr<InitValAST> initVal) {
-    init_val = std::move(initVal);
+  void SetIsConst(bool is_const) { m_is_const = is_const; }
+  void SetIsGlobal(bool is_global) { m_is_global = is_global; }
+  void SetVarType(VarType var_type) { m_var_type = var_type; }
+  void SetInitVal(std::unique_ptr<InitValAST> init_val) {
+    m_init_val = std::move(init_val);
   }
 
-  size_t dimensionsSize() const { return dimensions.size(); }
-  bool isGlobal() const { return is_global; }
-  bool isConst() const { return is_const; }
-  VarType varType() const { return var_type; }
+  size_t DimensionsSize() const { return m_dimensions.size(); }
+  bool IsGlobal() const { return m_is_global; }
+  bool IsConst() const { return m_is_const; }
+  VarType GetVarType() const { return m_var_type; }
 
   explicit DeclAST(std::string varname,
-                   std::unique_ptr<InitValAST> initval = nullptr)
-      : is_const(false),
-        is_global(false),
-        var_type(VarType::UNKNOWN),
-        varname(std::move(varname)),
-        init_val(std::move(initval)),
-        flatten_vals() {}
+                   std::unique_ptr<InitValAST> init_val = nullptr)
+      : m_is_const(false),
+        m_is_global(false),
+        m_var_type(VarType::UNKNOWN),
+        m_varname(std::move(varname)),
+        m_init_val(std::move(init_val)),
+        m_flatten_vals() {}
 
   void AddDimension(std::unique_ptr<ExprAST> expr);
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
 
   // called only when is_const = true and flatten_vals is constructed
-  std::variant<int, float> Evaluate(SymbolTable &symbolTable, int n);
+  std::variant<int, float> Evaluate(SymbolTable &symbol_table, int n);
 
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
@@ -310,41 +313,37 @@ public:
  */
 class FuncCallAST : public AST {
 private:
-  std::string func_name;
-  std::vector<std::unique_ptr<ExprAST>> params;
-  VarType return_type;
+  std::string m_func_name;
+  std::vector<std::unique_ptr<ExprAST>> m_params;
+  VarType m_return_type;  // initially UNKNOWN, available after typechecking
 
 public:
-  [[nodiscard]] size_t paramsSize() const { return params.size(); }
+  [[nodiscard]] size_t ParamsSize() const { return m_params.size(); }
 
 public:
   explicit FuncCallAST(std::string func_name)
-      : func_name(std::move(func_name)),
-        params(),
-        return_type(VarType::UNKNOWN) {}
+      : m_func_name(std::move(func_name)),
+        m_params(),
+        m_return_type(VarType::UNKNOWN) {}
 
-  void assignParams(std::vector<std::unique_ptr<ExprAST>> _params) {
-    params.assign(std::make_move_iterator(_params.begin()),
-                  std::make_move_iterator(_params.end()));
-    _params.clear();
-  }
+  void AssignParams(std::vector<std::unique_ptr<ExprAST>> params);
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class CondAST : public AST {
 private:
-  std::unique_ptr<ExprAST> expr;
+  std::unique_ptr<ExprAST> m_expr;
 
 public:
-  explicit CondAST(std::unique_ptr<ExprAST> expr) : expr(std::move(expr)) {}
+  explicit CondAST(std::unique_ptr<ExprAST> expr) : m_expr(std::move(expr)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
@@ -353,21 +352,19 @@ public:
  */
 class FuncFParamAST : public AST {
 private:
-  VarType type;
-  std::string name;
-  std::vector<std::unique_ptr<ExprAST>> dimensions;
+  VarType m_type;
+  std::string m_name;
+  std::vector<std::unique_ptr<ExprAST>> m_dimensions;
 
 public:
   explicit FuncFParamAST(VarType type, std::string name)
-      : type(type), name(std::move(name)), dimensions() {}
+      : m_type(type), m_name(std::move(name)), m_dimensions() {}
 
   explicit FuncFParamAST(VarType type, std::string name,
                          std::unique_ptr<ExprAST> dimension)
-      : type(type), name(std::move(name)), dimensions() {
-    dimensions.push_back(std::move(dimension));
+      : m_type(type), m_name(std::move(name)), m_dimensions() {
+    m_dimensions.push_back(std::move(dimension));
   }
-
-  void AddDimension();
 
   void AddDimension(int x);
 
@@ -375,139 +372,136 @@ public:
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class BlockAST : public StmtAST {
 private:
-  std::vector<std::shared_ptr<AST>> nodes;
+  std::vector<std::shared_ptr<AST>> m_nodes;
 
 public:
-  void AppendNodes(std::vector<std::unique_ptr<AST>> appendedNodes);
+  void AppendNodes(std::vector<std::unique_ptr<AST>> nodes);
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class FuncDefAST : public AST {
 private:
-  VarType return_type;
-  std::string func_name;
-  std::vector<std::unique_ptr<FuncFParamAST>> params;
-  std::unique_ptr<BlockAST> block;
+  VarType m_return_type;
+  std::string m_func_name;
+  std::vector<std::unique_ptr<FuncFParamAST>> m_params;
+  std::unique_ptr<BlockAST> m_block;
 
 public:
-  size_t paramsSize() const { return params.size(); }
-  VarType returnType() const { return return_type; }
-  std::string funcName() const { return func_name; }
+  size_t ParamsSize() const { return m_params.size(); }
+  VarType ReturnType() const { return m_return_type; }
+  std::string FuncName() const { return m_func_name; }
 
 public:
   explicit FuncDefAST(VarType return_type, std::string func_name,
                       std::vector<std::unique_ptr<FuncFParamAST>> params,
                       std::unique_ptr<BlockAST> block)
-      : return_type(return_type),
-        func_name(std::move(func_name)),
-        params(std::move(params)),
-        block(std::move(block)) {}
+      : m_return_type(return_type),
+        m_func_name(std::move(func_name)),
+        m_params(std::move(params)),
+        m_block(std::move(block)) {}
 
   explicit FuncDefAST(VarType return_type, std::string func_name,
                       std::unique_ptr<BlockAST> block)
-      : return_type(return_type),
-        func_name(std::move(func_name)),
-        params(),
-        block(std::move(block)) {}
+      : m_return_type(return_type),
+        m_func_name(std::move(func_name)),
+        m_params(),
+        m_block(std::move(block)) {}
 
-  void assignParams(std::vector<std::unique_ptr<FuncFParamAST>> _params) {
-    params.assign(std::make_move_iterator(_params.begin()),
-                  std::make_move_iterator(_params.end()));
-    _params.clear();
-  }
+  void AssignParams(std::vector<std::unique_ptr<FuncFParamAST>> params);
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class AssignStmtAST : public StmtAST {
 private:
-  std::unique_ptr<LValAST> lval;
-  std::unique_ptr<ExprAST> rhs;
+  std::unique_ptr<LValAST> m_lval;
+  std::unique_ptr<ExprAST> m_rhs;
 
 public:
   explicit AssignStmtAST(std::unique_ptr<LValAST> lval,
                          std::unique_ptr<ExprAST> rhs)
-      : lval(std::move(lval)), rhs(std::move(rhs)) {}
+      : m_lval(std::move(lval)), m_rhs(std::move(rhs)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class EvalStmtAST : public StmtAST {
 private:
-  std::unique_ptr<ExprAST> expr;
+  std::unique_ptr<ExprAST> m_expr;
 
 public:
-  explicit EvalStmtAST(std::unique_ptr<ExprAST> expr) : expr(std::move(expr)) {}
+  explicit EvalStmtAST(std::unique_ptr<ExprAST> expr)
+      : m_expr(std::move(expr)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class IfStmtAST : public StmtAST {
 private:
-  std::unique_ptr<CondAST> cond;
-  std::unique_ptr<StmtAST> then_stmt;
-  std::unique_ptr<StmtAST> else_stmt;
+  std::unique_ptr<CondAST> m_cond;
+  std::unique_ptr<StmtAST> m_then;
+  std::unique_ptr<StmtAST> m_else;
 
 public:
   explicit IfStmtAST(std::unique_ptr<CondAST> cond,
                      std::unique_ptr<StmtAST> then_stmt,
                      std::unique_ptr<StmtAST> else_stmt = nullptr)
-      : cond(std::move(cond)),
-        then_stmt(std::move(then_stmt)),
-        else_stmt(std::move(else_stmt)) {}
+      : m_cond(std::move(cond)),
+        m_then(std::move(then_stmt)),
+        m_else(std::move(else_stmt)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class ReturnStmtAST : public StmtAST {
 private:
-  std::unique_ptr<ExprAST> ret;
+  std::unique_ptr<ExprAST> m_ret;
 
 public:
   explicit ReturnStmtAST(std::unique_ptr<ExprAST> ret = nullptr)
-      : ret(std::move(ret)) {}
+      : m_ret(std::move(ret)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class WhileStmtAST : public StmtAST {
 private:
-  std::unique_ptr<CondAST> cond;
-  std::unique_ptr<StmtAST> stmt;
+  std::unique_ptr<CondAST> m_cond;
+  std::unique_ptr<StmtAST> m_stmt;
 
 public:
   explicit WhileStmtAST(std::unique_ptr<CondAST> cond,
                         std::unique_ptr<StmtAST> stmt)
-      : cond(std::move(cond)), stmt(std::move(stmt)) {}
+      : m_cond(std::move(cond)), m_stmt(std::move(stmt)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
@@ -515,7 +509,7 @@ class BreakStmtAST : public StmtAST {
 public:
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
@@ -523,13 +517,13 @@ class ContinueStmtAST : public StmtAST {
 public:
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 
 class CompUnitAST : public AST {
 private:
-  std::vector<std::shared_ptr<AST>> nodes;
+  std::vector<std::shared_ptr<AST>> m_nodes;
 
 public:
   void AppendDecls(std::vector<std::unique_ptr<DeclAST>> decls);
@@ -538,7 +532,7 @@ public:
 
   void Debug(std::ofstream &ofs, int depth) override;
 
-  void TypeCheck(SymbolTable &symbolTable) override;
+  void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
 

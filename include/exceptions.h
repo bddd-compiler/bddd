@@ -7,13 +7,13 @@
 
 class MyException : public std::exception {
 private:
-  std::string msg;
+  std::string msg_;
 
 public:
-  explicit MyException(std::string msg) : msg(std::move(msg)) {}
-  std::string getMsg() { return msg; }
+  explicit MyException(std::string msg) : msg_(std::move(msg)) {}
+  std::string Msg() { return msg_; }
 
-  MyException copy() { return MyException(msg); }
+  MyException copy() { return MyException(msg_); }
 };
 
 #endif  // BDDD_EXCEPTIONS_H

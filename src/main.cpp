@@ -23,7 +23,7 @@ int main() {
     SymbolTable symbol_table;
     driver.comp_unit->TypeCheck(symbol_table);
   } catch (MyException &e) {
-    std::cerr << "exception encountered: " << e.getMsg() << std::endl;
+    std::cerr << "exception encountered: " << e.Msg() << std::endl;
     return 1;
   }
 
