@@ -45,9 +45,11 @@ class Driver;
     SEMICOLON ";"
     LBRACE "{"
     RBRACE "}"
-    ASSIGN "="
+    LBRACKET "["
+    RBRACKET "]"
     LPAREN "("
     RPAREN ")"
+    ASSIGN "="
     VOID "void"
     IF "if"
     ELSE "else"
@@ -134,11 +136,11 @@ BType: "int" { $$ = VarType::INT; /* printf("(keyword, int)\n"); */ }
      ;
 
 ConstDecl: TOK_CONST BType ConstDef { $3->SetIsConst(true); $3->SetVarType($2); $$.push_back(std::move($3)); }
-         | ConstDecl TOK_COMMA ConstDef { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $3->SetIsConst(true); $$.push_back(std::move($3)); }
+         | ConstDecl TOK_COMMA ConstDef { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $3->SetVarType($$[0]->GetVarType()); $3->SetIsConst(true); $$.push_back(std::move($3)); }
          ;
 
 VarDecl: BType VarDef { $2->SetVarType($1); $$.push_back(std::move($2)); }
-       | VarDecl TOK_COMMA VarDef { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $$.push_back(std::move($3)); }
+       | VarDecl TOK_COMMA VarDef { $$.assign(std::make_move_iterator(std::begin($1)), std::make_move_iterator(std::end($1))); $1.clear(); $3->SetVarType($$[0]->GetVarType()); $$.push_back(std::move($3)); }
        ;
 
 VarDef: VarDefSingle { $$ = std::move($1); }
@@ -242,7 +244,7 @@ FuncFParam: FuncFParamSingle { $$ = std::move($1); }
 
 FuncFParamSingle: BType IDENT { $$ = std::make_unique<FuncFParamAST>($1, std::move($2)); };
 
-FuncFParamArray: BType IDENT TOK_LBRACKET TOK_RBRACKET { $$ = std::make_unique<FuncFParamAST>($1, std::move($2)); $$->AddDimension(nullptr); }
+FuncFParamArray: BType IDENT TOK_LBRACKET TOK_RBRACKET { $$ = std::make_unique<FuncFParamAST>($1, std::move($2)); $$->AddDimension(-1); }
                | FuncFParamArray TOK_LBRACKET Exp TOK_RBRACKET { $$ = std::move($1); $$->AddDimension(std::move($3)); }
                ;
 
