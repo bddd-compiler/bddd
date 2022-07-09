@@ -23,6 +23,8 @@ private:
 public:
   explicit SymbolTable();
 
+  explicit SymbolTable(const std::vector<std::shared_ptr<FuncDefAST>>& funcs);
+
   bool Insert(const std::string& name, const std::shared_ptr<AST>& ast);
 
   std::shared_ptr<DeclAST> GetDecl(const std::string& name);
