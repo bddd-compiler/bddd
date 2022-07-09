@@ -121,6 +121,7 @@ private:
   std::vector<std::unique_ptr<ExprAST>> dimensions;
 
 public:
+  std::string getName() const { return name; }
   std::shared_ptr<DeclAST> decl;
   explicit LValAST(std::string name)
       : name(std::move(name)), dimensions(), decl(nullptr) {}
@@ -139,7 +140,7 @@ public:
   void TypeCheck(SymbolTable &symbolTable) override;
 
   // called only when is_const is true and not an array
-  std::variant<int, float> Evaluate();
+  std::variant<int, float> Evaluate(SymbolTable &SymbolTable);
 
   // methods used in codegen
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
@@ -241,7 +242,8 @@ public:
 
   void TypeCheck(SymbolTable &symbolTable) override;
 
-  std::pair<EvalType, std::variant<int, float>> Evaluate();
+  std::pair<EvalType, std::variant<int, float>> Evaluate(
+      SymbolTable &symbolTable);
 
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
   std::shared_ptr<Value> CodeGenAnd(IRBuilder &builder);
@@ -296,7 +298,7 @@ public:
   void TypeCheck(SymbolTable &symbolTable) override;
 
   // called only when is_const = true and flatten_vals is constructed
-  std::variant<int, float> Evaluate(int n);
+  std::variant<int, float> Evaluate(SymbolTable &symbolTable, int n);
 
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };

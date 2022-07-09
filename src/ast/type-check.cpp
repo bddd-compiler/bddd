@@ -27,10 +27,10 @@ void LValAST::TypeCheck(SymbolTable& symbolTable) {
     dimension->TypeCheck(symbolTable);
   }
 }
-std::variant<int, float> LValAST::Evaluate() {
+std::variant<int, float> LValAST::Evaluate(SymbolTable& symbolTable) {
   assert(!isArray());
   if (dimensions.empty()) {
-    return decl->Evaluate(0);
+    return decl->Evaluate(symbolTable, 0);
   }
 
   int offset = 0;
@@ -40,37 +40,38 @@ std::variant<int, float> LValAST::Evaluate() {
   int tot = 1;
   for (auto i = decl->dimensions.size() - 1; i >= 0; --i) {
     // happen after DeclAST::TypeCheck
-    auto [type, res] = decl->dimensions[i]->Evaluate();
+    auto [type, res] = decl->dimensions[i]->Evaluate(symbolTable);
     assert(type == ExprAST::EvalType::INT);
     tot *= std::get<int>(res);
     products[i] = tot;
   }
   // TODO(garen): potentially buggy code
   for (auto i = 0; i < dimensions.size() - 1; i++) {
-    auto [type, res] = dimensions[i]->Evaluate();
+    auto [type, res] = dimensions[i]->Evaluate(symbolTable);
     assert(type == ExprAST::EvalType::INT);
     offset += std::get<int>(res) * products[i + 1];
   }
-  auto [type, res] = dimensions[dimensions.size() - 1]->Evaluate();
+  auto [type, res] = dimensions[dimensions.size() - 1]->Evaluate(symbolTable);
   assert(type == ExprAST::EvalType::INT);
   offset += std::get<int>(res);
 
-  return decl->Evaluate(offset);
+  return decl->Evaluate(symbolTable, offset);
 }
 void ExprAST::TypeCheck(SymbolTable& symbolTable) {
-  auto [var_type, res] = Evaluate();
+  auto [var_type, res] = Evaluate(symbolTable);
   // INT, FLOAT, BOOL, VAR, anything except ERROR, are legal results
   if (var_type == EvalType::ERROR) throw MyException("unexpected evaluation");
 }
 
-std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate() {
+std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
+    SymbolTable& symbolTable) {
   std::pair<EvalType, std::variant<int, float>> lhs_res, rhs_res;
   switch (op) {
     case Op::POSITIVE:
-      return lhs->Evaluate();
+      return lhs->Evaluate(symbolTable);
       break;
     case Op::NEGATIVE:
-      lhs_res = lhs->Evaluate();
+      lhs_res = lhs->Evaluate(symbolTable);
       if (lhs_res.first == EvalType::INT)
         return std::make_pair(lhs_res.first, -std::get<int>(lhs_res.second));
       else if (lhs_res.first == EvalType::FLOAT)
@@ -81,8 +82,8 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate() {
         return std::make_pair(EvalType::ERROR, 0);
       break;
     case Op::PLUS:
-      lhs_res = lhs->Evaluate();
-      rhs_res = rhs->Evaluate();
+      lhs_res = lhs->Evaluate(symbolTable);
+      rhs_res = rhs->Evaluate(symbolTable);
       if (lhs_res.first == EvalType::INT) {
         if (rhs_res.first == EvalType::INT) {
           return std::make_pair(
@@ -119,8 +120,8 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate() {
       }
       break;
     case Op::MINUS:
-      lhs_res = lhs->Evaluate();
-      rhs_res = rhs->Evaluate();
+      lhs_res = lhs->Evaluate(symbolTable);
+      rhs_res = rhs->Evaluate(symbolTable);
       if (lhs_res.first == EvalType::INT) {
         if (rhs_res.first == EvalType::INT) {
           return std::make_pair(
@@ -157,8 +158,8 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate() {
       }
       break;
     case Op::MULTI:
-      lhs_res = lhs->Evaluate();
-      rhs_res = rhs->Evaluate();
+      lhs_res = lhs->Evaluate(symbolTable);
+      rhs_res = rhs->Evaluate(symbolTable);
       if (lhs_res.first == EvalType::INT) {
         if (rhs_res.first == EvalType::INT) {
           return std::make_pair(
@@ -195,8 +196,8 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate() {
       }
       break;
     case Op::DIV:
-      lhs_res = lhs->Evaluate();
-      rhs_res = rhs->Evaluate();
+      lhs_res = lhs->Evaluate(symbolTable);
+      rhs_res = rhs->Evaluate(symbolTable);
       if (lhs_res.first == EvalType::INT) {
         if (rhs_res.first == EvalType::INT) {
           auto dividend = std::get<int>(lhs_res.second);
@@ -265,8 +266,8 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate() {
     case Op::GEQ:
     case Op::EQ:
     case Op::NEQ:
-      lhs_res = lhs->Evaluate();
-      rhs_res = rhs->Evaluate();
+      lhs_res = lhs->Evaluate(symbolTable);
+      rhs_res = rhs->Evaluate(symbolTable);
       if ((lhs_res.first == EvalType::INT || lhs_res.first == EvalType::FLOAT
            || lhs_res.first == EvalType::VAR)
           && (rhs_res.first == EvalType::INT || rhs_res.first == EvalType::FLOAT
@@ -278,8 +279,8 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate() {
       break;
     case Op::AND:
     case Op::OR:
-      lhs_res = lhs->Evaluate();
-      rhs_res = rhs->Evaluate();
+      lhs_res = lhs->Evaluate(symbolTable);
+      rhs_res = rhs->Evaluate(symbolTable);
       if (lhs_res.first == EvalType::BOOL && rhs_res.first == EvalType::BOOL) {
         return std::make_pair(EvalType::BOOL, 0);
       } else {
@@ -287,7 +288,7 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate() {
       }
       break;
     case Op::NOT:
-      lhs_res = lhs->Evaluate();
+      lhs_res = lhs->Evaluate(symbolTable);
       if (lhs_res.first == EvalType::BOOL)
         return std::make_pair(EvalType::BOOL, 0);
       else
@@ -300,13 +301,19 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate() {
       return std::make_pair(EvalType::FLOAT, float_val);
       break;
     case Op::LVAL:
+      assert(lval->decl == nullptr);
+      // assign value to lval->decl
+      lval->decl = symbolTable.GetDecl(lval->getName());
+
+      assert(lval->decl != nullptr);
       if (lval->decl->isConst()) {
         auto var_type = lval->decl->varType();
         if (var_type == VarType::INT) {
-          return std::make_pair(EvalType::INT, std::get<int>(lval->Evaluate()));
+          return std::make_pair(EvalType::INT,
+                                std::get<int>(lval->Evaluate(symbolTable)));
         } else if (var_type == VarType::FLOAT) {
           return std::make_pair(EvalType::FLOAT,
-                                std::get<float>(lval->Evaluate()));
+                                std::get<float>(lval->Evaluate(symbolTable)));
         }
       } else {
         return std::make_pair(EvalType::VAR, 0);
@@ -345,7 +352,7 @@ void DeclAST::TypeCheck(SymbolTable& symbolTable) {
     std::vector<int> products(dimensions.size());
     for (auto i = dimensions.size() - 1; i >= 0; --i) {
       dimensions[i]->TypeCheck(symbolTable);
-      auto [type, res] = dimensions[i]->Evaluate();
+      auto [type, res] = dimensions[i]->Evaluate(symbolTable);
       assert(type == ExprAST::EvalType::INT);
       tot *= std::get<int>(res);
       products[i] = tot;
@@ -384,9 +391,9 @@ void DeclAST::fillFlattenVals(int n, int offset,
     }
   }
 }
-std::variant<int, float> DeclAST::Evaluate(int n) {
+std::variant<int, float> DeclAST::Evaluate(SymbolTable& symbolTable, int n) {
   assert(n < flatten_vals.size());
-  auto [type, ret] = flatten_vals[n]->Evaluate();
+  auto [type, ret] = flatten_vals[n]->Evaluate(symbolTable);
   assert(type == ExprAST::EvalType::INT || type == ExprAST::EvalType::FLOAT);
   return ret;
 }
