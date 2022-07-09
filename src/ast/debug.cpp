@@ -226,8 +226,12 @@ void IfStmtAST::Debug(std::ofstream& ofs, int depth) {
   }
 }
 void ReturnStmtAST::Debug(std::ofstream& ofs, int depth) {
-  ofs << std::string(depth * 2, ' ') << "ReturnStmtAST:" << std::endl;
-  m_ret->Debug(ofs, depth + 1);
+  if (m_ret) {
+    ofs << std::string(depth * 2, ' ') << "ReturnStmtAST:" << std::endl;
+    m_ret->Debug(ofs, depth + 1);
+  } else {
+    ofs << std::string(depth * 2, ' ') << "ReturnStmtAST: null" << std::endl;
+  }
 }
 void WhileStmtAST::Debug(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ') << "WhileStmtAST:" << std::endl;

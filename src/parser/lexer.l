@@ -18,12 +18,12 @@ Identifier [a-zA-Z_][a-zA-Z0-9_]*
 HexConst "0"[xX][0-9a-fA-F]+
 OctConst "0"[0-7]*
 DecConst [1-9][0-9]*
-whitespace [ \t]
+whitespace [ \t\r]
 DecFloatConst1 [0-9]*"."[0-9]+([eE][+-]?[0-9]+)?
 DecFloatConst2 [0-9]+"."([eE][+-]?[0-9]+)?
 DecFloatConst3 [0-9]+[eE][+-]?[0-9]+
-HexFloatConst1 "0"[xX][0-9a-fA-F]*"."[0-9a-fA-F]+"p"[+-]?[0-9]+
-HexFloatConst2 "0"[xX][0-9a-fA-F]+"."?"p"[+-]?[0-9]+
+HexFloatConst1 "0"[xX][0-9a-fA-F]*"."[0-9a-fA-F]+[pP][+-]?[0-9]+
+HexFloatConst2 "0"[xX][0-9a-fA-F]+"."?[pP][+-]?[0-9]+
 
 %{
 #define YY_USER_ACTION loc.columns(yyleng);

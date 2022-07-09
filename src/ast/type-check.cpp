@@ -25,7 +25,7 @@ void InitValAST::FillVals(int n, int& offset, const std::vector<int>& sizes,
   auto size = (n == sizes.size() - 1 ? 1 : sizes[n + 1]);
 
   // assign values
-  // TODO(garen): nullptr represents zero, bad behaviour
+  // TODO(garen): WARNING!!! nullptr represents zero, danger behaviour
   for (auto& val : m_vals) {
     if (val->m_expr) {  // single
       vals[offset++] = val->m_expr;
@@ -75,7 +75,7 @@ std::variant<int, float> LValAST::Evaluate(SymbolTable& symbol_table) {
     offset += std::get<int>(res) * products[i + 1];
   }
   auto [type, res] = m_dimensions[i]->Evaluate(symbol_table);
-  assert(type == ExprAST::EvalType::INT);
+  assert(type == ExprAST::EvalType::INT || type == ExprAST::EvalType::VAR_INT);
   offset += std::get<int>(res);
 
   return m_decl->Evaluate(symbol_table, offset);
@@ -92,6 +92,9 @@ void ExprAST::TypeCheck(SymbolTable& symbol_table) {
     case EvalType::VAR_FLOAT:
       SetIsConst(false);
       break;
+    case EvalType::ARR:
+      // do nothing
+      break;
     case EvalType::ERROR:
       throw MyException("unexpected evaluation");
       break;
@@ -100,9 +103,9 @@ void ExprAST::TypeCheck(SymbolTable& symbol_table) {
   }
 }
 
-// TODO(garen): waiting to be refactored, here are some problems:
 // if a is int variable, if (+--!!!a) {} is legal expression
-// there is no distinction between int and bool, waiting to be fixed up
+// there is no distinction between int and bool
+// array may be evaluated, which cannot join in any computation
 std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
     SymbolTable& symbol_table) {
   std::pair<EvalType, std::variant<int, float>> lhs_res, rhs_res;
@@ -277,6 +280,8 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
         else {
           return std::make_pair(EvalType::ERROR, 0);
         }
+      } else if (lhs_res.first == EvalType::VAR_FLOAT) {
+        return std::make_pair(EvalType::VAR_FLOAT, 0);
       } else {
         return std::make_pair(EvalType::ERROR, 0);
       }
@@ -288,12 +293,16 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
         if (rhs_res.first == EvalType::INT) {
           auto dividend = std::get<int>(lhs_res.second);
           auto divisor = std::get<int>(rhs_res.second);
-          if (divisor == 0) return std::make_pair(EvalType::ERROR, 0);
+          if (divisor == 0) {
+            return std::make_pair(EvalType::ERROR, 0);
+          }
           return std::make_pair(EvalType::INT, dividend / divisor);
         } else if (rhs_res.first == EvalType::FLOAT) {
           auto dividend = std::get<int>(lhs_res.second);
           auto divisor = std::get<float>(rhs_res.second);
-          if (divisor == 0) return std::make_pair(EvalType::ERROR, 0);
+          if (divisor == 0) {
+            return std::make_pair(EvalType::ERROR, 0);
+          }
           return std::make_pair(EvalType::FLOAT,
                                 static_cast<float>(dividend) / divisor);
         } else if (rhs_res.first == EvalType::VAR_INT) {
@@ -309,13 +318,17 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
         if (rhs_res.first == EvalType::INT) {
           auto dividend = std::get<float>(lhs_res.second);
           auto divisor = std::get<int>(rhs_res.second);
-          if (divisor == 0) return std::make_pair(EvalType::ERROR, 0);
+          if (divisor == 0) {
+            return std::make_pair(EvalType::ERROR, 0);
+          }
           return std::make_pair(EvalType::FLOAT,
                                 dividend / static_cast<float>(divisor));
         } else if (rhs_res.first == EvalType::FLOAT) {
           auto dividend = std::get<float>(lhs_res.second);
           auto divisor = std::get<float>(rhs_res.second);
-          if (divisor == 0) return std::make_pair(EvalType::ERROR, 0);
+          if (divisor == 0) {
+            return std::make_pair(EvalType::ERROR, 0);
+          }
           return std::make_pair(EvalType::FLOAT, dividend / divisor);
         } else if (rhs_res.first == EvalType::VAR_INT
                    || rhs_res.first == EvalType::VAR_FLOAT) {
@@ -336,6 +349,8 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
         else {
           return std::make_pair(EvalType::ERROR, 0);
         }
+      } else if (lhs_res.first == EvalType::VAR_FLOAT) {
+        return std::make_pair(EvalType::VAR_FLOAT, 0);
       } else {
         return std::make_pair(EvalType::ERROR, 0);
       }
@@ -347,7 +362,9 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
         if (rhs_res.first == EvalType::INT) {
           auto dividend = std::get<int>(lhs_res.second);
           auto divisor = std::get<int>(rhs_res.second);
-          if (divisor == 0) return std::make_pair(EvalType::ERROR, 0);
+          if (divisor == 0) {
+            return std::make_pair(EvalType::ERROR, 0);
+          }
           return std::make_pair(EvalType::INT, dividend % divisor);
         } else if (rhs_res.first == EvalType::VAR_INT) {
           // divided-by-zero may happen in runtime
@@ -374,8 +391,9 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
     case Op::NEQ:
       lhs_res = m_lhs->Evaluate(symbol_table);
       rhs_res = m_rhs->Evaluate(symbol_table);
-      if (lhs_res.first != EvalType::ERROR
-          && rhs_res.first != EvalType::ERROR) {
+      if (lhs_res.first != EvalType::ERROR && lhs_res.first != EvalType::ARR
+          && rhs_res.first != EvalType::ERROR
+          && rhs_res.first != EvalType::ARR) {
         return std::make_pair(EvalType::VAR_INT, 0);
       } else {
         return std::make_pair(EvalType::ERROR, 0);
@@ -385,9 +403,13 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
     case Op::OR:
       lhs_res = m_lhs->Evaluate(symbol_table);
       rhs_res = m_rhs->Evaluate(symbol_table);
-      if ((lhs_res.first == EvalType::INT || lhs_res.first == EvalType::VAR_INT)
+      if ((lhs_res.first == EvalType::INT || lhs_res.first == EvalType::VAR_INT
+           || lhs_res.first == EvalType::FLOAT
+           || lhs_res.first == EvalType::VAR_FLOAT)
           && (rhs_res.first == EvalType::INT
-              || rhs_res.first == EvalType::VAR_INT)) {
+              || rhs_res.first == EvalType::VAR_INT
+              || rhs_res.first == EvalType::FLOAT
+              || rhs_res.first == EvalType::VAR_FLOAT)) {
         return std::make_pair(EvalType::VAR_INT, 0);
       } else {
         return std::make_pair(EvalType::ERROR, 0);
@@ -401,7 +423,13 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
           return std::make_pair(EvalType::INT, 0);
         else
           return std::make_pair(EvalType::INT, 1);
-      } else if (lhs_res.first == EvalType::VAR_INT) {
+      } else if (lhs_res.first == EvalType::FLOAT) {
+        if (std::get<float>(lhs_res.second) != 0)
+          return std::make_pair(EvalType::INT, 0);
+        else
+          return std::make_pair(EvalType::INT, 1);
+      } else if (lhs_res.first == EvalType::VAR_INT
+                 || lhs_res.first == EvalType::VAR_FLOAT) {
         return std::make_pair(EvalType::VAR_INT, 0);
       } else
         return std::make_pair(EvalType::ERROR, 0);
@@ -420,7 +448,11 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
       // }
 
       assert(m_lval->m_decl != nullptr);
-      assert(!m_lval->IsArray());  // TODO(garen): can we handle lval array?
+
+      // can we handle lval array?
+      // yes, just give a new enum variant ARR
+      if (m_lval->IsArray()) return std::make_pair(EvalType::ARR, 0);
+
       if (m_lval->m_decl->IsConst()) {
         auto var_type = m_lval->m_decl->GetVarType();
         if (var_type == VarType::INT) {
@@ -477,7 +509,24 @@ void DeclAST::TypeCheck(SymbolTable& symbol_table) {
     return;  // param finished here
   }
   // not a param of function
-  if (m_init_val) m_init_val->TypeCheck(symbol_table);
+  if (m_init_val) {
+    m_init_val->TypeCheck(symbol_table);
+    if (m_init_val->m_expr) {
+      // single init-val
+      auto op = m_init_val->m_expr->GetOp();
+      if (m_var_type == VarType::INT) {
+        if (op == Op::CONST_FLOAT) {
+          auto temp = static_cast<int>(m_init_val->m_expr->FloatVal());
+          m_init_val->m_expr = std::make_shared<ExprAST>(temp);
+        }
+      } else if (m_var_type == VarType::FLOAT) {
+        if (op == Op::CONST_INT) {
+          auto temp = static_cast<float>(m_init_val->m_expr->IntVal());
+          m_init_val->m_expr = std::make_shared<ExprAST>(temp);
+        }
+      }
+    }
+  }
 
   if (m_is_const && !m_init_val)
     throw MyException("const declaration without init val");

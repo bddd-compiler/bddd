@@ -181,6 +181,7 @@ public:
   int IntVal() const { return m_int_val; }
   float FloatVal() const { return m_float_val; }
   void SetIsConst(bool is_const) { m_is_const = is_const; }
+  Op GetOp() const { return m_op; }
 
 public:
   enum class EvalType {

@@ -9,9 +9,8 @@ int main(int argc, char **argv) {
   if (argc == 2) {
     filename = argv[1];
   } else if (argc == 1) {
-    // std::cout << "input source code file: >";
-    // std::cin >> filename;
-    filename = "../tests/functional/55_sort_test1.sy";
+    std::cout << "input source code file: >";
+    std::cin >> filename;
   } else {
     std::cerr << "???";
     return 1;
