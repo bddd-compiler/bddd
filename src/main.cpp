@@ -16,7 +16,7 @@ int main() {
    */
   int res = driver.parse(filename);
 
-  std::ofstream ofs("ast.out");
+  std::ofstream ofs(filename.substr(0, filename.rfind('.')) + "_ast.out");
   driver.comp_unit->Debug(ofs, 0);
 
   try {

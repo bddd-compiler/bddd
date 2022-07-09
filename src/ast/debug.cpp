@@ -135,11 +135,13 @@ void DeclAST::Debug(std::ofstream& ofs, int depth) {
   switch (m_var_type) {
     case VarType::INT:
       ofs << " (int) " << m_varname << ":" << std::endl;
-      m_init_val->Debug(ofs, depth + 1);
+      if (m_init_val)
+        m_init_val->Debug(ofs, depth + 1);
       break;
     case VarType::FLOAT:
       ofs << " (float) " << m_varname << ":" << std::endl;
-      m_init_val->Debug(ofs, depth + 1);
+      if (m_init_val)
+        m_init_val->Debug(ofs, depth + 1);
       break;
     default:
       std::cerr << "unexpected var_type in DeclAST" << std::endl;
