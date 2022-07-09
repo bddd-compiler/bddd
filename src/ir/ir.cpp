@@ -5,56 +5,6 @@
 
 #include "ast/ast.h"
 
-static std::vector<std::unique_ptr<FuncDefAST>> builtin_funcs;
-
-void InitBuiltinFunctions() {
-  builtin_funcs.clear();
-
-  builtin_funcs.push_back(
-      std::make_unique<FuncDefAST>(VarType::INT, "getint", nullptr));
-  builtin_funcs.push_back(
-      std::make_unique<FuncDefAST>(VarType::INT, "getch", nullptr));
-  builtin_funcs.push_back(
-      std::make_unique<FuncDefAST>(VarType::FLOAT, "getfloat", nullptr));
-
-  std::vector<std::unique_ptr<FuncFParamAST>> temp1;
-  temp1.push_back(std::make_unique<FuncFParamAST>(VarType::INT, "", nullptr));
-  builtin_funcs.push_back(std::make_unique<FuncDefAST>(
-      VarType::INT, "getarray", std::move(temp1), nullptr));
-
-  std::vector<std::unique_ptr<FuncFParamAST>> temp2;
-  temp2.push_back(std::make_unique<FuncFParamAST>(VarType::FLOAT, "", nullptr));
-  builtin_funcs.push_back(std::make_unique<FuncDefAST>(
-      VarType::INT, "getfarray", std::move(temp2), nullptr));
-
-  std::vector<std::unique_ptr<FuncFParamAST>> temp3;
-  temp3.push_back(std::make_unique<FuncFParamAST>(VarType::INT, ""));
-  builtin_funcs.push_back(std::make_unique<FuncDefAST>(
-      VarType::VOID, "putint", std::move(temp3), nullptr));
-
-  std::vector<std::unique_ptr<FuncFParamAST>> temp4;
-  temp4.push_back(std::make_unique<FuncFParamAST>(VarType::INT, ""));
-  builtin_funcs.push_back(std::make_unique<FuncDefAST>(
-      VarType::VOID, "putch", std::move(temp4), nullptr));
-
-  std::vector<std::unique_ptr<FuncFParamAST>> temp5;
-  temp5.push_back(std::make_unique<FuncFParamAST>(VarType::FLOAT, ""));
-  builtin_funcs.push_back(std::make_unique<FuncDefAST>(
-      VarType::VOID, "putfloat", std::move(temp5), nullptr));
-
-  std::vector<std::unique_ptr<FuncFParamAST>> temp6;
-  temp6.push_back(std::make_unique<FuncFParamAST>(VarType::INT, ""));
-  temp6.push_back(std::make_unique<FuncFParamAST>(VarType::INT, "", nullptr));
-  builtin_funcs.push_back(std::make_unique<FuncDefAST>(
-      VarType::VOID, "putarray", std::move(temp6), nullptr));
-
-  std::vector<std::unique_ptr<FuncFParamAST>> temp7;
-  temp7.push_back(std::make_unique<FuncFParamAST>(VarType::INT, ""));
-  temp7.push_back(std::make_unique<FuncFParamAST>(VarType::FLOAT, "", nullptr));
-  builtin_funcs.push_back(std::make_unique<FuncDefAST>(
-      VarType::VOID, "putfarray", std::move(temp7), nullptr));
-}
-
 void convertSSA() {
   InitBuiltinFunctions();
   IRBuilder builder;

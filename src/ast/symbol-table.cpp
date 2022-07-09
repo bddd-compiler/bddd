@@ -1,8 +1,22 @@
 #include "ast/symbol-table.h"
 
+#include <cassert>
+
 SymbolTable::SymbolTable() : tables(), scopes() {
   tables.emplace_back();
   scopes.push_back(ScopeType::GLOBAL);
+}
+
+SymbolTable::SymbolTable(const std::vector<std::shared_ptr<FuncDefAST>>& funcs)
+    : tables(), scopes() {
+  tables.emplace_back();
+  scopes.push_back(ScopeType::GLOBAL);
+
+  assert(funcs.size() == 10);
+  for (auto& func : funcs) {
+    // anything wrong should not happen here
+    Insert(func->FuncName(), func);
+  }
 }
 
 bool SymbolTable::Insert(const std::string& name,

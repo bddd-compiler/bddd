@@ -106,6 +106,8 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbol_table) override;
+  void FillVals(int n, int &offset, const std::vector<int> &sizes,
+                std::vector<std::shared_ptr<ExprAST>> &vals);
 
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 
@@ -182,10 +184,12 @@ public:
 
 public:
   enum class EvalType {
-    INT,
+    INT,  // BOOL is included, non-zero is true, zero is false
     FLOAT,
-    BOOL,
-    VAR,
+    // BOOL,
+    VAR_INT,
+    VAR_FLOAT,
+    ARR,  // array cannot join with any computation
     ERROR,
   };
 
@@ -256,17 +260,16 @@ public:
 /**
  * @is_const indicates whether it is a const declaration
  * @is_global used in typechecking
+ * @is_param not declaration of variable but an argument of function definition
  * @var_type only can be INT or FLOAT
  */
 class DeclAST : public AST {
 private:
-  bool m_is_const;  // true => init_val is also const
-  bool m_is_global;
+  bool m_is_const;   // true => init_val is also const
+  bool m_is_global;  // false at default
   VarType m_var_type;
-
   std::string m_varname;
-
-  void FillFlattenVals(int n, int offset, const std::vector<int> &sizes);
+  bool m_is_param;  // false at default
 
 public:
   std::vector<std::unique_ptr<ExprAST>> m_dimensions;
@@ -275,6 +278,7 @@ public:
 
   void SetIsConst(bool is_const) { m_is_const = is_const; }
   void SetIsGlobal(bool is_global) { m_is_global = is_global; }
+  void SetIsParam(bool is_param) { m_is_param = is_param; }
   void SetVarType(VarType var_type) { m_var_type = var_type; }
   void SetInitVal(std::unique_ptr<InitValAST> init_val) {
     m_init_val = std::move(init_val);
@@ -283,17 +287,21 @@ public:
   size_t DimensionsSize() const { return m_dimensions.size(); }
   bool IsGlobal() const { return m_is_global; }
   bool IsConst() const { return m_is_const; }
+  bool IsParam() const { return m_is_param; }
   VarType GetVarType() const { return m_var_type; }
+  std::string VarName() const { return m_varname; }
 
   explicit DeclAST(std::string varname,
                    std::unique_ptr<InitValAST> init_val = nullptr)
       : m_is_const(false),
         m_is_global(false),
+        m_is_param(false),
         m_var_type(VarType::UNKNOWN),
         m_varname(std::move(varname)),
         m_init_val(std::move(init_val)),
         m_flatten_vals() {}
 
+  void AddDimension(int x);
   void AddDimension(std::unique_ptr<ExprAST> expr);
 
   void Debug(std::ofstream &ofs, int depth) override;
@@ -321,6 +329,7 @@ public:
   [[nodiscard]] size_t ParamsSize() const { return m_params.size(); }
 
 public:
+  VarType GetReturnType() const { return m_return_type; }
   explicit FuncCallAST(std::string func_name)
       : m_func_name(std::move(func_name)),
         m_params(),
@@ -348,22 +357,28 @@ public:
 };
 
 /**
- * @dimensions not null when param is array, the first element should be -1
+ * @attention
+ * FuncFParam is a special wrapper of DeclAST, in which m_is_const = false,
+ * m_is_global = false, m_init_val = nullptr, and m_flatten_vals is meaningless
+ *
+ * We only use m_name, m_var_type and m_dimensions
  */
 class FuncFParamAST : public AST {
 private:
-  VarType m_type;
-  std::string m_name;
-  std::vector<std::unique_ptr<ExprAST>> m_dimensions;
+  std::shared_ptr<DeclAST> decl;
 
 public:
   explicit FuncFParamAST(VarType type, std::string name)
-      : m_type(type), m_name(std::move(name)), m_dimensions() {}
-
+      : decl(std::make_shared<DeclAST>(std::move(name))) {
+    decl->SetVarType(type);
+    decl->SetIsParam(true);
+  }
   explicit FuncFParamAST(VarType type, std::string name,
                          std::unique_ptr<ExprAST> dimension)
-      : m_type(type), m_name(std::move(name)), m_dimensions() {
-    m_dimensions.push_back(std::move(dimension));
+      : decl(std::make_shared<DeclAST>(std::move(name))) {
+    decl->SetVarType(type);
+    decl->SetIsParam(true);
+    decl->m_dimensions.push_back(std::move(dimension));
   }
 
   void AddDimension(int x);
@@ -535,5 +550,9 @@ public:
   void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(IRBuilder &builder) override;
 };
+
+extern std::vector<std::shared_ptr<FuncDefAST>> g_builtin_funcs;  // global
+
+void InitBuiltinFunctions();
 
 #endif  // BDDD_AST_H

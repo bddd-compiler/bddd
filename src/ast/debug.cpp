@@ -134,16 +134,27 @@ void DeclAST::Debug(std::ofstream& ofs, int depth) {
   }
   switch (m_var_type) {
     case VarType::INT:
-      ofs << " (int) " << m_varname << ":" << std::endl;
-      m_init_val->Debug(ofs, depth + 1);
+      ofs << " (int)";
       break;
     case VarType::FLOAT:
-      ofs << " (float) " << m_varname << ":" << std::endl;
-      m_init_val->Debug(ofs, depth + 1);
+      ofs << " (float)";
       break;
     default:
       std::cerr << "unexpected var_type in DeclAST" << std::endl;
       exit(-1);
+  }
+  ofs << " " << m_varname;
+  if (!m_dimensions.empty()) {
+    ofs << " (array):" << std::endl;
+    for (auto& dimension : m_dimensions) {
+      dimension->Debug(ofs, depth + 1);
+    }
+  } else {
+    ofs << " (single):" << std::endl;
+  }
+  if (m_init_val) {
+    ofs << std::string(depth * 2, ' ') << "with init_val:" << std::endl;
+    m_init_val->Debug(ofs, depth + 1);
   }
 }
 void FuncCallAST::Debug(std::ofstream& ofs, int depth) {
@@ -159,27 +170,8 @@ void CondAST::Debug(std::ofstream& ofs, int depth) {
   m_expr->Debug(ofs, depth + 1);
 }
 void FuncFParamAST::Debug(std::ofstream& ofs, int depth) {
-  ofs << std::string(depth * 2, ' ') << "FuncFParamAST";
-  switch (m_type) {
-    case VarType::INT:
-      ofs << " (int)";
-      break;
-    case VarType::FLOAT:
-      ofs << " (float)";
-      break;
-    default:
-      std::cerr << "unexpected var_type in FuncFParamAST" << std::endl;
-      exit(-1);
-  }
-  ofs << " " << m_name;
-  if (!m_dimensions.empty()) {
-    ofs << " (array):" << std::endl;
-    for (auto& dimension : m_dimensions) {
-      dimension->Debug(ofs, depth + 1);
-    }
-  } else {
-    ofs << " (single)" << std::endl;
-  }
+  ofs << std::string(depth * 2, ' ') << "FuncFParamAST (special DeclAST):";
+  decl->Debug(ofs, depth);
 }
 void BlockAST::Debug(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ') << "BlockAST:" << std::endl;
