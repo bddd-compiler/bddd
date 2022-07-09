@@ -4,10 +4,17 @@
 #include "exceptions.h"
 #include "parser/driver.h"
 
-int main() {
-  std::cout << "input test file: >";
+int main(int argc, char **argv) {
   std::string filename;
-  std::cin >> filename;
+  if (argc == 2) {
+    filename = argv[1];
+  } else if (argc == 1) {
+    std::cout << "input source code file: >";
+    std::cin >> filename;
+  } else {
+    std::cerr << "???";
+    return 1;
+  }
   Driver driver;
 
   /**
@@ -15,18 +22,22 @@ int main() {
    * ASTs can be accessed via driver.comp_unit
    */
   int res = driver.parse(filename);
+  if (res != 0) {
+    std::cerr << "GG" << std::endl;
+    return 1;
+  }
 
   std::ofstream ofs("ast.out");
   driver.comp_unit->Debug(ofs, 0);
 
   try {
-    SymbolTable symbol_table;
+    InitBuiltinFunctions();
+    SymbolTable symbol_table(g_builtin_funcs);
     driver.comp_unit->TypeCheck(symbol_table);
   } catch (MyException &e) {
     std::cerr << "exception encountered: " << e.Msg() << std::endl;
     return 1;
   }
 
-  std::cout << "res: " << res << std::endl;
   return 0;
 }
