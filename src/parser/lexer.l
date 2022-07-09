@@ -49,6 +49,8 @@ HexFloatConst2 "0"[xX][0-9a-fA-F]+"."?"p"[+-]?[0-9]+
 ";"        return yy::parser::make_SEMICOLON(loc);
 "("        return yy::parser::make_LPAREN(loc);
 ")"        return yy::parser::make_RPAREN(loc);
+"["        return yy::parser::make_LBRACKET(loc);
+"]"        return yy::parser::make_RBRACKET(loc);
 "{"        return yy::parser::make_LBRACE(loc);
 "}"        return yy::parser::make_RBRACE(loc);
 "void"      return yy::parser::make_VOID(loc);

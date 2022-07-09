@@ -48,6 +48,8 @@ class Driver;
     ASSIGN "="
     LPAREN "("
     RPAREN ")"
+    LBRACKET "["
+    RBRACKET "]"
     VOID "void"
     IF "if"
     ELSE "else"
