@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
    */
   int res = driver.parse(filename);
   if (res != 0) {
-    std::cerr << "GG" << std::endl;
+    std::cerr << filename << " GG" << std::endl;
     return 1;
   }
 
