@@ -3,3 +3,5 @@ cmake-build-debug
 .idea
 .vscode
 ast.out
+test.c
+testSource
