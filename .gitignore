@@ -2,4 +2,7 @@ build
 cmake-build-debug
 .idea
 .vscode
-ast.out
+*ast.out
+*ir.out
+*.ll
+*.exe
