@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    filename = "../testSource/buaa/part4/test1.c";
+    filename = "../testSource/buaa/part6/test3.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -34,8 +34,8 @@ int main(int argc, char **argv) {
   driver.comp_unit->Debug(ofs1, 0);
   ofs1.close();
 
+  InitBuiltinFunctions();
   try {
-    InitBuiltinFunctions();
     SymbolTable symbol_table(g_builtin_funcs);
     driver.comp_unit->TypeCheck(symbol_table);
   } catch (MyException &e) {
@@ -44,6 +44,10 @@ int main(int argc, char **argv) {
   }
 
   auto module = std::make_unique<Module>();
+  for (auto &builtin_func : g_builtin_funcs) {
+    auto func_decl = std::make_shared<Function>(builtin_func);
+    module->AppendFunctionDecl(std::move(func_decl));
+  }
   auto builder = std::make_shared<IRBuilder>(std::move(module));
   try {
     driver.comp_unit->CodeGen(builder);

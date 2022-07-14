@@ -83,6 +83,7 @@ void ExprAST::TypeCheck(SymbolTable& symbol_table) {
       SetIsConst(false);
       break;
     case EvalType::ARR:
+    case EvalType::VOID:
       // do nothing
       break;
     case EvalType::ERROR:
@@ -177,7 +178,9 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::EvaluateInner(
           return std::make_pair(EvalType::ERROR, 0);
         }
       } else if (lhs_res.first == EvalType::VAR_FLOAT) {
-        if (rhs_res.first != EvalType::ERROR)
+        if (rhs_res.first == EvalType::INT || rhs_res.first == EvalType::FLOAT
+            || rhs_res.first == EvalType::VAR_INT
+            || rhs_res.first == EvalType::VAR_FLOAT)
           return std::make_pair(EvalType::VAR_FLOAT, 0);
         else
           return std::make_pair(EvalType::ERROR, 0);
@@ -231,7 +234,9 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::EvaluateInner(
           return std::make_pair(EvalType::ERROR, 0);
         }
       } else if (lhs_res.first == EvalType::VAR_FLOAT) {
-        if (rhs_res.first != EvalType::ERROR)
+        if (rhs_res.first == EvalType::INT || rhs_res.first == EvalType::FLOAT
+            || rhs_res.first == EvalType::VAR_INT
+            || rhs_res.first == EvalType::VAR_FLOAT)
           return std::make_pair(EvalType::VAR_FLOAT, 0);
         else
           return std::make_pair(EvalType::ERROR, 0);
@@ -424,10 +429,15 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::EvaluateInner(
         else
           assert(false);  // unreachable
 
-      } else if (lhs_res.first != EvalType::ERROR
-                 && lhs_res.first != EvalType::ARR
-                 && rhs_res.first != EvalType::ERROR
-                 && rhs_res.first != EvalType::ARR) {
+      } else if ((lhs_res.first == EvalType::INT
+                  || lhs_res.first == EvalType::FLOAT
+                  || lhs_res.first == EvalType::VAR_INT
+                  || lhs_res.first == EvalType::VAR_FLOAT)
+                 && ((rhs_res.first == EvalType::INT
+                      || rhs_res.first == EvalType::FLOAT
+                      || rhs_res.first == EvalType::VAR_INT
+                      || rhs_res.first == EvalType::VAR_FLOAT))) {
+        // either one of them is not constant, then may be 1 or 0
         return std::make_pair(EvalType::VAR_INT, 0);
       } else {
         return std::make_pair(EvalType::ERROR, 0);
@@ -520,7 +530,7 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::EvaluateInner(
         case VarType::VOID:
           // TODO(garen): temp solution with serious problems
           // void function call should return nothing, rather than an integer
-          return std::make_pair(EvalType::INT, 0);
+          return std::make_pair(EvalType::VOID, 0);
         default:
           return std::make_pair(EvalType::ERROR, 0);
       }
@@ -620,7 +630,7 @@ void FuncCallAST::TypeCheck(SymbolTable& symbol_table) {
   if (FuncName() != "putf" && ParamsSize() != ptr->ParamsSize())
     throw MyException("incorrect # of params");
 
-  m_function = ptr;
+  m_func_def = ptr;
   m_return_type = ptr->ReturnType();
   for (auto& param : m_params) {
     param->TypeCheck(symbol_table);

@@ -192,6 +192,7 @@ public:
     VAR_INT,
     VAR_FLOAT,
     ARR,  // array cannot join with any computation
+    VOID,
     ERROR,
   };
 
@@ -351,7 +352,7 @@ private:
   std::vector<std::shared_ptr<ExprAST>> m_params;
 
   VarType m_return_type;  // initially UNKNOWN, available after typechecking
-  std::shared_ptr<FuncDefAST> m_function;  // is nullptr until typechecking
+  std::shared_ptr<FuncDefAST> m_func_def;  // is nullptr until typechecking
 
 public:
   [[nodiscard]] size_t ParamsSize() const { return m_params.size(); }
@@ -443,27 +444,31 @@ private:
   std::string m_func_name;
   std::vector<std::unique_ptr<FuncFParamAST>> m_params;
   std::unique_ptr<BlockAST> m_block;
+  bool m_is_builtin;
 
 public:
   size_t ParamsSize() const { return m_params.size(); }
   VarType ReturnType() const { return m_return_type; }
   std::string FuncName() const { return m_func_name; }
+  bool IsBuiltin() const { return m_is_builtin; }
 
 public:
   explicit FuncDefAST(VarType return_type, std::string func_name,
                       std::vector<std::unique_ptr<FuncFParamAST>> params,
-                      std::unique_ptr<BlockAST> block)
+                      std::unique_ptr<BlockAST> block, bool is_builtin = false)
       : m_return_type(return_type),
         m_func_name(std::move(func_name)),
         m_params(std::move(params)),
-        m_block(std::move(block)) {}
+        m_block(std::move(block)),
+        m_is_builtin(is_builtin) {}
 
   explicit FuncDefAST(VarType return_type, std::string func_name,
-                      std::unique_ptr<BlockAST> block)
+                      std::unique_ptr<BlockAST> block, bool is_builtin = false)
       : m_return_type(return_type),
         m_func_name(std::move(func_name)),
         m_params(),
-        m_block(std::move(block)) {}
+        m_block(std::move(block)),
+        m_is_builtin(is_builtin) {}
 
   void AssignParams(std::vector<std::unique_ptr<FuncFParamAST>> params);
 
@@ -473,6 +478,7 @@ public:
   std::shared_ptr<Value> CodeGen(std::shared_ptr<IRBuilder> builder) override;
 
   friend class Function;
+  friend class FunctionDecl;
 };
 
 class AssignStmtAST : public StmtAST {

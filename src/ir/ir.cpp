@@ -111,17 +111,13 @@ std::shared_ptr<Instruction> IRBuilder::CreateBinaryInstruction(
   bb->PushBackInstruction(instr);
   return instr;
 }
-std::shared_ptr<Instruction> IRBuilder::CreateCallInstruction(
-    std::shared_ptr<FuncCallAST> func_call) {
-  std::vector<Use> param_uses;
-  for (const auto& param : func_call->m_params) {
-    auto val = param->CodeGen(shared_from_this());
-  }
-
-  auto instr = std::make_shared<CallInstruction>(
-      func_call->ReturnType(), func_call->FuncName(), std::move(param_uses));
-
-  return nullptr;
+std::shared_ptr<CallInstruction> IRBuilder::CreateCallInstruction(
+    std::shared_ptr<FuncDefAST> func_def) {
+  auto bb = m_module->GetCurrentBB();
+  auto instr = std::make_shared<CallInstruction>(func_def->ReturnType(),
+                                                 func_def->FuncName(), bb);
+  bb->PushBackInstruction(instr);
+  return instr;
 }
 std::shared_ptr<Instruction> IRBuilder::CreateJumpInstruction(
     std::shared_ptr<BasicBlock> block) {
@@ -192,6 +188,9 @@ std::shared_ptr<Instruction> IRBuilder::CreateAllocaInstruction(
 
 // module, function, basic block
 
+void Module::AppendFunctionDecl(std::shared_ptr<Function> function_decl) {
+  m_function_decl_list.push_back(function_decl);
+}
 void Module::AppendFunction(std::shared_ptr<Function> function) {
   m_function_list.push_back(function);
   m_current_func = m_function_list.back();
@@ -326,26 +325,36 @@ void Module::ExportIR(std::ofstream& ofs, int depth) {
   for (auto& global_variable : m_global_variable_list) {
     global_variable->ExportIR(ofs, depth);
   }
-  // for (auto &func_decl: m_func_decl_list) {
-  //
-  // }
+  for (auto& func_decl : m_function_decl_list) {
+    func_decl->ExportIR(ofs, depth);
+  }
   for (auto& func_def : m_function_list) {
     func_def->ExportIR(ofs, depth);
   }
 }
 void Function::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
-  ofs << "define dso_local " << VarTypeToString(ReturnType());
+  if (m_is_decl) {
+    ofs << "declare ";
+  } else {
+    ofs << "define dso_local ";
+  }
+  ofs << VarTypeToString(ReturnType());
   ofs << " @" << FuncName() << "(";
   for (auto& arg : m_args) {
     arg->ExportIR(ofs, depth);
   }
-  ofs << ") {" << std::endl;
-  // TODO(garen): print function body
-  for (auto& bb : m_bb_list) {
-    bb->ExportIR(ofs, depth + 1);
+  ofs << ")";
+  if (!m_is_decl) {
+    ofs << " {" << std::endl;
+    // TODO(garen): print function body
+    for (auto& bb : m_bb_list) {
+      bb->ExportIR(ofs, depth + 1);
+    }
+    ofs << "}" << std::endl;
+  } else {
+    ofs << std::endl;
   }
-  ofs << "}" << std::endl;
 }
 void BasicBlock::ExportIR(std::ofstream& ofs, int depth) {
   for (auto& instr : m_instr_list) {
@@ -375,8 +384,22 @@ void BinaryInstruction::ExportIR(std::ofstream& ofs, int depth) {
       << GetValueName(m_rhs_val_use.m_value) << std::endl;
 }
 void CallInstruction::ExportIR(std::ofstream& ofs, int depth) {
-  // TODO(garen):
-  ofs << "(TODO) CallInstruction" << std::endl;
+  ofs << std::string(depth * 2, ' ');
+  if (m_type != ValueType::VOID) {
+    ofs << GetValueName(shared_from_this()) << " = ";
+  }
+  ofs << "call " << ValueTypeToString(m_type) << " @" << m_func_name << "(";
+  // params
+  bool first = true;
+  for (auto& param : m_params) {
+    if (first)
+      first = false;
+    else
+      ofs << ", ";
+    ofs << ValueTypeToString(param.m_value->m_type) << " "
+        << GetValueName(param.m_value);
+  }
+  ofs << ")" << std::endl;
 }
 void BranchInstruction::ExportIR(std::ofstream& ofs, int depth) {
   // TODO(garen):
@@ -471,5 +494,5 @@ void GlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
   ofs << "(TODO) GlobalVariable" << std::endl;
 }
 void FunctionArg::ExportIR(std::ofstream& ofs, int depth) {
-  // TODO(garen): depth is useless here
+  ofs << ValueTypeToString(m_type);
 }

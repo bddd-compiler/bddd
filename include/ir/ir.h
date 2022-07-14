@@ -207,21 +207,31 @@ class Function;
 
 class CallInstruction : public Instruction {
 public:
-  VarType m_return_type;
   std::string m_func_name;
   std::vector<Use> m_params;
 
-  std::shared_ptr<Function> m_function;
-
   explicit CallInstruction(VarType return_type, std::string func_name,
-                           std::vector<Use> m_params,
                            std::shared_ptr<BasicBlock> bb = nullptr)
       : Instruction(IROp::CALL, std::move(bb)),
-        m_return_type(return_type),
         m_func_name(std::move(func_name)),
-        m_params(std::move(m_params)) {}
+        m_params() {
+    switch (return_type) {
+      case VarType::INT:
+        m_type = ValueType::INT;
+        break;
+      case VarType::FLOAT:
+        m_type = ValueType::FLOAT;
+        break;
+      case VarType::VOID:
+        m_type = ValueType::VOID;
+        break;
+      default:
+        assert(false);  // unreachable
+    }
+  }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
+  void SetParams(std::vector<Use> params) { m_params = std::move(params); }
 };
 
 class BranchInstruction : public Instruction {
@@ -385,17 +395,28 @@ class FunctionArg : public Value {
 public:
   std::shared_ptr<DeclAST> m_decl;
   explicit FunctionArg(std::unique_ptr<FuncFParamAST> &arg)
-      : m_decl(arg->m_decl) {}
+      : m_decl(arg->m_decl) {
+    if (m_decl->GetVarType() == VarType::INT) {
+      if (m_decl->IsArray())
+        m_type = ValueType::INT_PTR;
+      else
+        m_type = ValueType::INT;
+    } else if (m_decl->GetVarType() == VarType::FLOAT) {
+      if (m_decl->IsArray())
+        m_type = ValueType::FLOAT_PTR;
+      else
+        m_type = ValueType::FLOAT;
+    } else
+      assert(false);  // unreachable
+  }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
 };
 
-// function declaration
-// class FuncDecl {};
-
-// class definition
+// function declaration and function definition
 class Function : public Value {
 private:
+  bool m_is_decl;
   std::string m_func_name;
   std::shared_ptr<FuncDefAST> m_func_ast;
   std::vector<std::shared_ptr<FunctionArg>> m_args;
@@ -409,9 +430,23 @@ public:
         m_func_name(func_ast->FuncName()),
         m_bb_list(),
         m_args(),
+        m_is_decl(func_ast->m_is_builtin),
         m_current_bb(nullptr) {
     for (auto &arg : func_ast->m_params) {
       m_args.push_back(std::make_unique<FunctionArg>(arg));
+    }
+    switch (func_ast->ReturnType()) {
+      case VarType::INT:
+        m_type = ValueType::INT;
+        break;
+      case VarType::FLOAT:
+        m_type = ValueType::FLOAT;
+        break;
+      case VarType::VOID:
+        m_type = ValueType::VOID;
+        break;
+      default:
+        assert(false);  // unreachable
     }
   }
 
@@ -431,7 +466,7 @@ private:
 
 public:
   std::list<std::shared_ptr<Function>> m_function_list;
-  // std::list<std::shared_ptr<FuncDecl>> m_func_decl_list;
+  std::list<std::shared_ptr<Function>> m_function_decl_list;
   std::list<std::shared_ptr<GlobalVariable>> m_global_variable_list;
 
   std::map<int, std::shared_ptr<Constant>> m_const_ints;
@@ -442,6 +477,7 @@ public:
   }
   std::shared_ptr<Function> GetCurrentFunc() { return m_current_func; }
 
+  void AppendFunctionDecl(std::shared_ptr<Function> function_decl);
   void AppendFunction(std::shared_ptr<Function> function);
   void AppendGlobalVariable(std::shared_ptr<GlobalVariable> global_variable);
   void AppendBasicBlock(std::shared_ptr<BasicBlock> bb);
@@ -477,8 +513,8 @@ public:
       IROp op, const std::shared_ptr<Value> &lhs,
       const std::shared_ptr<Value> &rhs);
 
-  std::shared_ptr<Instruction> CreateCallInstruction(
-      std::shared_ptr<FuncCallAST> func_call);
+  std::shared_ptr<CallInstruction> CreateCallInstruction(
+      std::shared_ptr<FuncDefAST> func_def);
 
   std::shared_ptr<Instruction> CreateBranchInstruction(
       std::shared_ptr<Value> cond_val, std::shared_ptr<BasicBlock> true_block,

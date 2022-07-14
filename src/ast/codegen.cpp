@@ -191,9 +191,40 @@ std::shared_ptr<Value> DeclAST::CodeGen(std::shared_ptr<IRBuilder> builder) {
 
 std::shared_ptr<Value> FuncCallAST::CodeGen(
     std::shared_ptr<IRBuilder> builder) {
+  // search from declarations
+  for (const auto &it : builder->m_module->m_function_decl_list) {
+    if (it->FuncName() == m_func_name) {
+      std::vector<Use> param_uses;
+      for (const auto &param : m_params) {
+        auto val = param->CodeGen(builder);
+        auto use = Use(val);
+        param_uses.push_back(use);
+      }
+      auto ret = builder->CreateCallInstruction(m_func_def);
+      for (auto &param : param_uses) {
+        param.SetUser(ret);
+      }
+
+      ret->SetParams(std::move(param_uses));
+      return ret;
+    }
+  }
+  // search from definitions
   for (const auto &it : builder->m_module->m_function_list) {
     if (it->FuncName() == m_func_name) {
-      return builder->CreateCallInstruction(shared_from_base<FuncCallAST>());
+      std::vector<Use> param_uses;
+      for (const auto &param : m_params) {
+        auto val = param->CodeGen(builder);
+        auto use = Use(val);
+        param_uses.push_back(use);
+      }
+      auto ret = builder->CreateCallInstruction(m_func_def);
+      for (auto &param : param_uses) {
+        param.SetUser(ret);
+      }
+
+      ret->SetParams(std::move(param_uses));
+      return ret;
     }
   }
   return nullptr;
