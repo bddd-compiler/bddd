@@ -1,6 +1,7 @@
 #ifndef BDDD_IR_H
 #define BDDD_IR_H
 
+#include <algorithm>
 #include <list>
 #include <memory>
 #include <unordered_map>
@@ -29,6 +30,7 @@ enum class IROp {
   STORE,
   GET_ELEMENT_PTR,
   PHI,
+  ZEXT,
 };
 
 enum class ValueType {
@@ -37,6 +39,8 @@ enum class ValueType {
   INT_PTR,
   FLOAT_PTR,
   VOID,
+  LABEL,  // return type of basic blocks
+  BOOL,   // value returned by icmp or fcmp
 };
 
 class Value;
@@ -46,16 +50,19 @@ public:
   std::shared_ptr<Value> m_value;
   std::shared_ptr<Value> m_user;
 
-  explicit Use(std::shared_ptr<Value> value);
+  explicit Use(std::shared_ptr<Value> value)
+      : m_value(std::move(value)), m_user(nullptr) {}
 
+  // IMPORTANT:
+  // must be done after construction in IRBuilder::CreateXXX
+  // only after this function, the whole initialization is complete
   void SetUser(std::shared_ptr<Value> user);
 };
 
 // for simplification, value and user are composite together
 class Value : public std::enable_shared_from_this<Value> {
 protected:
-  std::list<Use> m_use_list;      // users that use this value (def-use)
-  std::list<Use> m_operand_list;  // values that this user uses (use-def)
+  std::list<Use> m_use_list;  // users that use this value (def-use)
   template <typename Derived> std::shared_ptr<Derived> shared_from_base() {
     return std::static_pointer_cast<Derived>(shared_from_this());
   }
@@ -94,13 +101,21 @@ public:
       case ValueType::VOID:
         return "void ";
       default:
+        assert(false);  // unreachable
         return "???";
     }
   }
 
-  void AppendUse(Use use);
-  void AppendOperand(const Use &use);
-
+  void AppendUse(const Use &use) { m_use_list.push_back(use); }
+  void RemoveUse(const Use &use) {
+    for (auto it = m_use_list.begin(); it != m_use_list.end(); ++it) {
+      if (it->m_value == use.m_value && it->m_user == use.m_user) {
+        m_use_list.erase(it);
+        return;
+      }
+    }
+    assert(false);  // not found! what happen?
+  }
   virtual void ExportIR(std::ofstream &ofs, int depth) = 0;
 };
 
@@ -194,10 +209,38 @@ public:
       : Instruction(op, std::move(bb)),
         m_lhs_val_use(std::move(lhs_val)),
         m_rhs_val_use(std::move(rhs_val)) {
-    assert(m_lhs_val_use.m_value->m_type == m_rhs_val_use.m_value->m_type);
-    m_type = m_lhs_val_use.m_value->m_type;
-    AppendOperand(m_lhs_val_use);
-    AppendOperand(m_rhs_val_use);
+    // assert(m_lhs_val_use.m_value->m_type == m_rhs_val_use.m_value->m_type);
+    switch (op) {
+      case IROp::ADD:
+      case IROp::SUB:
+      case IROp::MUL:
+      case IROp::SDIV:
+      case IROp::SREM:
+        m_type = ValueType::INT;
+        break;
+      case IROp::SGEQ:
+      case IROp::SGE:
+      case IROp::SLEQ:
+      case IROp::SLE:
+      case IROp::EQ:
+      case IROp::NE:
+        m_type = ValueType::BOOL;
+        break;
+      case IROp::ZEXT:
+        // no need to set?
+        break;
+      case IROp::CALL:
+      case IROp::BRANCH:
+      case IROp::JUMP:
+      case IROp::RETURN:
+      case IROp::ALLOCA:
+      case IROp::LOAD:
+      case IROp::STORE:
+      case IROp::GET_ELEMENT_PTR:
+      case IROp::PHI:
+        assert(false);  // unreachable
+        break;
+    }
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
@@ -269,9 +312,7 @@ public:
 
   explicit ReturnInstruction(std::shared_ptr<Value> ret = nullptr,
                              std::shared_ptr<BasicBlock> bb = nullptr)
-      : Instruction(IROp::RETURN, std::move(bb)), m_ret(std::move(ret)) {
-    if (m_ret.m_value != nullptr) AppendOperand(m_ret);
-  }
+      : Instruction(IROp::RETURN, std::move(bb)), m_ret(std::move(ret)) {}
 
   void ExportIR(std::ofstream &ofs, int depth) override;
 
@@ -354,7 +395,9 @@ public:
   explicit AllocaInstruction(VarType type,
                              std::shared_ptr<Value> init_val = nullptr,
                              std::shared_ptr<BasicBlock> bb = nullptr)
-      : Instruction(IROp::ALLOCA, std::move(bb)), m_init_val(init_val) {
+      : Instruction(IROp::ALLOCA, std::move(bb)),
+        m_init_val(init_val),
+        m_size(0) {
     if (type == VarType::INT)
       m_type = ValueType::INT_PTR;
     else if (type == VarType::FLOAT)
@@ -371,6 +414,22 @@ public:
   void ExportIR(std::ofstream &ofs, int depth) override;
 };
 
+class ZExtInstruction : public Instruction {
+public:
+  Use m_val;
+  ValueType m_target_type;
+
+  explicit ZExtInstruction(std::shared_ptr<Value> val, ValueType target_type,
+                           std::shared_ptr<BasicBlock> bb = nullptr)
+      : Instruction(IROp::ZEXT, std::move(bb)),
+        m_val(std::move(val)),
+        m_target_type(target_type) {
+    m_type = m_target_type;
+  }
+
+  void ExportIR(std::ofstream &ofs, int depth) override;
+};
+
 class BasicBlock : public Value {
 private:
   std::string m_name;
@@ -378,7 +437,8 @@ private:
   std::list<std::shared_ptr<Instruction>> m_instr_list;
 
 public:
-  explicit BasicBlock(std::string name) : Value(), m_name(std::move(name)) {}
+  explicit BasicBlock(std::string name)
+      : Value(ValueType::LABEL), m_name(std::move(name)) {}
 
   void PushBackInstruction(std::shared_ptr<Instruction> instr);
   void PushFrontInstruction(std::shared_ptr<Instruction> instr);
@@ -546,6 +606,9 @@ public:
       std::shared_ptr<DeclAST> decl);
   std::shared_ptr<FloatGlobalVariable> CreateFloatGlobalVariable(
       std::shared_ptr<DeclAST> decl);
+
+  std::shared_ptr<Value> CreateZExtInstruction(std::shared_ptr<Value> from,
+                                               ValueType type_to);
 
   std::shared_ptr<Value> GetIntConstant(int int_val);
   std::shared_ptr<Value> GetFloatConstant(float float_val);

@@ -10,15 +10,10 @@
 
 // use, user, value
 
-Use::Use(std::shared_ptr<Value> value)
-    : m_value(std::move(value)), m_user(nullptr) {
-  if (m_value != nullptr) m_value->AppendUse(*this);
+void Use::SetUser(std::shared_ptr<Value> user) {
+  m_user = std::move(user);
+  m_value->AppendUse(*this);
 }
-void Use::SetUser(std::shared_ptr<Value> user) { m_user = std::move(user); }
-
-void Value::AppendUse(Use use) { m_use_list.push_back(use); }
-
-void Value::AppendOperand(const Use& use) { m_operand_list.push_back(use); }
 
 // IRBuilder
 
@@ -103,11 +98,28 @@ std::shared_ptr<Instruction> IRBuilder::CreateBinaryInstruction(
   auto instr = std::make_shared<BinaryInstruction>(op, lhs, rhs, bb);
   instr->m_lhs_val_use.SetUser(instr);
   instr->m_rhs_val_use.SetUser(instr);
-  assert(instr->m_lhs_val_use.m_value->m_type == ValueType::INT
-         || instr->m_lhs_val_use.m_value->m_type == ValueType::FLOAT);
-  assert(instr->m_rhs_val_use.m_value->m_type == ValueType::INT
-         || instr->m_rhs_val_use.m_value->m_type == ValueType::FLOAT);
 
+  if (instr->m_lhs_val_use.m_value->m_type == ValueType::BOOL
+      && instr->m_rhs_val_use.m_value->m_type == ValueType::INT) {
+    auto new_lhs = CreateZExtInstruction(instr->m_lhs_val_use.m_value,
+                                         instr->m_rhs_val_use.m_value->m_type);
+    instr->m_lhs_val_use.m_value->RemoveUse(instr->m_lhs_val_use);
+    instr->m_lhs_val_use = Use(new_lhs);
+    instr->m_lhs_val_use.SetUser(instr);
+
+  } else if (instr->m_lhs_val_use.m_value->m_type == ValueType::INT
+             && instr->m_rhs_val_use.m_value->m_type == ValueType::BOOL) {
+    auto new_rhs = CreateZExtInstruction(instr->m_rhs_val_use.m_value,
+                                         instr->m_lhs_val_use.m_value->m_type);
+    instr->m_rhs_val_use.m_value->RemoveUse(instr->m_rhs_val_use);
+    instr->m_rhs_val_use = Use(new_rhs);
+    instr->m_rhs_val_use.SetUser(instr);
+  } else {
+    assert(instr->m_lhs_val_use.m_value->m_type == ValueType::INT
+           || instr->m_lhs_val_use.m_value->m_type == ValueType::FLOAT);
+    assert(instr->m_lhs_val_use.m_value->m_type
+           == instr->m_rhs_val_use.m_value->m_type);
+  }
   bb->PushBackInstruction(instr);
   return instr;
 }
@@ -130,11 +142,23 @@ std::shared_ptr<Instruction> IRBuilder::CreateBranchInstruction(
     std::shared_ptr<Value> cond_val, std::shared_ptr<BasicBlock> true_block,
     std::shared_ptr<BasicBlock> false_block) {
   auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<BranchInstruction>(
-      std::move(cond_val), std::move(true_block), std::move(false_block), bb);
-  instr->m_cond.SetUser(instr);
-  bb->PushBackInstruction(instr);
-  return instr;
+  if (cond_val->m_type != ValueType::BOOL) {
+    assert(cond_val->m_type == ValueType::INT);
+    auto new_cond_val
+        = CreateBinaryInstruction(IROp::NE, cond_val, GetIntConstant(0));
+    auto instr = std::make_shared<BranchInstruction>(
+        std::move(new_cond_val), std::move(true_block), std::move(false_block),
+        bb);
+    instr->m_cond.SetUser(instr);
+    bb->PushBackInstruction(instr);
+    return instr;
+  } else {
+    auto instr = std::make_shared<BranchInstruction>(
+        std::move(cond_val), std::move(true_block), std::move(false_block), bb);
+    instr->m_cond.SetUser(instr);
+    bb->PushBackInstruction(instr);
+    return instr;
+  }
 }
 std::shared_ptr<Instruction> IRBuilder::CreateStoreInstruction(
     std::shared_ptr<Value> addr, std::shared_ptr<Value> val) {
@@ -184,6 +208,14 @@ std::shared_ptr<Instruction> IRBuilder::CreateAllocaInstruction(
     bb->PushBackInstruction(instr);
     return instr;
   }
+}
+
+std::shared_ptr<Value> IRBuilder::CreateZExtInstruction(
+    std::shared_ptr<Value> from, ValueType type_to) {
+  auto bb = m_module->GetCurrentBB();
+  auto instr = std::make_shared<ZExtInstruction>(std::move(from), type_to, bb);
+  bb->PushBackInstruction(instr);
+  return instr;
 }
 
 // module, function, basic block
@@ -261,6 +293,10 @@ std::string ValueTypeToString(ValueType value_type) {
       return "f32*";
     case ValueType::VOID:
       return "void";
+    case ValueType::BOOL:
+      return "i1";
+    case ValueType::LABEL:
+      return "label";
     default:
       assert(false);  // unreachable
   }
@@ -269,35 +305,41 @@ std::string ValueTypeToString(ValueType value_type) {
 std::string BinaryOpToString(IROp op) {
   switch (op) {
     case IROp::ADD:
-      return "add i32";
+      return "add";
     case IROp::SUB:
-      return "sub i32";
+      return "sub";
     case IROp::MUL:
-      return "mul i32";
+      return "mul";
     case IROp::SDIV:
-      return "sdiv i32";
+      return "sdiv";
     case IROp::SREM:
-      return "srem?";
+      return "srem";
     case IROp::SGEQ:
-      return "icmp geq?";
+      return "icmp sge";
     case IROp::SGE:
-      return "icmp ge?";
+      return "icmp sgt";
     case IROp::SLEQ:
-      return "icmp leq?";
+      return "icmp sle";
     case IROp::SLE:
-      return "icmp le?";
+      return "icmp slt";
     case IROp::EQ:
-      return "icmp eq?";
+      return "icmp eq";
     case IROp::NE:
-      return "icmp neq?";
+      return "icmp ne";
     default:
       return "???";
   }
 }
 
 static std::unordered_map<std::shared_ptr<Value>, std::string> g_name_of_value;
-static int g_name_of_value_cnt = 1;  // TODO(garen): special feature of LLVM
+static int g_virtual_reg_cnt = 0;
+static int g_label_cnt = 0;
+
+// return in string
+// example: %1, %L1
 std::string GetValueName(const std::shared_ptr<Value>& val) {
+  assert(val != nullptr);
+
   // check if the value is constant
   if (auto constant = std::dynamic_pointer_cast<Constant>(val)) {
     if (constant->m_is_float)
@@ -308,7 +350,30 @@ std::string GetValueName(const std::shared_ptr<Value>& val) {
 
   auto it = g_name_of_value.find(val);
   if (it == g_name_of_value.end()) {
-    g_name_of_value[val] = "%" + std::to_string(g_name_of_value_cnt++);
+    if (val->m_type == ValueType::LABEL)
+      g_name_of_value[val] = "L" + std::to_string(g_label_cnt++);
+    else
+      g_name_of_value[val] = std::to_string(g_virtual_reg_cnt++);
+  }
+  return "%" + g_name_of_value[val];
+}
+
+// return in string
+// example: 1 or L1
+std::string GetValueNumber(const std::shared_ptr<Value>& val) {
+  assert(val != nullptr);
+
+  // check if the value is constant
+  if (auto constant = std::dynamic_pointer_cast<Constant>(val)) {
+    assert(false);  // constant does not have number in virtual registers
+  }
+
+  auto it = g_name_of_value.find(val);
+  if (it == g_name_of_value.end()) {
+    if (val->m_type == ValueType::LABEL)
+      g_name_of_value[val] = "L" + std::to_string(g_label_cnt++);
+    else
+      g_name_of_value[val] = std::to_string(g_virtual_reg_cnt++);
   }
   return g_name_of_value[val];
 }
@@ -357,6 +422,7 @@ void Function::ExportIR(std::ofstream& ofs, int depth) {
   }
 }
 void BasicBlock::ExportIR(std::ofstream& ofs, int depth) {
+  ofs << GetValueNumber(shared_from_this()) << ":" << std::endl;
   for (auto& instr : m_instr_list) {
     instr->ExportIR(ofs, depth);
     ofs << std::endl;
@@ -371,15 +437,14 @@ void FloatGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
   ofs << "(TODO) FloatGlobalVariable" << std::endl;
 }
 void BinaryInstruction::ExportIR(std::ofstream& ofs, int depth) {
-  // TODO(garen):
-  assert(m_lhs_val_use.m_value->m_type == ValueType::INT
-         || m_lhs_val_use.m_value->m_type == ValueType::FLOAT);
-  assert(m_rhs_val_use.m_value->m_type == ValueType::INT
-         || m_rhs_val_use.m_value->m_type == ValueType::FLOAT);
+  // assert(m_lhs_val_use.m_value->m_type == ValueType::INT
+  //        || m_lhs_val_use.m_value->m_type == ValueType::FLOAT);
+  // assert(m_lhs_val_use.m_value->m_type == m_rhs_val_use.m_value->m_type);
 
   ofs << std::string(depth * 2, ' ');
   ofs << GetValueName(shared_from_this()) << " = ";
-  ofs << BinaryOpToString(m_op) << " ";
+  ofs << BinaryOpToString(m_op) << " "
+      << ValueTypeToString(m_lhs_val_use.m_value->m_type) << " ";
   ofs << GetValueName(m_lhs_val_use.m_value) << ", "
       << GetValueName(m_rhs_val_use.m_value) << std::endl;
 }
@@ -402,12 +467,18 @@ void CallInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << ")" << std::endl;
 }
 void BranchInstruction::ExportIR(std::ofstream& ofs, int depth) {
-  // TODO(garen):
-  ofs << "(TODO) BranchInstruction" << std::endl;
+  ofs << std::string(depth * 2, ' ') << "br ";
+  ofs << ValueTypeToString(m_cond.m_value->m_type) << " "
+      << GetValueName(m_cond.m_value) << ", ";
+  ofs << ValueTypeToString(m_true_block->m_type) << " "
+      << GetValueName(m_true_block) << ", ";
+  ofs << ValueTypeToString(m_false_block->m_type) << " "
+      << GetValueName(m_false_block) << std::endl;
 }
 void JumpInstruction::ExportIR(std::ofstream& ofs, int depth) {
-  // TODO(garen):
-  ofs << "(TODO) JumpInstruction" << std::endl;
+  ofs << std::string(depth * 2, ' ') << "br ";
+  ofs << ValueTypeToString(m_target_block->m_type) << " "
+      << GetValueName(m_target_block) << std::endl;
 }
 void ReturnInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
@@ -495,4 +566,11 @@ void GlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
 }
 void FunctionArg::ExportIR(std::ofstream& ofs, int depth) {
   ofs << ValueTypeToString(m_type);
+}
+void ZExtInstruction::ExportIR(std::ofstream& ofs, int depth) {
+  ofs << std::string(depth * 2, ' ');
+  ofs << GetValueName(shared_from_this()) << " = zext ";
+  ofs << ValueTypeToString(m_val.m_value->m_type) << " "
+      << GetValueName(m_val.m_value) << " to "
+      << ValueTypeToString(m_target_type) << std::endl;
 }

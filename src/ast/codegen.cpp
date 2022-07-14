@@ -69,6 +69,8 @@ std::shared_ptr<Value> ExprAST::CodeGen(std::shared_ptr<IRBuilder> builder) {
       // TODO(garen): A SUPER SERIOUS QUESTION: what if it is float?
       return builder->CreateBinaryInstruction(
           IROp::SUB, builder->GetIntConstant(0), lhs_val);
+      // return builder->CreateBinaryInstruction(IROp::EQ, lhs_val,
+      //                                         builder->GetIntConstant(0));
     case Op::NOT:
       lhs_val = m_lhs->CodeGen(builder);
       return builder->CreateBinaryInstruction(IROp::EQ, lhs_val,

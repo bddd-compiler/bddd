@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    filename = "../testSource/buaa/part6/test3.c";
+    filename = "../testSource/buaa/part7/test4.c";
   } else {
     std::cerr << "???";
     return 1;
