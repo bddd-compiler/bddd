@@ -70,12 +70,16 @@ std::shared_ptr<FloatGlobalVariable> IRBuilder::CreateFloatGlobalVariable(
   return global_variable;
 }
 std::shared_ptr<GlobalVariable> IRBuilder::CreateGlobalVariable(
-    std::shared_ptr<DeclAST> decl) {
-  if (decl->GetVarType() == VarType::INT)
-    return CreateIntGlobalVariable(std::move(decl));
-  else if (decl->GetVarType() == VarType::FLOAT)
-    return CreateFloatGlobalVariable(std::move(decl));
-  else
+    const std::shared_ptr<DeclAST>& decl) {
+  if (decl->GetVarType() == VarType::INT) {
+    auto addr = CreateIntGlobalVariable(decl);
+    decl->m_addr = addr;
+    return addr;
+  } else if (decl->GetVarType() == VarType::FLOAT) {
+    auto addr = CreateFloatGlobalVariable(decl);
+    decl->m_addr = addr;
+    return addr;
+  } else
     assert(false);  // unreachable
 }
 std::shared_ptr<Instruction> IRBuilder::CreateReturnInstruction(
@@ -335,6 +339,11 @@ static std::unordered_map<std::shared_ptr<Value>, std::string> g_name_of_value;
 static int g_virtual_reg_cnt = 0;
 static int g_label_cnt = 0;
 
+void SetValueName(const std::shared_ptr<Value>& val, std::string name) {
+  assert(g_name_of_value.find(val) == g_name_of_value.end());
+  g_name_of_value[val] = std::move(name);
+}
+
 // return in string
 // example: %1, %L1
 std::string GetValueName(const std::shared_ptr<Value>& val) {
@@ -351,29 +360,9 @@ std::string GetValueName(const std::shared_ptr<Value>& val) {
   auto it = g_name_of_value.find(val);
   if (it == g_name_of_value.end()) {
     if (val->m_type == ValueType::LABEL)
-      g_name_of_value[val] = "L" + std::to_string(g_label_cnt++);
+      g_name_of_value[val] = "%L" + std::to_string(g_label_cnt++);
     else
-      g_name_of_value[val] = std::to_string(g_virtual_reg_cnt++);
-  }
-  return "%" + g_name_of_value[val];
-}
-
-// return in string
-// example: 1 or L1
-std::string GetValueNumber(const std::shared_ptr<Value>& val) {
-  assert(val != nullptr);
-
-  // check if the value is constant
-  if (auto constant = std::dynamic_pointer_cast<Constant>(val)) {
-    assert(false);  // constant does not have number in virtual registers
-  }
-
-  auto it = g_name_of_value.find(val);
-  if (it == g_name_of_value.end()) {
-    if (val->m_type == ValueType::LABEL)
-      g_name_of_value[val] = "L" + std::to_string(g_label_cnt++);
-    else
-      g_name_of_value[val] = std::to_string(g_virtual_reg_cnt++);
+      g_name_of_value[val] = "%" + std::to_string(g_virtual_reg_cnt++);
   }
   return g_name_of_value[val];
 }
@@ -422,19 +411,25 @@ void Function::ExportIR(std::ofstream& ofs, int depth) {
   }
 }
 void BasicBlock::ExportIR(std::ofstream& ofs, int depth) {
-  ofs << GetValueNumber(shared_from_this()) << ":" << std::endl;
+  ofs << GetValueName(shared_from_this()).substr(1) << ":" << std::endl;
   for (auto& instr : m_instr_list) {
     instr->ExportIR(ofs, depth);
     ofs << std::endl;
   }
 }
 void IntGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
-  // TODO(garen):
-  ofs << "(TODO) IntGlobalVariable" << std::endl;
+  // depth is useless here
+  assert(m_init_vals.size() == 1);
+  SetValueName(shared_from_this(), "@" + m_varname);
+  ofs << "@" << m_varname << " = dso_local global i32 " << m_init_vals[0]
+      << std::endl;
 }
 void FloatGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
-  // TODO(garen):
-  ofs << "(TODO) FloatGlobalVariable" << std::endl;
+  // depth is useless here
+  assert(m_init_vals.size() == 1);
+  SetValueName(shared_from_this(), "@" + m_varname);
+  ofs << GetValueName(shared_from_this()) << " = dso_local global f32 "
+      << m_init_vals[0] << std::endl;
 }
 void BinaryInstruction::ExportIR(std::ofstream& ofs, int depth) {
   // assert(m_lhs_val_use.m_value->m_type == ValueType::INT
@@ -559,10 +554,6 @@ void Constant::ExportIR(std::ofstream& ofs, int depth) {
   } else {
     ofs << "i32 " << m_int_val;
   }
-}
-void GlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
-  // TODO(garen):
-  ofs << "(TODO) GlobalVariable" << std::endl;
 }
 void FunctionArg::ExportIR(std::ofstream& ofs, int depth) {
   ofs << ValueTypeToString(m_type);

@@ -154,8 +154,6 @@ public:
         m_is_const(decl->IsConst()),
         m_is_float(decl->GetVarType() == VarType::FLOAT),
         m_is_array(decl->IsArray()) {}
-
-  void ExportIR(std::ofstream &ofs, int depth) override;
 };
 
 class IntGlobalVariable : public GlobalVariable {
@@ -168,6 +166,7 @@ public:
       if (init_val == nullptr) m_init_vals.push_back(0);
       m_init_vals.push_back(init_val->IntVal());
     }
+    m_type = ValueType::INT_PTR;
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
@@ -183,6 +182,7 @@ public:
       if (init_val == nullptr) m_init_vals.push_back(0);
       m_init_vals.push_back(init_val->FloatVal());
     }
+    m_type = ValueType::FLOAT_PTR;
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
@@ -601,7 +601,7 @@ public:
       std::shared_ptr<DeclAST> decl, std::shared_ptr<Value> init_val = nullptr);
 
   std::shared_ptr<GlobalVariable> CreateGlobalVariable(
-      std::shared_ptr<DeclAST> decl);
+      const std::shared_ptr<DeclAST> &decl);
   std::shared_ptr<IntGlobalVariable> CreateIntGlobalVariable(
       std::shared_ptr<DeclAST> decl);
   std::shared_ptr<FloatGlobalVariable> CreateFloatGlobalVariable(
