@@ -326,6 +326,8 @@ std::shared_ptr<Value> WhileStmtAST::CodeGen(
   builder->m_while_exit = std::make_shared<BasicBlock>("while.finally");
 
   // codegen begin
+  builder->CreateJumpInstruction(builder->m_while_entry); // terminator
+
   builder->AppendBasicBlock(builder->m_while_entry);
 
   auto cond_val = m_cond->CodeGen(builder);
