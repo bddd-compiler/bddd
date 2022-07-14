@@ -31,6 +31,10 @@ void LValAST::AddDimension(std::unique_ptr<ExprAST> expr) {
   m_dimensions.push_back(std::move(expr));
 }
 
+bool LValAST::IsSingle() {
+  return m_decl->DimensionsSize() == m_dimensions.size();
+}
+
 bool LValAST::IsArray() {
   return m_decl->DimensionsSize() > m_dimensions.size();
 }
@@ -41,9 +45,9 @@ void DeclAST::AddDimension(int x) {
 void DeclAST::AddDimension(std::unique_ptr<ExprAST> expr) {
   m_dimensions.push_back(std::move(expr));
 }
-void FuncFParamAST::AddDimension(int x) { decl->AddDimension(x); }
+void FuncFParamAST::AddDimension(int x) { m_decl->AddDimension(x); }
 void FuncFParamAST::AddDimension(std::unique_ptr<ExprAST> expr) {
-  decl->AddDimension(std::move(expr));
+  m_decl->AddDimension(std::move(expr));
 }
 void BlockAST::AppendNodes(std::vector<std::unique_ptr<AST>> nodes) {
   m_nodes.insert(m_nodes.end(), std::make_move_iterator(nodes.begin()),
