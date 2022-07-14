@@ -1,5 +1,21 @@
 #include "asm/asm.h"
 
+bool Operand::immCheck(int imm) {
+  if ((imm & ~0xff) == 0 || (imm & ~0xc000003f) == 0 || (imm & ~0xf000000f)
+      || (imm & ~0xfc000003) == 0) {
+    return true;
+  }
+
+  unsigned int window = (0xff << 24);
+  while (window > (unsigned int)0xff) {
+    if ((imm & ~window) == 0) {
+      return true;
+    }
+    window >>= 2;
+  }
+  return false;
+}
+
 Shift::Shift(ShiftType t, int v) : s_type(t), s_val(v) {
   if (v < 0 || v > 32) {
     std::cout << "invalid shift value!" << std::endl;

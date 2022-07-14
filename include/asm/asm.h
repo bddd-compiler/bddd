@@ -135,7 +135,11 @@ public:
   Operand(std::string label) : m_op_type(OperandType::LABEL), m_name(label) {}
 
   Operand(int val) : m_op_type(OperandType::IMM), m_immval(val) {}
+
+  static bool immCheck(int imm);
 };
+
+int Operand::m_vcnt = 0;
 
 class ASM_Instruction;
 class ASM_BasicBlock;

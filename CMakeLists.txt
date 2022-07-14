@@ -21,25 +21,25 @@ FLEX_TARGET(
 ADD_FLEX_BISON_DEPENDENCY(MyScanner MyParser)
 
 set(PARSER_SOURCE
-${BISON_MyParser_OUTPUTS}
-${FLEX_MyScanner_OUTPUTS}
-src/parser/driver.cpp
+  ${BISON_MyParser_OUTPUTS}
+  ${FLEX_MyScanner_OUTPUTS}
+  src/parser/driver.cpp
 )
 
 set(AST_SOURCE
-src/ast/ast.cpp
-src/ast/symbol-table.cpp
-src/ast/type-check.cpp
-src/ast/debug.cpp
-src/ast/codegen.cpp
+  src/ast/ast.cpp
+  src/ast/symbol-table.cpp
+  src/ast/type-check.cpp
+  src/ast/debug.cpp
+  src/ast/codegen.cpp
 )
 
 set(IR_SOURCE
-src/ir/ir.cpp
+  src/ir/ir.cpp
 )
 
 set(ASM_SOURCE
-src/asm/asm.cpp
+  src/asm/asm.cpp
 )
 
 add_executable(bddd
