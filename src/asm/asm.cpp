@@ -65,7 +65,7 @@ PInst::PInst(InstOp op, std::vector<std::unique_ptr<Operand>> regs) {
 
 BInst::BInst(InstOp op, std::unique_ptr<Operand> label) {
   m_op = op;
-  m_label = std::make_unique<Operand>(label);
+  m_label = std::move(label);
 }
 
 ShiftInst::ShiftInst(InstOp op, std::unique_ptr<Operand> dest,
@@ -163,11 +163,11 @@ CTInst::CTInst(InstOp op, std::unique_ptr<Operand> operand1, int imm) {
   m_op = op;
   m_type = RIType::IMM;
   m_operand1 = std::move(operand1);
-  m_operand2 = std::make_unique<Operand>(imm);  
+  m_operand2 = std::make_unique<Operand>(imm);
 }
 
 CTInst::CTInst(InstOp op, std::unique_ptr<Operand> operand1,
-         std::unique_ptr<Operand> operand2) {
+               std::unique_ptr<Operand> operand2) {
   m_op = op;
   m_type = RIType::REG;
   m_operand1 = std::move(operand1);

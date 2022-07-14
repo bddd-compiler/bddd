@@ -1,6 +1,7 @@
 #ifndef BDDD_ASM_H
 #define BDDD_ASM_H
 
+#include <fstream>
 #include <iostream>
 #include <list>
 #include <memory>
@@ -144,6 +145,10 @@ class ASM_Module {
 public:
   std::list<std::shared_ptr<ASM_Function>> m_funcs;
   std::shared_ptr<Module> m_ir_module;
+
+  void printGlobalVar(std::ofstream& ofs);
+
+  void print(std::ofstream& ofs);
 };
 
 class ASM_Function {
@@ -151,6 +156,8 @@ public:
   std::string m_name;
   std::shared_ptr<Function> m_ir_func;
   std::list<std::shared_ptr<ASM_BasicBlock>> m_blocks;
+
+  void print(std::ofstream& ofs);
 };
 
 class ASM_BasicBlock {
@@ -158,12 +165,16 @@ public:
   std::string m_label;
   std::shared_ptr<BasicBlock> m_ir_block;
   std::list<std::shared_ptr<ASM_Instruction>> m_insts;
+
+  void print(std::ofstream& ofs);
 };
 
 class ASM_Instruction {
 public:
   InstOp m_op;
   CondType m_cond;
+
+  virtual void print(std::ofstream& ofs) = 0;
 };
 
 class Shift {
@@ -274,7 +285,7 @@ public:
 
   MULInst(InstOp op, std::unique_ptr<Operand> dest,
           std::unique_ptr<Operand> operand1, std::unique_ptr<Operand> operand2,
-          std::unique_ptr<Operand> append = nullptr);
+          std::unique_ptr<Operand> append);
 };
 
 class SDIVInst : public ASM_Instruction {
