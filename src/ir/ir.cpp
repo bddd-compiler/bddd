@@ -223,15 +223,20 @@ std::shared_ptr<Instruction> IRBuilder::CreateAllocaInstruction(
 
   if (decl->IsArray()) {
     std::vector<int> dimensions;
-    for (auto& dimension : decl->m_dimensions) {
-      dimensions.push_back(dimension->IntVal());
+    int ptr_cnt = 1;
+    if (decl->m_dimensions[0] == nullptr) {
+      ++ptr_cnt;
+    } else
+      dimensions.push_back(decl->m_dimensions[0]->IntVal());
+
+    for (int i = 1; i < decl->m_dimensions.size(); ++i) {
+      dimensions.push_back(decl->m_dimensions[i]->IntVal());
     }
     auto value_type
-        = ValueType(decl->GetVarType(), std::move(dimensions), true);
-    if (decl->IsParam()) {
-      int x = decl->m_dimensions.size();
-      value_type = value_type.Reduce(x).Reference(x);
-    }
+        = ValueType(decl->GetVarType(), std::move(dimensions), ptr_cnt);
+    // if (decl->IsParam()) {
+    //   value_type = value_type.Reduce(1).Reference(1);
+    // }
     auto instr = std::make_shared<AllocaInstruction>(value_type, init_val, bb);
     bb->PushBackInstruction(instr);
     return instr;

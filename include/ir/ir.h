@@ -444,10 +444,19 @@ public:
 
   explicit FunctionArg(std::unique_ptr<FuncFParamAST> &arg)
       : m_decl(arg->m_decl) {
+    std::vector<int> dimensions;
+    if (m_decl->m_dimensions.size() >= 1) {
+      assert(m_decl->m_dimensions[0] == nullptr);
+    }
+    for (int i = 1; i < m_decl->m_dimensions.size(); ++i) {
+      dimensions.push_back(m_decl->m_dimensions[i]->IntVal());
+    }
     if (m_decl->GetVarType() == VarType::INT) {
-      m_type.Set(BaseType::INT, m_decl->DimensionsSize());
+      m_type.Set(BaseType::INT, std::move(dimensions),
+                 m_decl->DimensionsSize() >= 1);
     } else if (m_decl->GetVarType() == VarType::FLOAT) {
-      m_type.Set(BaseType::FLOAT, m_decl->DimensionsSize());
+      m_type.Set(BaseType::FLOAT, std::move(dimensions),
+                 m_decl->DimensionsSize() >= 1);
     } else
       assert(false);  // unreachable
     // if (m_decl->IsArray() && m_decl->IsParam()) {
@@ -478,8 +487,9 @@ public:
         m_args(),
         m_is_decl(func_ast->m_is_builtin),
         m_current_bb(nullptr) {
-    for (auto &arg : func_ast->m_params) {
-      m_args.push_back(std::make_shared<FunctionArg>(arg));
+    for (auto &param : func_ast->m_params) {
+      auto arg = std::make_shared<FunctionArg>(param);
+      m_args.push_back(arg);
     }
     switch (func_ast->ReturnType()) {
       case VarType::INT:

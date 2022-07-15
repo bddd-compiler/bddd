@@ -11,9 +11,9 @@ int main(int argc, char **argv) {
   if (argc == 2) {
     filename = argv[1];
   } else if (argc == 1) {
-    // std::cout << "input source code file: >";
-    // std::cin >> filename;
-    filename = "../testSource/buaa/part13/test4.c";
+    std::cout << "input source code file: >";
+    std::cin >> filename;
+    // filename = "../testSource/buaa/part12/test3.c";
   } else {
     std::cerr << "???";
     return 1;

@@ -25,13 +25,11 @@ std::shared_ptr<Value> LValAST::CodeGen(std::shared_ptr<IRBuilder> builder) {
     }
   } else {
     // function argument
-    assert(IsSingle());
-
     // for (auto &dimension : m_indices) {
     //   builder->CreateGetElementPtrInstruction(0, dimension->IntVal())
     // }
     // if single, load the value
-    return nullptr;
+    assert(false);
   }
 }
 
@@ -51,7 +49,7 @@ std::shared_ptr<Value> LValAST::CodeGenAddr(
     addr = builder->CreateLoadInstruction(addr);
     ++cnt;
   }
-  assert(cnt <= 1);
+  // assert(cnt <= 1);
   std::vector<std::shared_ptr<Value>> indices;
   if (cnt < 1) indices.push_back(builder->GetIntConstant(0));
   for (auto &index : m_indices) {
@@ -182,14 +180,13 @@ std::shared_ptr<Value> DeclAST::CodeGen(std::shared_ptr<IRBuilder> builder) {
     }
   }
   if (IsArray()) {
-    auto addr = builder->CreateAllocaInstruction(shared_from_base<DeclAST>());
-    // use memset
-    std::vector<std::shared_ptr<Value>> first_indices;
-    first_indices.push_back(builder->GetIntConstant(0));
-    for (size_t i = 0; i < m_dimensions.size(); ++i) {
-      first_indices.push_back(builder->GetIntConstant(0));
-    }
     if (!m_is_param) {
+      auto addr = builder->CreateAllocaInstruction(shared_from_base<DeclAST>());
+      std::vector<std::shared_ptr<Value>> first_indices;
+      first_indices.push_back(builder->GetIntConstant(0));
+      for (size_t i = 0; i < m_dimensions.size(); ++i) {
+        first_indices.push_back(builder->GetIntConstant(0));
+      }
       // invoke memset to zero-initialize local array
       auto first_elem = builder->CreateGetElementPtrInstruction(
           addr, std::move(first_indices));
@@ -211,8 +208,13 @@ std::shared_ptr<Value> DeclAST::CodeGen(std::shared_ptr<IRBuilder> builder) {
           }
         }
       }
+      return m_addr = addr;
+    } else {
+      assert(m_dimensions[0] == nullptr);
+      // actually, we should not allocate an array but a fat pointer
+      auto addr = builder->CreateAllocaInstruction(shared_from_base<DeclAST>());
+      return m_addr = addr;
     }
-    return m_addr = addr;
   } else {
     // single
     if (m_init_val) {
@@ -232,68 +234,46 @@ std::shared_ptr<Value> DeclAST::CodeGen(std::shared_ptr<IRBuilder> builder) {
 std::shared_ptr<Value> FuncCallAST::CodeGen(
     std::shared_ptr<IRBuilder> builder) {
   // search from declarations
-  for (const auto &it : builder->m_module->m_function_decl_list) {
-    if (it->FuncName() == m_func_name) {
-      std::vector<Use> param_uses;
-      assert(m_params.size() == it->m_args.size());
-      for (int i = 0; i < m_params.size(); ++i) {
-        auto val = m_params[i]->CodeGen(builder);
-        if (val->m_type.m_dimensions > it->m_args[i]->m_type.m_dimensions
-            && val->m_type.m_num_star == it->m_args[i]->m_type.m_num_star) {
-          // fat pointer to thin pointer
-          std::vector<std::shared_ptr<Value>> gep_params(
-              val->m_type.m_dimensions.size() + 1
-                  - it->m_args[i]->m_type.m_dimensions.size(),
-              builder->GetIntConstant(0));
-          val = builder->CreateGetElementPtrInstruction(val,
-                                                        std::move(gep_params));
-        }
-        assert(val->m_type == it->m_args[i]->m_type);
-        auto use = Use(val);
-        param_uses.push_back(use);
-      }
-      auto ret = builder->CreateCallInstruction(m_func_def->ReturnType(),
-                                                m_func_name);
-      for (auto &param : param_uses) {
-        param.SetUser(ret);
-      }
-
-      ret->SetParams(std::move(param_uses));
-      return ret;
-    }
+  auto it = std::find_if(builder->m_module->m_function_decl_list.begin(),
+                         builder->m_module->m_function_decl_list.end(),
+                         [=](const std::shared_ptr<Function> &ptr) {
+                           return ptr->FuncName() == m_func_name;
+                         });
+  if (it == builder->m_module->m_function_decl_list.end()) {
+    it = std::find_if(builder->m_module->m_function_list.begin(),
+                      builder->m_module->m_function_list.end(),
+                      [=](const std::shared_ptr<Function> &ptr) {
+                        return ptr->FuncName() == m_func_name;
+                      });
+    assert(it != builder->m_module->m_function_list.end());
   }
-  // search from definitions
-  for (const auto &it : builder->m_module->m_function_list) {
-    if (it->FuncName() == m_func_name) {
-      std::vector<Use> param_uses;
-      assert(m_params.size() == it->m_args.size());
-      for (int i = 0; i < m_params.size(); ++i) {
-        auto val = m_params[i]->CodeGen(builder);
-        if (val->m_type.m_dimensions > it->m_args[i]->m_type.m_dimensions
-            && val->m_type.m_num_star == it->m_args[i]->m_type.m_num_star) {
-          // fat pointer to thin pointer
-          std::vector<std::shared_ptr<Value>> gep_params(
-              val->m_type.m_dimensions.size() + 1
-                  - it->m_args[i]->m_type.m_dimensions.size(),
-              builder->GetIntConstant(0));
-          val = builder->CreateGetElementPtrInstruction(val,
-                                                        std::move(gep_params));
-        }
-        assert(val->m_type == it->m_args[i]->m_type);
-        auto use = Use(val);
-        param_uses.push_back(use);
-      }
-      auto ret = builder->CreateCallInstruction(m_func_def->ReturnType(),
-                                                m_func_name);
-      for (auto &param : param_uses) {
-        param.SetUser(ret);
-      }
-
-      ret->SetParams(std::move(param_uses));
-      return ret;
+  auto ptr = *it;
+  std::vector<Use> param_uses;
+  assert(m_params.size() == ptr->m_args.size());
+  for (int i = 0; i < m_params.size(); ++i) {
+    auto val = m_params[i]->CodeGen(builder);
+    if (val->m_type.m_dimensions.size()
+            > ptr->m_args[i]->m_type.m_dimensions.size()
+        && val->m_type.m_num_star == ptr->m_args[i]->m_type.m_num_star) {
+      // fat pointer to thin pointer
+      std::vector<std::shared_ptr<Value>> gep_params(
+          val->m_type.m_dimensions.size() + 1
+              - ptr->m_args[i]->m_type.m_dimensions.size(),
+          builder->GetIntConstant(0));
+      val = builder->CreateGetElementPtrInstruction(val, std::move(gep_params));
     }
+    assert(val->m_type == ptr->m_args[i]->m_type);
+
+    auto use = Use(val);
+    param_uses.push_back(use);
   }
-  return nullptr;
+  auto ret
+      = builder->CreateCallInstruction(m_func_def->ReturnType(), m_func_name);
+  for (auto &param : param_uses) {
+    param.SetUser(ret);
+  }
+  ret->SetParams(std::move(param_uses));
+  return ret;
 }
 
 std::shared_ptr<Value> CondAST::CodeGen(std::shared_ptr<IRBuilder> builder) {

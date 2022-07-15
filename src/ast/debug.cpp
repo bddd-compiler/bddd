@@ -147,7 +147,10 @@ void DeclAST::Debug(std::ofstream& ofs, int depth) {
   if (!m_dimensions.empty()) {
     ofs << " (array):" << std::endl;
     for (auto& dimension : m_dimensions) {
-      dimension->Debug(ofs, depth + 1);
+      if (dimension == nullptr)
+        ofs << "[]" << std::endl;
+      else
+        dimension->Debug(ofs, depth + 1);
     }
   } else {
     ofs << " (single):" << std::endl;

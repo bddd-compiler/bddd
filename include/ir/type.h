@@ -20,17 +20,17 @@ public:
   std::vector<int> m_dimensions;
   int m_num_star;  // have *
 
-  explicit ValueType(BaseType base_type, bool is_ptr = false)
-      : m_base_type(base_type), m_dimensions(), m_num_star(is_ptr) {}
+  explicit ValueType(BaseType base_type, int ptr_cnt = 0)
+      : m_base_type(base_type), m_dimensions(), m_num_star(ptr_cnt) {}
 
   explicit ValueType(BaseType base_type, std::vector<int> dimensions,
-                     bool is_ptr = false)
+                     int ptr_cnt = 0)
       : m_base_type(base_type),
         m_dimensions(std::move(dimensions)),
-        m_num_star(is_ptr) {}
+        m_num_star(ptr_cnt) {}
 
-  explicit ValueType(VarType var_type, bool is_ptr = false)
-      : m_base_type(), m_dimensions(), m_num_star(is_ptr) {
+  explicit ValueType(VarType var_type, int ptr_cnt = 0)
+      : m_base_type(), m_dimensions(), m_num_star(ptr_cnt) {
     switch (var_type) {
       case VarType::INT:
         m_base_type = BaseType::INT;
@@ -47,8 +47,8 @@ public:
   }
 
   explicit ValueType(VarType var_type, std::vector<int> dimensions,
-                     bool is_ptr = false)
-      : ValueType(var_type, is_ptr) {
+                     int ptr_cnt = 0)
+      : ValueType(var_type, ptr_cnt) {
     m_dimensions = std::move(dimensions);
   }
 

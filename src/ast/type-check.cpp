@@ -549,7 +549,7 @@ void DeclAST::TypeCheck(SymbolTable& symbol_table) {
       for (int i = m_dimensions.size() - 1; i > 0; --i) {
         m_dimensions[i]->TypeCheck(symbol_table);
       }
-      if (!m_dimensions[0]->IsConst() || m_dimensions[0]->IntVal() != -1) {
+      if (m_dimensions[0] != nullptr) {
         throw MyException("the first dimension of param array is not empty?!");
       }
       m_products.clear();
