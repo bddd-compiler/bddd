@@ -42,7 +42,7 @@ void LValAST::TypeCheck(SymbolTable& symbol_table) {
   if (!ptr) throw MyException("undefined lval");
   m_decl = ptr;
   if (m_decl->DimensionsSize() < m_dimensions.size())
-    throw MyException("array dimensions of lval more than real array");
+    throw MyException("array m_dimensions of lval more than real array");
 
   for (auto& dimension : m_dimensions) {
     dimension->TypeCheck(symbol_table);
@@ -52,33 +52,23 @@ std::variant<int, float> LValAST::Evaluate(SymbolTable& symbol_table) {
   assert(!IsArray());
   assert(m_decl != nullptr);
   if (m_dimensions.empty()) {
-    return m_decl->Evaluate(symbol_table, 0);
+    return m_decl->GetFlattenVal(symbol_table, 0);
   }
 
   int offset = 0;
-  std::vector<int> products(m_decl->DimensionsSize());
 
-  // calculate array products
-  int tot = 1;
-  for (int i = m_decl->m_dimensions.size() - 1; i >= 0; --i) {
-    // happen after DeclAST::TypeCheck
-    auto [type, res] = m_decl->m_dimensions[i]->Evaluate(symbol_table);
-    assert(type == ExprAST::EvalType::INT);
-    tot *= std::get<int>(res);
-    products[i] = tot;
-  }
-
+  assert(m_decl->m_products.size() == m_decl->m_dimensions.size());
   size_t i;
   for (i = 0; i < m_dimensions.size() - 1; i++) {
     auto [type, res] = m_dimensions[i]->Evaluate(symbol_table);
     assert(type == ExprAST::EvalType::INT);
-    offset += std::get<int>(res) * products[i + 1];
+    offset += std::get<int>(res) * m_decl->m_products[i + 1];
   }
   auto [type, res] = m_dimensions[i]->Evaluate(symbol_table);
   assert(type == ExprAST::EvalType::INT || type == ExprAST::EvalType::VAR_INT);
   offset += std::get<int>(res);
 
-  return m_decl->Evaluate(symbol_table, offset);
+  return m_decl->GetFlattenVal(symbol_table, offset);
 }
 void ExprAST::TypeCheck(SymbolTable& symbol_table) {
   auto [var_type, res] = Evaluate(symbol_table);
@@ -93,6 +83,7 @@ void ExprAST::TypeCheck(SymbolTable& symbol_table) {
       SetIsConst(false);
       break;
     case EvalType::ARR:
+    case EvalType::VOID:
       // do nothing
       break;
     case EvalType::ERROR:
@@ -107,6 +98,20 @@ void ExprAST::TypeCheck(SymbolTable& symbol_table) {
 // there is no distinction between int and bool
 // array may be evaluated, which cannot join in any computation
 std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
+    SymbolTable& symbol_table) {
+  auto ret = EvaluateInner(symbol_table);
+  // memorize the answer
+  if (ret.first == EvalType::INT) {
+    m_op = Op::CONST_INT;
+    m_int_val = std::get<int>(ret.second);
+  } else if (ret.first == EvalType::FLOAT) {
+    m_op = Op::CONST_FLOAT;
+    m_float_val = std::get<float>(ret.second);
+  }
+  return ret;
+}
+
+std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::EvaluateInner(
     SymbolTable& symbol_table) {
   std::pair<EvalType, std::variant<int, float>> lhs_res, rhs_res;
   switch (m_op) {
@@ -173,7 +178,9 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
           return std::make_pair(EvalType::ERROR, 0);
         }
       } else if (lhs_res.first == EvalType::VAR_FLOAT) {
-        if (rhs_res.first != EvalType::ERROR)
+        if (rhs_res.first == EvalType::INT || rhs_res.first == EvalType::FLOAT
+            || rhs_res.first == EvalType::VAR_INT
+            || rhs_res.first == EvalType::VAR_FLOAT)
           return std::make_pair(EvalType::VAR_FLOAT, 0);
         else
           return std::make_pair(EvalType::ERROR, 0);
@@ -227,7 +234,9 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
           return std::make_pair(EvalType::ERROR, 0);
         }
       } else if (lhs_res.first == EvalType::VAR_FLOAT) {
-        if (rhs_res.first != EvalType::ERROR)
+        if (rhs_res.first == EvalType::INT || rhs_res.first == EvalType::FLOAT
+            || rhs_res.first == EvalType::VAR_INT
+            || rhs_res.first == EvalType::VAR_FLOAT)
           return std::make_pair(EvalType::VAR_FLOAT, 0);
         else
           return std::make_pair(EvalType::ERROR, 0);
@@ -391,9 +400,44 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
     case Op::NEQ:
       lhs_res = m_lhs->Evaluate(symbol_table);
       rhs_res = m_rhs->Evaluate(symbol_table);
-      if (lhs_res.first != EvalType::ERROR && lhs_res.first != EvalType::ARR
-          && rhs_res.first != EvalType::ERROR
-          && rhs_res.first != EvalType::ARR) {
+      if ((lhs_res.first == EvalType::INT || lhs_res.first == EvalType::FLOAT)
+          && (rhs_res.first == EvalType::INT
+              || rhs_res.first == EvalType::FLOAT)) {
+        // lhs and rhs are constant, then the result is also constant
+        float lhs_num, rhs_num;
+        if (lhs_res.first == EvalType::INT)
+          lhs_num = static_cast<float>(std::get<int>(lhs_res.second));
+        else
+          lhs_num = std::get<float>(lhs_res.second);
+        if (rhs_res.first == EvalType::INT)
+          rhs_num = static_cast<float>(std::get<int>(rhs_res.second));
+        else
+          rhs_num = std::get<float>(rhs_res.second);
+
+        if (m_op == Op::LE)
+          return std::make_pair(EvalType::INT, lhs_num < rhs_num ? 1 : 0);
+        else if (m_op == Op::LEQ)
+          return std::make_pair(EvalType::INT, lhs_num <= rhs_num ? 1 : 0);
+        else if (m_op == Op::GE)
+          return std::make_pair(EvalType::INT, lhs_num > rhs_num ? 1 : 0);
+        else if (m_op == Op::GEQ)
+          return std::make_pair(EvalType::INT, lhs_num >= rhs_num ? 1 : 0);
+        else if (m_op == Op::EQ)
+          return std::make_pair(EvalType::INT, lhs_num == rhs_num ? 1 : 0);
+        else if (m_op == Op::NEQ)
+          return std::make_pair(EvalType::INT, lhs_num != rhs_num ? 1 : 0);
+        else
+          assert(false);  // unreachable
+
+      } else if ((lhs_res.first == EvalType::INT
+                  || lhs_res.first == EvalType::FLOAT
+                  || lhs_res.first == EvalType::VAR_INT
+                  || lhs_res.first == EvalType::VAR_FLOAT)
+                 && ((rhs_res.first == EvalType::INT
+                      || rhs_res.first == EvalType::FLOAT
+                      || rhs_res.first == EvalType::VAR_INT
+                      || rhs_res.first == EvalType::VAR_FLOAT))) {
+        // either one of them is not constant, then may be 1 or 0
         return std::make_pair(EvalType::VAR_INT, 0);
       } else {
         return std::make_pair(EvalType::ERROR, 0);
@@ -431,8 +475,9 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
       } else if (lhs_res.first == EvalType::VAR_INT
                  || lhs_res.first == EvalType::VAR_FLOAT) {
         return std::make_pair(EvalType::VAR_INT, 0);
-      } else
+      } else {
         return std::make_pair(EvalType::ERROR, 0);
+      }
       break;
     case Op::CONST_INT:
       return std::make_pair(EvalType::INT, m_int_val);
@@ -477,16 +522,18 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
     case Op::FUNC_CALL:
       m_func_call->TypeCheck(symbol_table);
 
-      if (m_func_call->GetReturnType() == VarType::INT)
-        return std::make_pair(EvalType::VAR_INT, 0);
-      else if (m_func_call->GetReturnType() == VarType::FLOAT)
-        return std::make_pair(EvalType::VAR_FLOAT, 0);
-      else if (m_func_call->GetReturnType() == VarType::VOID) {
-        // TODO(garen): temp solution with serious problems
-        // void function call should return nothing, rather than an integer
-        return std::make_pair(EvalType::INT, 0);
-      } else
-        return std::make_pair(EvalType::ERROR, 0);
+      switch (m_func_call->ReturnType()) {
+        case VarType::INT:
+          return std::make_pair(EvalType::VAR_INT, 0);
+        case VarType::FLOAT:
+          return std::make_pair(EvalType::VAR_FLOAT, 0);
+        case VarType::VOID:
+          // TODO(garen): temp solution with serious problems
+          // void function call should return nothing, rather than an integer
+          return std::make_pair(EvalType::VOID, 0);
+        default:
+          return std::make_pair(EvalType::ERROR, 0);
+      }
       break;
     default:
       assert(false);  // unreachable
@@ -543,18 +590,18 @@ void DeclAST::TypeCheck(SymbolTable& symbol_table) {
     }
   } else {  // array
     int tot = 1;
-    std::vector<int> products(m_dimensions.size());
+    m_products.resize(m_dimensions.size());
     for (int i = m_dimensions.size() - 1; i >= 0; --i) {
       m_dimensions[i]->TypeCheck(symbol_table);
       auto [type, res] = m_dimensions[i]->Evaluate(symbol_table);
       assert(type == ExprAST::EvalType::INT);
       tot *= std::get<int>(res);
-      products[i] = tot;
+      m_products[i] = tot;
     }
     m_flatten_vals.resize(tot);
     if (m_init_val) {
       int offset = 0;
-      m_init_val->FillVals(0, offset, products, m_flatten_vals);
+      m_init_val->FillVals(0, offset, m_products, m_flatten_vals);
     } else {
       // temporarily all set to nullptr
       // TODO(garen): insert *tot* random values
@@ -568,9 +615,10 @@ void DeclAST::TypeCheck(SymbolTable& symbol_table) {
     throw MyException("declaration defined multiple times");
 }
 
-std::variant<int, float> DeclAST::Evaluate(SymbolTable& symbol_table, int n) {
-  assert(n < m_flatten_vals.size());
-  auto [type, ret] = m_flatten_vals[n]->Evaluate(symbol_table);
+std::variant<int, float> DeclAST::GetFlattenVal(SymbolTable& symbol_table,
+                                                int offset) {
+  assert(offset < m_flatten_vals.size());
+  auto [type, ret] = m_flatten_vals[offset]->Evaluate(symbol_table);
   assert(type == ExprAST::EvalType::INT || type == ExprAST::EvalType::FLOAT);
   return ret;
 }
@@ -579,9 +627,10 @@ void FuncCallAST::TypeCheck(SymbolTable& symbol_table) {
   auto ptr = symbol_table.GetFuncDef(m_func_name);
   if (!ptr) throw MyException("FuncCall call on undefined function");
 
-  if (ParamsSize() != ptr->ParamsSize())
+  if (FuncName() != "putf" && ParamsSize() != ptr->ParamsSize())
     throw MyException("incorrect # of params");
 
+  m_func_def = ptr;
   m_return_type = ptr->ReturnType();
   for (auto& param : m_params) {
     param->TypeCheck(symbol_table);
@@ -592,9 +641,9 @@ void CondAST::TypeCheck(SymbolTable& symbol_table) {
 }
 void FuncFParamAST::TypeCheck(SymbolTable& symbol_table) {
   // TODO(garen): FuncFParamAST::TypeCheck
-  // allow name shadowing
-  decl->TypeCheck(symbol_table);
-  if (!symbol_table.Insert(decl->VarName(), decl))
+  // allow m_name shadowing
+  m_decl->TypeCheck(symbol_table);
+  if (!symbol_table.Insert(m_decl->VarName(), m_decl))
     throw MyException("redefined variable conflict with function argument");
 }
 void BlockAST::TypeCheck(SymbolTable& symbol_table) {
@@ -630,6 +679,8 @@ void FuncDefAST::TypeCheck(SymbolTable& symbol_table) {
 }
 void AssignStmtAST::TypeCheck(SymbolTable& symbol_table) {
   m_lval->TypeCheck(symbol_table);
+  if (m_lval->m_decl->IsConst())
+    throw MyException("lval must be a non-const variable");
   m_rhs->TypeCheck(symbol_table);
 }
 void EvalStmtAST::TypeCheck(SymbolTable& symbol_table) {

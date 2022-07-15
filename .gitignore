@@ -5,3 +5,7 @@ cmake-build-debug
 ast.out
 test.c
 testSource
+*ast.out
+*ir.out
+*.ll
+*.exe

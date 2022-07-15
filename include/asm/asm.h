@@ -150,16 +150,26 @@ public:
   std::list<std::shared_ptr<ASM_Function>> m_funcs;
   std::shared_ptr<Module> m_ir_module;
 
+  ASM_Module(std::shared_ptr<Module> ir_module) : m_ir_module(ir_module) {}
+
   void printGlobalVar(std::ofstream& ofs);
 
   void print(std::ofstream& ofs);
 };
+
+class PInst;
 
 class ASM_Function {
 public:
   std::string m_name;
   std::shared_ptr<Function> m_ir_func;
   std::list<std::shared_ptr<ASM_BasicBlock>> m_blocks;
+  std::shared_ptr<ASM_BasicBlock> m_rblock;
+  std::list<std::unique_ptr<Operand>> m_params;
+  std::unique_ptr<PInst> m_push, m_pop;
+  unsigned int m_stack_size;
+
+  ASM_Function(std::shared_ptr<Function> if_func);
 
   void print(std::ofstream& ofs);
 };
@@ -203,6 +213,8 @@ public:
 
   LDRInst(std::unique_ptr<Operand> dest, std::unique_ptr<Operand> src,
           std::unique_ptr<Operand> offs);
+
+  void print(std::ofstream& ofs) override;
 };
 
 class STRInst : public ASM_Instruction {
@@ -217,6 +229,8 @@ public:
 
   STRInst(std::unique_ptr<Operand> src, std::unique_ptr<Operand> dest,
           std::unique_ptr<Operand> offs);
+
+  void print(std::ofstream& ofs) override;
 };
 
 // TODO(Huang): class ADRInst
@@ -231,6 +245,8 @@ public:
   MOVInst(std::unique_ptr<Operand> dest, int imm);
 
   MOVInst(std::unique_ptr<Operand> dest, std::unique_ptr<Operand> src);
+
+  void print(std::ofstream& ofs) override;
 };
 
 // TODO(Huang): class VMOVInst
@@ -240,6 +256,8 @@ public:
   std::vector<std::unique_ptr<Operand>> m_regs;
 
   PInst(InstOp op, std::vector<std::unique_ptr<Operand>> regs);
+
+  void print(std::ofstream& ofs) override;
 };
 
 class BInst : public ASM_Instruction {
@@ -247,6 +265,8 @@ public:
   std::unique_ptr<Operand> m_label;
 
   BInst(InstOp op, std::unique_ptr<Operand> label);
+
+  void print(std::ofstream& ofs) override;
 };
 
 class ShiftInst : public ASM_Instruction {
@@ -261,6 +281,8 @@ public:
 
   ShiftInst(InstOp op, std::unique_ptr<Operand> dest,
             std::unique_ptr<Operand> src, std::unique_ptr<Operand> sval);
+
+  void print(std::ofstream& ofs) override;
 };
 
 // ADD SUB RSB
@@ -277,6 +299,8 @@ public:
 
   ASInst(InstOp op, std::unique_ptr<Operand> dest,
          std::unique_ptr<Operand> operand1, std::unique_ptr<Operand> operand2);
+
+  void print(std::ofstream& ofs) override;
 };
 
 // MUL MLA MLS
@@ -290,6 +314,8 @@ public:
   MULInst(InstOp op, std::unique_ptr<Operand> dest,
           std::unique_ptr<Operand> operand1, std::unique_ptr<Operand> operand2,
           std::unique_ptr<Operand> append);
+
+  void print(std::ofstream& ofs) override;
 };
 
 class SDIVInst : public ASM_Instruction {
@@ -300,6 +326,8 @@ public:
 
   SDIVInst(std::unique_ptr<Operand> dest, std::unique_ptr<Operand> devidend,
            std::unique_ptr<Operand> devisor);
+
+  void print(std::ofstream& ofs) override;
 };
 
 class BITInst : public ASM_Instruction {
@@ -321,6 +349,8 @@ public:
 
   BITInst(InstOp op, std::unique_ptr<Operand> dest,
           std::unique_ptr<Operand> operand1);
+
+  void print(std::ofstream& ofs) override;
 };
 
 // CMP TST
@@ -335,6 +365,8 @@ public:
 
   CTInst(InstOp op, std::unique_ptr<Operand> operand1,
          std::unique_ptr<Operand> operand2);
+
+  void print(std::ofstream& ofs) override;
 };
 
 #endif  // BDDD_ASM_H

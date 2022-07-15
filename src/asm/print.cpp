@@ -14,8 +14,8 @@ void ASM_Module::print(std::ofstream& ofs) {
 
   printGlobalVar(ofs);
   ofs << "\t.text" << std::endl;  // start of the code section
-  for (auto& p : m_funcs) {
-    p->print(ofs);
+  for (auto& f : m_funcs) {
+    f->print(ofs);
   }
 
   // sylib generates additional outputs and we have to link it.
@@ -29,9 +29,21 @@ void ASM_Function::print(std::ofstream& ofs) {
   ofs << "\t.align 2" << std::endl;
   ofs << "\t.type " << m_name << ", \%function" << std::endl;
   ofs << m_name << ":" << std::endl;
+  m_push->print(ofs);
+  
+  // TODO(Huang): stack allocate
 
-  // TODO(Huang): print PUSH, Block and POP
+  for (auto& b : m_blocks) {
+    b->print(ofs);
+  }
 
+  // TODO(Huang): stack reclaim
+
+  m_pop->print(ofs);
   ofs << "\t.pool" << std::endl;
   ofs << "\t.size " << m_name << ", .-" << m_name << std::endl;
+}
+
+void ASM_BasicBlock::print(std::ofstream& ofs) {
+  
 }

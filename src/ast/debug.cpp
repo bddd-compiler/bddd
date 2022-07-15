@@ -171,7 +171,7 @@ void CondAST::Debug(std::ofstream& ofs, int depth) {
 }
 void FuncFParamAST::Debug(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ') << "FuncFParamAST (special DeclAST):";
-  decl->Debug(ofs, depth);
+  m_decl->Debug(ofs, depth);
 }
 void BlockAST::Debug(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ') << "BlockAST:" << std::endl;
