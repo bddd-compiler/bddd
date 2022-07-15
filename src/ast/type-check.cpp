@@ -41,17 +41,17 @@ void LValAST::TypeCheck(SymbolTable& symbol_table) {
   auto ptr = symbol_table.GetDecl(m_name);
   if (!ptr) throw MyException("undefined lval");
   m_decl = ptr;
-  if (m_decl->DimensionsSize() < m_dimensions.size())
-    throw MyException("array m_dimensions of lval more than real array");
+  if (m_decl->DimensionsSize() < m_indices.size())
+    throw MyException("array m_indices of lval more than real array");
 
-  for (auto& dimension : m_dimensions) {
-    dimension->TypeCheck(symbol_table);
+  for (auto& index : m_indices) {
+    index->TypeCheck(symbol_table);
   }
 }
 std::variant<int, float> LValAST::Evaluate(SymbolTable& symbol_table) {
   assert(!IsArray());
   assert(m_decl != nullptr);
-  if (m_dimensions.empty()) {
+  if (m_indices.empty()) {
     return m_decl->GetFlattenVal(symbol_table, 0);
   }
 
@@ -59,12 +59,12 @@ std::variant<int, float> LValAST::Evaluate(SymbolTable& symbol_table) {
 
   assert(m_decl->m_products.size() == m_decl->m_dimensions.size());
   size_t i;
-  for (i = 0; i < m_dimensions.size() - 1; i++) {
-    auto [type, res] = m_dimensions[i]->Evaluate(symbol_table);
+  for (i = 0; i < m_indices.size() - 1; i++) {
+    auto [type, res] = m_indices[i]->Evaluate(symbol_table);
     assert(type == ExprAST::EvalType::INT);
     offset += std::get<int>(res) * m_decl->m_products[i + 1];
   }
-  auto [type, res] = m_dimensions[i]->Evaluate(symbol_table);
+  auto [type, res] = m_indices[i]->Evaluate(symbol_table);
   assert(type == ExprAST::EvalType::INT || type == ExprAST::EvalType::VAR_INT);
   offset += std::get<int>(res);
 
@@ -552,6 +552,8 @@ void DeclAST::TypeCheck(SymbolTable& symbol_table) {
       if (!m_dimensions[0]->IsConst() || m_dimensions[0]->IntVal() != -1) {
         throw MyException("the first dimension of param array is not empty?!");
       }
+      m_products.clear();
+      m_products.push_back(-1);
     }
     return;  // param finished here
   }
@@ -598,6 +600,7 @@ void DeclAST::TypeCheck(SymbolTable& symbol_table) {
       tot *= std::get<int>(res);
       m_products[i] = tot;
     }
+    assert(tot > 0);
     m_flatten_vals.resize(tot);
     if (m_init_val) {
       int offset = 0;

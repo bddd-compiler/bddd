@@ -15,13 +15,13 @@ void InitValAST::Debug(std::ofstream& ofs, int depth) {
   }
 }
 void LValAST::Debug(std::ofstream& ofs, int depth) {
-  if (m_dimensions.empty()) {
+  if (m_indices.empty()) {
     ofs << std::string(depth * 2, ' ') << "LValAST (single): " << m_name
         << std::endl;
   } else {
     ofs << std::string(depth * 2, ' ') << "LValAST (array): " << m_name
         << std::endl;
-    for (auto& dimension : m_dimensions) {
+    for (auto& dimension : m_indices) {
       dimension->Debug(ofs, depth + 1);
     }
   }
@@ -170,8 +170,8 @@ void CondAST::Debug(std::ofstream& ofs, int depth) {
   m_expr->Debug(ofs, depth + 1);
 }
 void FuncFParamAST::Debug(std::ofstream& ofs, int depth) {
-  ofs << std::string(depth * 2, ' ') << "FuncFParamAST (special DeclAST):";
-  m_decl->Debug(ofs, depth);
+  ofs << std::string(depth * 2, ' ') << "FuncFParamAST:" << std::endl;
+  m_decl->Debug(ofs, depth + 1);
 }
 void BlockAST::Debug(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ') << "BlockAST:" << std::endl;

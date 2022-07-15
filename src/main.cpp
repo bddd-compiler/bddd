@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    filename = "../testSource/buaa/part11/test2.c";
+    filename = "../testSource/buaa/part13/test4.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -57,6 +57,7 @@ int main(int argc, char **argv) {
   }
 
   module = std::move(builder->m_module);  // take it back
+  module->Check();
   std::ofstream ofs2(filename.substr(0, filename.rfind('.')) + "_ir.out");
   module->ExportIR(ofs2, 0);
   ofs2.close();

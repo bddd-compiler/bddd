@@ -12,7 +12,6 @@ SymbolTable::SymbolTable(const std::vector<std::shared_ptr<FuncDefAST>>& funcs)
   tables.emplace_back();
   scopes.push_back(ScopeType::GLOBAL);
 
-  assert(funcs.size() == 10);
   for (auto& func : funcs) {
     // anything wrong should not happen here
     Insert(func->FuncName(), func);
