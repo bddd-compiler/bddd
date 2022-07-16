@@ -123,20 +123,20 @@ public:
 
 /**
  * @name cannot be empty
- * @dimensions optional (nullptr might appear in m_dimensions)
+ * @dimensions optional (nullptr might appear in m_indices)
  * @decl available after typechecking
  */
 class LValAST : public AST {
 private:
   std::string m_name;
-  std::vector<std::unique_ptr<ExprAST>> m_dimensions;
+  std::vector<std::unique_ptr<ExprAST>> m_indices;
 
 public:
   std::shared_ptr<DeclAST> m_decl;
   std::string Name() const { return m_name; }
 
   explicit LValAST(std::string name)
-      : m_name(std::move(name)), m_dimensions(), m_decl(nullptr) {}
+      : m_name(std::move(name)), m_indices(), m_decl(nullptr) {}
 
   // methods used in AST construction
   void AddDimension(int x);
@@ -393,7 +393,7 @@ public:
  * FuncFParam is a special wrapper of DeclAST, in which m_is_const = false,
  * m_is_global = false, m_init_val = nullptr, and m_flatten_vals is meaningless
  *
- * We only use m_name, m_var_type and m_dimensions
+ * We only use m_name, m_var_type and m_indices
  */
 class FuncFParamAST : public AST {
 private:
@@ -422,6 +422,7 @@ public:
   void TypeCheck(SymbolTable &symbol_table) override;
   std::shared_ptr<Value> CodeGen(std::shared_ptr<IRBuilder> builder) override;
 
+  friend class Function;
   friend class FunctionArg;
 };
 

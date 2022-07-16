@@ -36,6 +36,7 @@ set(AST_SOURCE
 
 set(IR_SOURCE
   src/ir/ir.cpp
+  src/ir/export.cpp
 )
 
 set(ASM_SOURCE
