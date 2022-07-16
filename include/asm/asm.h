@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 #include "ir/ir.h"
 
@@ -124,6 +125,7 @@ class Operand {
 public:
   static int m_vcnt;
 
+  std::shared_ptr<ASM_Instruction> m_inst;
   OperandType m_op_type;
   std::string m_name;
   RReg m_rreg;
@@ -165,7 +167,7 @@ public:
   std::shared_ptr<Function> m_ir_func;
   std::list<std::shared_ptr<ASM_BasicBlock>> m_blocks;
   std::shared_ptr<ASM_BasicBlock> m_rblock;
-  std::list<std::unique_ptr<Operand>> m_params;
+  std::list<std::shared_ptr<Operand>> m_params;
   std::unique_ptr<PInst> m_push, m_pop;
   unsigned int m_stack_size;
 
@@ -180,6 +182,9 @@ public:
   std::shared_ptr<BasicBlock> m_ir_block;
   std::list<std::shared_ptr<ASM_Instruction>> m_insts;
 
+  std::unordered_set<std::shared_ptr<Operand>> m_def;
+  std::unordered_set<std::shared_ptr<Operand>> m_use;
+
   void print(std::ofstream& ofs);
 };
 
@@ -187,6 +192,10 @@ class ASM_Instruction {
 public:
   InstOp m_op;
   CondType m_cond;
+
+  std::shared_ptr<ASM_BasicBlock> m_block;
+  std::unordered_set<std::shared_ptr<Operand>> m_def;
+  std::unordered_set<std::shared_ptr<Operand>> m_use;
 
   virtual void print(std::ofstream& ofs) = 0;
 };
@@ -202,17 +211,17 @@ public:
 class LDRInst : public ASM_Instruction {
 public:
   enum class Type { LABEL, REG, IMM } m_type;
-  std::unique_ptr<Operand> m_dest;
-  std::unique_ptr<Operand> m_src;
-  std::unique_ptr<Operand> m_offs;
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_src;
+  std::shared_ptr<Operand> m_offs;
   std::unique_ptr<Shift> m_shift;
 
-  LDRInst(std::unique_ptr<Operand> dest, std::string label);
+  LDRInst(std::shared_ptr<Operand> dest, std::string label);
 
-  LDRInst(std::unique_ptr<Operand> dest, std::unique_ptr<Operand> src, int imm);
+  LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src, int imm);
 
-  LDRInst(std::unique_ptr<Operand> dest, std::unique_ptr<Operand> src,
-          std::unique_ptr<Operand> offs);
+  LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
+          std::shared_ptr<Operand> offs);
 
   void print(std::ofstream& ofs) override;
 };
@@ -220,15 +229,15 @@ public:
 class STRInst : public ASM_Instruction {
 public:
   RIType m_type;
-  std::unique_ptr<Operand> m_src;
-  std::unique_ptr<Operand> m_dest;
-  std::unique_ptr<Operand> m_offs;
+  std::shared_ptr<Operand> m_src;
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_offs;
   std::unique_ptr<Shift> m_shift;
 
-  STRInst(std::unique_ptr<Operand> src, std::unique_ptr<Operand> dest, int imm);
+  STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest, int imm);
 
-  STRInst(std::unique_ptr<Operand> src, std::unique_ptr<Operand> dest,
-          std::unique_ptr<Operand> offs);
+  STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
+          std::shared_ptr<Operand> offs);
 
   void print(std::ofstream& ofs) override;
 };
@@ -239,12 +248,12 @@ class ADRInst;
 class MOVInst : public ASM_Instruction {
 public:
   RIType m_type;
-  std::unique_ptr<Operand> m_dest;
-  std::unique_ptr<Operand> m_src;
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_src;
 
-  MOVInst(std::unique_ptr<Operand> dest, int imm);
+  MOVInst(std::shared_ptr<Operand> dest, int imm);
 
-  MOVInst(std::unique_ptr<Operand> dest, std::unique_ptr<Operand> src);
+  MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src);
 
   void print(std::ofstream& ofs) override;
 };
@@ -253,18 +262,18 @@ public:
 
 class PInst : public ASM_Instruction {
 public:
-  std::vector<std::unique_ptr<Operand>> m_regs;
+  std::vector<std::shared_ptr<Operand>> m_regs;
 
-  PInst(InstOp op, std::vector<std::unique_ptr<Operand>> regs);
+  PInst(InstOp op, std::vector<std::shared_ptr<Operand>> regs);
 
   void print(std::ofstream& ofs) override;
 };
 
 class BInst : public ASM_Instruction {
 public:
-  std::unique_ptr<Operand> m_label;
+  std::shared_ptr<Operand> m_label;
 
-  BInst(InstOp op, std::unique_ptr<Operand> label);
+  BInst(InstOp op, std::shared_ptr<Operand> label);
 
   void print(std::ofstream& ofs) override;
 };
@@ -272,15 +281,15 @@ public:
 class ShiftInst : public ASM_Instruction {
 public:
   RIType m_type;
-  std::unique_ptr<Operand> m_dest;
-  std::unique_ptr<Operand> m_src;
-  std::unique_ptr<Operand> m_sval;
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_src;
+  std::shared_ptr<Operand> m_sval;
 
-  ShiftInst(InstOp op, std::unique_ptr<Operand> dest,
-            std::unique_ptr<Operand> src, int imm);
+  ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
+            std::shared_ptr<Operand> src, int imm);
 
-  ShiftInst(InstOp op, std::unique_ptr<Operand> dest,
-            std::unique_ptr<Operand> src, std::unique_ptr<Operand> sval);
+  ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
+            std::shared_ptr<Operand> src, std::shared_ptr<Operand> sval);
 
   void print(std::ofstream& ofs) override;
 };
@@ -289,16 +298,16 @@ public:
 class ASInst : public ASM_Instruction {
 public:
   RIType m_type;
-  std::unique_ptr<Operand> m_dest;
-  std::unique_ptr<Operand> m_operand1;
-  std::unique_ptr<Operand> m_operand2;
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_operand1;
+  std::shared_ptr<Operand> m_operand2;
   std::unique_ptr<Shift> m_shift;
 
-  ASInst(InstOp op, std::unique_ptr<Operand> dest,
-         std::unique_ptr<Operand> operand1, int imm);
+  ASInst(InstOp op, std::shared_ptr<Operand> dest,
+         std::shared_ptr<Operand> operand1, int imm);
 
-  ASInst(InstOp op, std::unique_ptr<Operand> dest,
-         std::unique_ptr<Operand> operand1, std::unique_ptr<Operand> operand2);
+  ASInst(InstOp op, std::shared_ptr<Operand> dest,
+         std::shared_ptr<Operand> operand1, std::shared_ptr<Operand> operand2);
 
   void print(std::ofstream& ofs) override;
 };
@@ -306,26 +315,26 @@ public:
 // MUL MLA MLS
 class MULInst : public ASM_Instruction {
 public:
-  std::unique_ptr<Operand> m_dest;
-  std::unique_ptr<Operand> m_operand1;
-  std::unique_ptr<Operand> m_operand2;
-  std::unique_ptr<Operand> m_append;
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_operand1;
+  std::shared_ptr<Operand> m_operand2;
+  std::shared_ptr<Operand> m_append;
 
-  MULInst(InstOp op, std::unique_ptr<Operand> dest,
-          std::unique_ptr<Operand> operand1, std::unique_ptr<Operand> operand2,
-          std::unique_ptr<Operand> append);
+  MULInst(InstOp op, std::shared_ptr<Operand> dest,
+          std::shared_ptr<Operand> operand1, std::shared_ptr<Operand> operand2,
+          std::shared_ptr<Operand> append);
 
   void print(std::ofstream& ofs) override;
 };
 
 class SDIVInst : public ASM_Instruction {
 public:
-  std::unique_ptr<Operand> m_dest;
-  std::unique_ptr<Operand> m_devidend;
-  std::unique_ptr<Operand> m_devisor;
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_devidend;
+  std::shared_ptr<Operand> m_devisor;
 
-  SDIVInst(std::unique_ptr<Operand> dest, std::unique_ptr<Operand> devidend,
-           std::unique_ptr<Operand> devisor);
+  SDIVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> devidend,
+           std::shared_ptr<Operand> devisor);
 
   void print(std::ofstream& ofs) override;
 };
@@ -333,22 +342,22 @@ public:
 class BITInst : public ASM_Instruction {
 public:
   RIType m_type;
-  std::unique_ptr<Operand> m_dest;
-  std::unique_ptr<Operand> m_operand1;
-  std::unique_ptr<Operand> m_operand2;
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_operand1;
+  std::shared_ptr<Operand> m_operand2;
   std::unique_ptr<Shift> m_shift;
 
-  BITInst(InstOp op, std::unique_ptr<Operand> dest,
-          std::unique_ptr<Operand> operand1, int imm);
+  BITInst(InstOp op, std::shared_ptr<Operand> dest,
+          std::shared_ptr<Operand> operand1, int imm);
 
-  BITInst(InstOp op, std::unique_ptr<Operand> dest,
-          std::unique_ptr<Operand> operand1, std::unique_ptr<Operand> operand2);
+  BITInst(InstOp op, std::shared_ptr<Operand> dest,
+          std::shared_ptr<Operand> operand1, std::shared_ptr<Operand> operand2);
 
   // MVN
-  BITInst(InstOp op, std::unique_ptr<Operand> dest, int imm);
+  BITInst(InstOp op, std::shared_ptr<Operand> dest, int imm);
 
-  BITInst(InstOp op, std::unique_ptr<Operand> dest,
-          std::unique_ptr<Operand> operand1);
+  BITInst(InstOp op, std::shared_ptr<Operand> dest,
+          std::shared_ptr<Operand> operand1);
 
   void print(std::ofstream& ofs) override;
 };
@@ -357,14 +366,14 @@ public:
 class CTInst : public ASM_Instruction {
 public:
   RIType m_type;
-  std::unique_ptr<Operand> m_operand1;
-  std::unique_ptr<Operand> m_operand2;
+  std::shared_ptr<Operand> m_operand1;
+  std::shared_ptr<Operand> m_operand2;
   std::unique_ptr<Shift> m_shift;
 
-  CTInst(InstOp op, std::unique_ptr<Operand> operand1, int imm);
+  CTInst(InstOp op, std::shared_ptr<Operand> operand1, int imm);
 
-  CTInst(InstOp op, std::unique_ptr<Operand> operand1,
-         std::unique_ptr<Operand> operand2);
+  CTInst(InstOp op, std::shared_ptr<Operand> operand1,
+         std::shared_ptr<Operand> operand2);
 
   void print(std::ofstream& ofs) override;
 };

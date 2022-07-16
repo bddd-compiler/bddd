@@ -449,6 +449,8 @@ public:
                              std::shared_ptr<Instruction> instr);
 
   void ExportIR(std::ofstream &ofs, int depth) override;
+
+  std::list<std::shared_ptr<Instruction>> GetInstList();
 };
 
 class FunctionArg : public Value {
@@ -516,6 +518,8 @@ public:
   std::shared_ptr<BasicBlock> GetCurrentBB() { return m_current_bb; }
 
   void AppendBasicBlock(std::shared_ptr<BasicBlock> bb);
+
+  std::list<std::shared_ptr<BasicBlock>> GetBlockList();
 
   void ExportIR(std::ofstream &ofs, int depth);
 };

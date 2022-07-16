@@ -242,6 +242,10 @@ void Function::AppendBasicBlock(std::shared_ptr<BasicBlock> bb) {
   m_bb_list.push_back(std::move(bb));
   m_current_bb = m_bb_list.back();
 }
+std::list<std::shared_ptr<BasicBlock>> Function::GetBlockList() {
+  return m_bb_list;
+}
+
 void IRBuilder::AppendBasicBlock(std::shared_ptr<BasicBlock> bb) {
   m_module->AppendBasicBlock(std::move(bb));
 }
@@ -416,6 +420,9 @@ void BasicBlock::ExportIR(std::ofstream& ofs, int depth) {
     instr->ExportIR(ofs, depth);
     ofs << std::endl;
   }
+}
+std::list<std::shared_ptr<Instruction>> BasicBlock::GetInstList() {
+  return m_instr_list;
 }
 void IntGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
   // depth is useless here
