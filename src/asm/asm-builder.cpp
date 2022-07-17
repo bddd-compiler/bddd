@@ -42,14 +42,6 @@ std::shared_ptr<LDRInst> ASM_Builder::appendLDR(std::shared_ptr<Operand> dest,
 
 std::shared_ptr<LDRInst> ASM_Builder::appendLDR(std::shared_ptr<Operand> dest,
                                                 std::shared_ptr<Operand> src,
-                                                int imm) {
-  auto ldr = std::make_shared<LDRInst>(dest, src, imm);
-  m_cur_block->insert(ldr);
-  return ldr;
-}
-
-std::shared_ptr<LDRInst> ASM_Builder::appendLDR(std::shared_ptr<Operand> dest,
-                                                std::shared_ptr<Operand> src,
                                                 std::shared_ptr<Operand> offs) {
   auto ldr = std::make_shared<LDRInst>(dest, src, offs);
   m_cur_block->insert(ldr);
@@ -57,13 +49,6 @@ std::shared_ptr<LDRInst> ASM_Builder::appendLDR(std::shared_ptr<Operand> dest,
 }
 
 // appendSTR
-std::shared_ptr<STRInst> ASM_Builder::appendSTR(std::shared_ptr<Operand> src,
-                                                std::shared_ptr<Operand> dest,
-                                                int imm) {
-  auto str = std::make_shared<STRInst>(src, dest, imm);
-  m_cur_block->insert(str);
-  return str;
-}
 
 std::shared_ptr<STRInst> ASM_Builder::appendSTR(std::shared_ptr<Operand> src,
                                                 std::shared_ptr<Operand> dest,
@@ -74,13 +59,105 @@ std::shared_ptr<STRInst> ASM_Builder::appendSTR(std::shared_ptr<Operand> src,
 }
 
 // appendMOV
-std::shared_ptr<MOVInst> ASM_Builder::appendMOV(std::shared_ptr<Operand> dest, int imm) {
-  
+std::shared_ptr<MOVInst> ASM_Builder::appendMOV(std::shared_ptr<Operand> dest,
+                                                int imm) {
+  auto mov = std::make_shared<MOVInst>(dest, imm);
+  m_cur_block->insert(mov);
+  return mov;
 }
 
 std::shared_ptr<MOVInst> ASM_Builder::appendMOV(std::shared_ptr<Operand> dest,
-                                   std::shared_ptr<Operand> src);
+                                                std::shared_ptr<Operand> src) {
+  auto mov = std::make_shared<MOVInst>(dest, src);
+  m_cur_block->insert(mov);
+  return mov;
+}
 
+// appendB
+std::shared_ptr<BInst> ASM_Builder::appendB(
+    std::shared_ptr<ASM_BasicBlock> block) {
+  auto b = std::make_shared<BInst>(block);
+  m_cur_block->insert(b);
+  return b;
+}
+
+// appendCALL
+std::shared_ptr<CALLInst> ASM_Builder::appendCALL(CALLInst::FuncType type,
+                                                  std::string label, int n) {
+  auto call = std::make_shared<CALLInst>(type, label, n);
+  m_cur_block->insert(call);
+  return call;
+}
+
+// appendShift
+std::shared_ptr<ShiftInst> ASM_Builder::appendShift(
+    InstOp op, std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
+    std::shared_ptr<Operand> sval) {
+  auto shift = std::make_shared<ShiftInst>(op, dest, src, sval);
+  m_cur_block->insert(shift);
+  return shift;
+}
+
+// appendAS
+std::shared_ptr<ASInst> ASM_Builder::appendAS(
+    InstOp op, std::shared_ptr<Operand> dest, std::shared_ptr<Operand> operand1,
+    std::shared_ptr<Operand> operand2) {
+  auto as = std::make_shared<ASInst>(op, dest, operand1, operand2);
+  m_cur_block->insert(as);
+  return as;
+}
+
+// appendMUL
+std::shared_ptr<MULInst> ASM_Builder::appendMUL(
+    InstOp op, std::shared_ptr<Operand> dest, std::shared_ptr<Operand> operand1,
+    std::shared_ptr<Operand> operand2) {
+  auto mul = std::make_shared<MULInst>(op, dest, operand1, operand2);
+  m_cur_block->insert(mul);
+  return mul;
+}
+
+std::shared_ptr<MULInst> ASM_Builder::appendMUL(
+    InstOp op, std::shared_ptr<Operand> dest, std::shared_ptr<Operand> operand1,
+    std::shared_ptr<Operand> operand2, std::shared_ptr<Operand> append) {
+  auto mul = std::make_shared<MULInst>(op, dest, operand1, operand2, append);
+  m_cur_block->insert(mul);
+  return mul;
+}
+
+// appendSDIV
+std::shared_ptr<SDIVInst> ASM_Builder::appendSDIV(
+    std::shared_ptr<Operand> dest, std::shared_ptr<Operand> devidend,
+    std::shared_ptr<Operand> devisor) {
+  auto sdiv = std::make_shared<SDIVInst>(dest, devidend, devisor);
+  m_cur_block->insert(sdiv);
+  return sdiv;
+}
+
+// appendBIT
+std::shared_ptr<BITInst> ASM_Builder::appendBIT(
+    InstOp op, std::shared_ptr<Operand> dest, std::shared_ptr<Operand> operand1,
+    std::shared_ptr<Operand> operand2) {
+  auto bit = std::make_shared<BITInst>(op, dest, operand1, operand2);
+  m_cur_block->insert(bit);
+  return bit;
+}
+
+std::shared_ptr<BITInst> ASM_Builder::appendBIT(
+    InstOp op, std::shared_ptr<Operand> dest,
+    std::shared_ptr<Operand> operand1) {
+  auto bit = std::make_shared<BITInst>(op, dest, operand1);
+  m_cur_block->insert(bit);
+  return bit;
+}
+
+// appendCT
+std::shared_ptr<CTInst> ASM_Builder::appendCT(InstOp op, std::shared_ptr<Operand> operand1, std::shared_ptr<Operand> operand2) {
+  auto ct = std::make_shared<CTInst>(op, operand1, operand2);
+  m_cur_block->insert(ct);
+  return ct;
+}
+
+#if 0
 void ASM_Builder::appendASInst(std::shared_ptr<Instruction> ir_inst) {
   std::shared_ptr<BinaryInstruction> inst
       = std::dynamic_pointer_cast<BinaryInstruction>(ir_inst);
@@ -109,3 +186,4 @@ void ASM_Builder::appendASInst(std::shared_ptr<Instruction> ir_inst) {
   auto newAS = std::make_shared<ASInst>(op, operand1, operand2);
   m_cur_block->insert(newAS);
 }
+#endif

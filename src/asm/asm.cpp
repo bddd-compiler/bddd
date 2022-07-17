@@ -22,11 +22,6 @@ bool Operand::immCheck(int imm) {
   return false;
 }
 
-std::shared_ptr<Operand> Operand::newVReg() {
-  std::shared_ptr<Operand> ret = std::make_shared<Operand>(OperandType::VREG);
-  return ret;
-}
-
 Shift::Shift(ShiftType t, int v) : s_type(t), s_val(v) {
   if (v < 0 || v > 32) {
     std::cout << "invalid shift value!" << std::endl;
@@ -40,14 +35,6 @@ LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
 }
 
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
-                 int imm) {
-  m_type = Type::IMM;
-  m_dest = dest;
-  m_src = src;
-  m_offs = std::make_shared<Operand>(imm);
-}
-
-LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
                  std::shared_ptr<Operand> offs) {
   m_type = Type::REG;
   m_dest = dest;
@@ -56,16 +43,7 @@ LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
 }
 
 STRInst::STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
-                 int imm) {
-  m_type = RIType::IMM;
-  m_src = src;
-  m_dest = dest;
-  m_offs = std::make_shared<Operand>(imm);
-}
-
-STRInst::STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
                  std::shared_ptr<Operand> offs) {
-  m_type = RIType::REG;
   m_dest = dest;
   m_src = src;
   m_offs = offs;
@@ -90,44 +68,24 @@ PInst::PInst(InstOp op, std::vector<std::shared_ptr<Operand>> regs) {
   }
 }
 
-BInst::BInst(InstOp op, std::shared_ptr<Operand> label) {
-  m_op = op;
-  m_label = label;
-}
-
-ShiftInst::ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
-                     std::shared_ptr<Operand> src, int imm) {
-  m_op = op;
-  m_type = RIType::IMM;
-  m_dest = dest;
-  m_src = src;
-  m_sval = std::make_shared<Operand>(imm);
+BInst::BInst(std::shared_ptr<ASM_BasicBlock> block) {
+  m_op = InstOp::B;
+  m_target = block;
 }
 
 ShiftInst::ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
                      std::shared_ptr<Operand> src,
                      std::shared_ptr<Operand> sval) {
   m_op = op;
-  m_type = RIType::REG;
   m_dest = dest;
   m_src = src;
   m_sval = sval;
 }
 
 ASInst::ASInst(InstOp op, std::shared_ptr<Operand> dest,
-               std::shared_ptr<Operand> operand1, int imm) {
-  m_op = op;
-  m_type = RIType::IMM;
-  m_dest = dest;
-  m_operand1 = operand1;
-  m_operand2 = std::make_shared<Operand>(imm);
-}
-
-ASInst::ASInst(InstOp op, std::shared_ptr<Operand> dest,
                std::shared_ptr<Operand> operand1,
                std::shared_ptr<Operand> operand2) {
   m_op = op;
-  m_type = RIType::REG;
   m_dest = dest;
   m_operand1 = operand1;
   m_operand2 = operand2;
@@ -153,50 +111,24 @@ SDIVInst::SDIVInst(std::shared_ptr<Operand> dest,
 }
 
 BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,
-                 std::shared_ptr<Operand> operand1, int imm) {
-  m_op = op;
-  m_type = RIType::IMM;
-  m_dest = dest;
-  m_operand1 = operand1;
-  m_operand2 = std::make_shared<Operand>(imm);
-}
-
-BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,
                  std::shared_ptr<Operand> operand1,
                  std::shared_ptr<Operand> operand2) {
   m_op = op;
-  m_type = RIType::REG;
   m_dest = dest;
   m_operand1 = operand1;
   m_operand2 = operand2;
 }
 
-BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest, int imm) {
-  m_op = op;
-  m_type = RIType::IMM;
-  m_dest = dest;
-  m_operand2 = std::make_shared<Operand>(imm);
-}
-
 BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,
                  std::shared_ptr<Operand> operand1) {
   m_op = op;
-  m_type = RIType::REG;
   m_dest = dest;
   m_operand1 = operand1;
-}
-
-CTInst::CTInst(InstOp op, std::shared_ptr<Operand> operand1, int imm) {
-  m_op = op;
-  m_type = RIType::IMM;
-  m_operand1 = operand1;
-  m_operand2 = std::make_shared<Operand>(imm);
 }
 
 CTInst::CTInst(InstOp op, std::shared_ptr<Operand> operand1,
                std::shared_ptr<Operand> operand2) {
   m_op = op;
-  m_type = RIType::REG;
   m_operand1 = operand1;
   m_operand2 = operand2;
 }

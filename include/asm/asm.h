@@ -115,7 +115,7 @@ enum class InstOp {
   VST1
 };
 
-enum class OperandType { REG, VREG, IMM, LABEL };
+enum class OperandType { REG, VREG, IMM };
 
 enum class CondType { EQ, NE, LT, LE, GT, GE, NONE };
 
@@ -134,13 +134,9 @@ public:
 
   Operand(OperandType t) : m_op_type(t) {}
 
-  Operand(std::string label) : m_op_type(OperandType::LABEL), m_name(label) {}
-
   Operand(int val) : m_op_type(OperandType::IMM), m_immval(val) {}
 
-  static bool immCheck(int imm);
-
-  static std::shared_ptr<Operand> newVReg();
+  static bool immCheck(int imm);  
 };
 
 int Operand::m_vcnt = 0;
@@ -192,6 +188,14 @@ public:
   void insert(std::shared_ptr<ASM_Instruction> inst);
 };
 
+class Shift {
+public:
+  enum class ShiftType { LSL, LSR, ASR, ROR, RRX } s_type;
+  int s_val;
+
+  Shift(ShiftType t, int v);
+};
+
 class ASM_Instruction {
 public:
   InstOp m_op;
@@ -204,25 +208,15 @@ public:
   virtual void print(std::ofstream& ofs) = 0;
 };
 
-class Shift {
-public:
-  enum class ShiftType { LSL, LSR, ASR, ROR, RRX } s_type;
-  int s_val;
-
-  Shift(ShiftType t, int v);
-};
-
 class LDRInst : public ASM_Instruction {
 public:
-  enum class Type { LABEL, REG, IMM } m_type;
+  enum class Type { LABEL, REG } m_type;
   std::shared_ptr<Operand> m_dest;
   std::shared_ptr<Operand> m_src;
   std::shared_ptr<Operand> m_offs;
   std::unique_ptr<Shift> m_shift;
 
   LDRInst(std::shared_ptr<Operand> dest, std::string label);
-
-  LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src, int imm);
 
   LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
           std::shared_ptr<Operand> offs);
@@ -232,13 +226,10 @@ public:
 
 class STRInst : public ASM_Instruction {
 public:
-  RIType m_type;
   std::shared_ptr<Operand> m_src;
   std::shared_ptr<Operand> m_dest;
   std::shared_ptr<Operand> m_offs;
   std::unique_ptr<Shift> m_shift;
-
-  STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest, int imm);
 
   STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
           std::shared_ptr<Operand> offs);
@@ -275,13 +266,14 @@ public:
 
 class BInst : public ASM_Instruction {
 public:
-  std::shared_ptr<Operand> m_label;
+  std::shared_ptr<ASM_BasicBlock> m_target;
 
-  BInst(InstOp op, std::shared_ptr<Operand> label);
+  BInst(std::shared_ptr<ASM_BasicBlock> block);
 
   void print(std::ofstream& ofs) override;
 };
 
+// CALL uses BL inst
 class CALLInst : public ASM_Instruction {
 public:
   enum class FuncType { VOID, INT, FLOAT } m_type;
@@ -296,13 +288,9 @@ public:
 
 class ShiftInst : public ASM_Instruction {
 public:
-  RIType m_type;
   std::shared_ptr<Operand> m_dest;
   std::shared_ptr<Operand> m_src;
   std::shared_ptr<Operand> m_sval;
-
-  ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
-            std::shared_ptr<Operand> src, int imm);
 
   ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
             std::shared_ptr<Operand> src, std::shared_ptr<Operand> sval);
@@ -313,14 +301,10 @@ public:
 // ADD SUB RSB
 class ASInst : public ASM_Instruction {
 public:
-  RIType m_type;
   std::shared_ptr<Operand> m_dest;
   std::shared_ptr<Operand> m_operand1;
   std::shared_ptr<Operand> m_operand2;
   std::unique_ptr<Shift> m_shift;
-
-  ASInst(InstOp op, std::shared_ptr<Operand> dest,
-         std::shared_ptr<Operand> operand1, int imm);
 
   ASInst(InstOp op, std::shared_ptr<Operand> dest,
          std::shared_ptr<Operand> operand1, std::shared_ptr<Operand> operand2);
@@ -357,21 +341,15 @@ public:
 
 class BITInst : public ASM_Instruction {
 public:
-  RIType m_type;
   std::shared_ptr<Operand> m_dest;
   std::shared_ptr<Operand> m_operand1;
   std::shared_ptr<Operand> m_operand2;
   std::unique_ptr<Shift> m_shift;
 
   BITInst(InstOp op, std::shared_ptr<Operand> dest,
-          std::shared_ptr<Operand> operand1, int imm);
-
-  BITInst(InstOp op, std::shared_ptr<Operand> dest,
           std::shared_ptr<Operand> operand1, std::shared_ptr<Operand> operand2);
 
   // MVN
-  BITInst(InstOp op, std::shared_ptr<Operand> dest, int imm);
-
   BITInst(InstOp op, std::shared_ptr<Operand> dest,
           std::shared_ptr<Operand> operand1);
 
@@ -381,12 +359,9 @@ public:
 // CMP TST
 class CTInst : public ASM_Instruction {
 public:
-  RIType m_type;
   std::shared_ptr<Operand> m_operand1;
   std::shared_ptr<Operand> m_operand2;
   std::unique_ptr<Shift> m_shift;
-
-  CTInst(InstOp op, std::shared_ptr<Operand> operand1, int imm);
 
   CTInst(InstOp op, std::shared_ptr<Operand> operand1,
          std::shared_ptr<Operand> operand2);
