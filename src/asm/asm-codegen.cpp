@@ -18,15 +18,49 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
   }
 }
 
-void GenerateBasicblock(std::shared_ptr<BasicBlock> ir_block, std::shared_ptr<ASM_Builder> builder) {
-  std::shared_ptr<ASM_BasicBlock> block = std::make_shared<ASM_BasicBlock>(ir_block);
+void GenerateBasicblock(std::shared_ptr<BasicBlock> ir_block,
+                        std::shared_ptr<ASM_Builder> builder) {
+  std::shared_ptr<ASM_BasicBlock> block
+      = std::make_shared<ASM_BasicBlock>(ir_block);
   builder->appendBlock(block);
   for (auto &i : ir_block->GetInstList()) {
-
+    GenerateInstruction(i, builder);
   }
 }
 
-void GenerateInstruction(std::shared_ptr<Instruction> ir_inst, std::shared_ptr<ASM_Builder> builder) {
-  std::shared_ptr<ASM_Instruction> inst = std::make_shared<ASM_Instruction>(ir_inst);
-  
+void GenerateInstruction(std::shared_ptr<Value> ir_value,
+                         std::shared_ptr<ASM_Builder> builder) {
+  if ((std::dynamic_pointer_cast<Constant>(ir_value)) != nullptr) {
+    auto value = std::dynamic_pointer_cast<Constant>(ir_value);
+    GenerateConstant(value, builder);
+    // TODO(Huang): Generate Constant
+  }
+  else if ((std::dynamic_pointer_cast<Constant>(ir_value)) != nullptr) {
+    // TODO(Huang): Generate Constant
+  }
+  else if ((std::dynamic_pointer_cast<Constant>(ir_value)) != nullptr) {
+    // TODO(Huang): Generate Constant
+  }
+  else if ((std::dynamic_pointer_cast<Constant>(ir_value)) != nullptr) {
+    // TODO(Huang): Generate Constant
+  }
+  else if ((std::dynamic_pointer_cast<Constant>(ir_value)) != nullptr) {
+    // TODO(Huang): Generate Constant
+  }
+  else if ((std::dynamic_pointer_cast<Constant>(ir_value)) != nullptr) {
+    // TODO(Huang): Generate Constant
+  }
+  else if ((std::dynamic_pointer_cast<Constant>(ir_value)) != nullptr) {
+    // TODO(Huang): Generate Constant
+  }
+  else if ((std::dynamic_pointer_cast<Constant>(ir_value)) != nullptr) {
+    // TODO(Huang): Generate Constant
+  }
+}
+
+std::shared_ptr<Operand> GenerateConstant(std::shared_ptr<Constant> value, std::shared_ptr<ASM_Builder> builder) {
+    std::shared_ptr<Operand> operand = builder->getOperand(value);
+    if (operand == nullptr) {
+        
+    }
 }

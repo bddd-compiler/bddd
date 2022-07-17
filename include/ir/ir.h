@@ -436,7 +436,7 @@ public:
   void ExportIR(std::ofstream &ofs, int depth) override;
 
   std::list<std::shared_ptr<Instruction>> GetInstList();
-  
+
   friend class Module;
 };
 

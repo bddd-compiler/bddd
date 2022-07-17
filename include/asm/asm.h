@@ -6,8 +6,8 @@
 #include <list>
 #include <memory>
 #include <string>
-#include <vector>
 #include <unordered_set>
+#include <vector>
 
 #include "ir/ir.h"
 
@@ -139,6 +139,8 @@ public:
   Operand(int val) : m_op_type(OperandType::IMM), m_immval(val) {}
 
   static bool immCheck(int imm);
+
+  static std::shared_ptr<Operand> newVReg();
 };
 
 int Operand::m_vcnt = 0;
@@ -186,6 +188,8 @@ public:
   std::unordered_set<std::shared_ptr<Operand>> m_use;
 
   void print(std::ofstream& ofs);
+
+  void insert(std::shared_ptr<ASM_Instruction> inst);
 };
 
 class ASM_Instruction {
@@ -276,6 +280,18 @@ public:
   BInst(InstOp op, std::shared_ptr<Operand> label);
 
   void print(std::ofstream& ofs) override;
+};
+
+class CALLInst : public ASM_Instruction {
+public:
+  enum class FuncType { VOID, INT, FLOAT } m_type;
+
+  std::string m_label;
+
+  int m_params;
+
+  // TODO(Huang): CALLInst implement
+  CALLInst(FuncType t, std::string l, int n);
 };
 
 class ShiftInst : public ASM_Instruction {
