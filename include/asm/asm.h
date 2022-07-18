@@ -100,7 +100,6 @@ enum class InstOp {
   TST,
   // floating-poing data-processing instructions
   VMOV,
-  VDUP,
   VADD,
   VSUB,
   VMLA,
@@ -108,11 +107,8 @@ enum class InstOp {
   VMUL,
   VDIV,
   VCMP,
-  // advanced SIMD load/store instructions
   VLDR,
-  VLD1,
   VSTR,
-  VST1
 };
 
 enum class OperandType { REG, VREG, IMM };
@@ -125,19 +121,33 @@ class ASM_Instruction;
 
 class Operand {
 public:
+  static int vreg_cnt;
+  static std::unordered_map<std::shared_ptr<Operand>, std::string> vreg_map;
+
   std::shared_ptr<ASM_Instruction> m_inst;
   OperandType m_op_type;
   std::string m_name;
   RReg m_rreg;
   SReg m_sreg;
+  bool m_is_rreg;
   int m_immval;
 
   Operand(OperandType t) : m_op_type(t) {}
 
   Operand(int val) : m_op_type(OperandType::IMM), m_immval(val) {}
 
+  std::string getName();
+
+  std::string getRegName(RReg reg);
+
+  std::string getRegName(SReg reg);
+
+  std::string getVRegName();
+
   static bool immCheck(int imm);
 };
+
+int Operand::vreg_cnt = 0;
 
 class ASM_Instruction;
 class ASM_BasicBlock;
@@ -148,9 +158,9 @@ public:
   std::list<std::shared_ptr<ASM_Function>> m_funcs;
   std::shared_ptr<Module> m_ir_module;
 
-  void printGlobalVar(std::ofstream& ofs);
+  void exportGlobalVar(std::ofstream& ofs);
 
-  void print(std::ofstream& ofs);
+  void exportASM(std::ofstream& ofs);
 };
 
 class PInst;
@@ -167,21 +177,26 @@ public:
 
   ASM_Function(std::shared_ptr<Function> ir_func) : m_ir_func(ir_func) {}
 
-  void print(std::ofstream& ofs);
+  void exportASM(std::ofstream& ofs);
 };
 
 class ASM_BasicBlock {
 public:
+  static int block_cnt;
   std::string m_label;
   std::list<std::shared_ptr<ASM_Instruction>> m_insts;
 
   std::unordered_set<std::shared_ptr<Operand>> m_def;
   std::unordered_set<std::shared_ptr<Operand>> m_use;
 
-  void print(std::ofstream& ofs);
+  ASM_BasicBlock() : m_label(".L" + std::to_string(block_cnt++)) {}
+
+  void exportASM(std::ofstream& ofs);
 
   void insert(std::shared_ptr<ASM_Instruction> inst);
 };
+
+int ASM_BasicBlock::block_cnt = 0;
 
 class Shift {
 public:
@@ -200,7 +215,13 @@ public:
   std::unordered_set<std::shared_ptr<Operand>> m_def;
   std::unordered_set<std::shared_ptr<Operand>> m_use;
 
-  // virtual void print(std::ofstream& ofs) = 0;
+  std::string getOpName();
+
+  std::string getCondName();
+
+  void exportInstHead(std::ofstream& ofs);
+
+  virtual void exportASM(std::ofstream& ofs) = 0;
 };
 
 class LDRInst : public ASM_Instruction {
@@ -217,7 +238,7 @@ public:
   LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
           std::shared_ptr<Operand> offs);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 class STRInst : public ASM_Instruction {
@@ -230,7 +251,7 @@ public:
   STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
           std::shared_ptr<Operand> offs);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 // TODO(Huang): class ADRInst
@@ -246,7 +267,7 @@ public:
 
   MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 // TODO(Huang): class VMOVInst
@@ -257,7 +278,7 @@ public:
 
   PInst(InstOp op, std::vector<std::shared_ptr<Operand>> regs);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 class BInst : public ASM_Instruction {
@@ -266,7 +287,7 @@ public:
 
   BInst(std::shared_ptr<ASM_BasicBlock> block);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 // CALL uses BL inst
@@ -281,7 +302,7 @@ public:
   // TODO(Huang): CALLInst implement
   CALLInst(VarType t, std::string l, int n);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 class ShiftInst : public ASM_Instruction {
@@ -293,7 +314,7 @@ public:
   ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
             std::shared_ptr<Operand> src, std::shared_ptr<Operand> sval);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 // ADD SUB RSB
@@ -307,7 +328,7 @@ public:
   ASInst(InstOp op, std::shared_ptr<Operand> dest,
          std::shared_ptr<Operand> operand1, std::shared_ptr<Operand> operand2);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 // MUL MLA MLS
@@ -322,7 +343,7 @@ public:
           std::shared_ptr<Operand> operand1, std::shared_ptr<Operand> operand2,
           std::shared_ptr<Operand> append = nullptr);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 class SDIVInst : public ASM_Instruction {
@@ -334,7 +355,7 @@ public:
   SDIVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> devidend,
            std::shared_ptr<Operand> devisor);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 class BITInst : public ASM_Instruction {
@@ -351,7 +372,7 @@ public:
   BITInst(InstOp op, std::shared_ptr<Operand> dest,
           std::shared_ptr<Operand> operand1);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 // CMP TST
@@ -364,7 +385,7 @@ public:
   CTInst(InstOp op, std::shared_ptr<Operand> operand1,
          std::shared_ptr<Operand> operand2);
 
-  // void print(std::ofstream& ofs) override;
+  void exportASM(std::ofstream& ofs) override;
 };
 
 #endif  // BDDD_ASM_H

@@ -149,16 +149,21 @@ std::shared_ptr<Operand> GenerateCallInstruction(
     builder->appendMOV(reg, builder->getOperand(value));
   }
   // save params to stack
+  std::shared_ptr<Operand> sp = std::make_shared<Operand>(OperandType::REG);
   while (i < n) {
     std::shared_ptr<Value> value = inst->m_params[i].m_value;
-    std::shared_ptr<Operand> sp = std::make_shared<Operand>(OperandType::REG);
     sp->m_rreg = RReg::SP;
     int offs = -(i - 3) * 4;
     builder->appendSTR(builder->getOperand(value), sp,
                        std::make_shared<Operand>(offs));
   }
 
-  // TODO(Huang): calculate the stack move size
+  // calculate the stack move size
+  int stack_move_size = std::max(n - 4, 0) * 4;
+  if (stack_move_size) {
+    auto move = std::make_shared<Operand>(stack_move_size);
+    builder->appendAS(InstOp::SUB, sp, sp, move);
+  }
 
   VarType return_type = (VarType)inst->m_type.m_base_type;
   builder->appendCALL(return_type, inst->m_func_name, n);
@@ -172,7 +177,11 @@ std::shared_ptr<Operand> GenerateCallInstruction(
     builder->m_value_map.insert(std::make_pair(inst, dest));
   }
 
-  // TODO(Huang): recover sp
+  // recover sp
+  if (stack_move_size) {
+    auto move = std::make_shared<Operand>(stack_move_size);
+    builder->appendAS(InstOp::ADD, sp, sp, move);
+  }
 
   return dest;
 }
@@ -213,10 +222,18 @@ std::shared_ptr<Operand> GenerateReturnInstruction(
   return nullptr;
 }
 
+// GetEPtrInstruction to generate
 
+std::shared_ptr<Operand> GenerateLoadInstruction(
+    std::shared_ptr<LoadInstruction> inst,
+    std::shared_ptr<ASM_Builder> builder) {
+  
+  return nullptr;
+}
 
 void GenerateInstruction(std::shared_ptr<Value> ir_value,
                          std::shared_ptr<ASM_Builder> builder) {
+  std::cout << "generate instruction" << std::endl;
   if ((std::dynamic_pointer_cast<Constant>(ir_value)) != nullptr) {
     auto value = std::dynamic_pointer_cast<Constant>(ir_value);
     GenerateConstant(value, builder);
@@ -246,6 +263,7 @@ void GenerateInstruction(std::shared_ptr<Value> ir_value,
 void GenerateBasicblock(std::shared_ptr<BasicBlock> ir_block,
                         std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<ASM_BasicBlock> block = std::make_shared<ASM_BasicBlock>();
+  std::cout << "generate basicblock" << std::endl;
   builder->appendBlock(block);
   for (auto &i : ir_block->GetInstList()) {
     GenerateInstruction(i, builder);
@@ -255,6 +273,7 @@ void GenerateBasicblock(std::shared_ptr<BasicBlock> ir_block,
 void GenerateFunction(std::shared_ptr<Function> ir_func,
                       std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<ASM_Function> func = std::make_shared<ASM_Function>(ir_func);
+  std::cout << "generate function" << std::endl;
   builder->appendFunction(func);
   for (auto &b : ir_func->GetBlockList()) {
     GenerateBasicblock(b, builder);
@@ -263,6 +282,7 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
 
 void GenerateModule(std::shared_ptr<Module> ir_module,
                     std::shared_ptr<ASM_Builder> builder) {
+  std::cout << "generate module" << std::endl;
   builder->setIrModule(ir_module);
   for (auto &f : ir_module->m_function_list) {
     GenerateFunction(f, builder);
