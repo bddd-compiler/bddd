@@ -41,6 +41,8 @@ set(IR_SOURCE
 
 set(ASM_SOURCE
   src/asm/asm.cpp
+  src/asm/asm-builder.cpp
+  src/asm/asm-codegen.cpp
 )
 
 add_executable(bddd

@@ -17,6 +17,10 @@ public:
                      std::shared_ptr<ASM_BasicBlock>>
       m_block_map;
 
+  std::unordered_map<std::shared_ptr<std::shared_ptr<ASM_BasicBlock>>,
+                     std::shared_ptr<BasicBlock>>
+      m_filled_block;
+
   ASM_Builder(std::shared_ptr<ASM_Module> m);
 
   void setIrModule(std::shared_ptr<Module> ir_module);
@@ -32,6 +36,8 @@ public:
   std::shared_ptr<Operand> getOperand(std::shared_ptr<Value> value);
 
   std::shared_ptr<Operand> createOperand(std::shared_ptr<Value> value);
+
+  std::shared_ptr<ASM_BasicBlock> getBlock(std::shared_ptr<BasicBlock> block);
 
   // appendLDR
   std::shared_ptr<LDRInst> appendLDR(std::shared_ptr<Operand> dest,
@@ -54,11 +60,11 @@ public:
                                      std::shared_ptr<Operand> src);
 
   // appendB
-  std::shared_ptr<BInst> appendB(std::shared_ptr<ASM_BasicBlock> block);
+  std::shared_ptr<BInst> appendB(std::shared_ptr<ASM_BasicBlock> block,
+                                 CondType cond);
 
   // appendCALL
-  std::shared_ptr<CALLInst> appendCALL(CALLInst::FuncType type,
-                                       std::string label, int n);
+  std::shared_ptr<CALLInst> appendCALL(VarType type, std::string label, int n);
 
   // appendShift
   std::shared_ptr<ShiftInst> appendShift(InstOp op,
@@ -100,5 +106,8 @@ public:
 
   void appendASInst(std::shared_ptr<Instruction> ir_inst);
 };
+
+void GenerateModule(std::shared_ptr<Module> ir_module,
+                    std::shared_ptr<ASM_Builder> builder);
 
 #endif  // BDDD_ASM_BUILDER_H

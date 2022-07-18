@@ -1,6 +1,8 @@
 #include <iostream>
 #include <memory>
 
+#include "asm/asm-builder.h"
+#include "asm/asm.h"
 #include "ast/symbol-table.h"
 #include "exceptions.h"
 #include "ir/ir.h"
@@ -61,6 +63,11 @@ int main(int argc, char **argv) {
   std::ofstream ofs2(filename.substr(0, filename.rfind('.')) + "_ir.out");
   module->ExportIR(ofs2, 0);
   ofs2.close();
+
+  // asm debug
+  auto asm_module = std::make_shared<ASM_Module>();
+  auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
+  GenerateModule(std::move(module), asm_builder);
 
   return 0;
 }

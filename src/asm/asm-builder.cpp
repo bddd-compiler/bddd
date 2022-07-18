@@ -30,7 +30,9 @@ std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value) {
 }
 
 std::shared_ptr<Operand> ASM_Builder::createOperand(
-    std::shared_ptr<Value> value) {}
+    std::shared_ptr<Value> value) {
+  return nullptr;
+}
 
 // appendLDR
 std::shared_ptr<LDRInst> ASM_Builder::appendLDR(std::shared_ptr<Operand> dest,
@@ -75,14 +77,15 @@ std::shared_ptr<MOVInst> ASM_Builder::appendMOV(std::shared_ptr<Operand> dest,
 
 // appendB
 std::shared_ptr<BInst> ASM_Builder::appendB(
-    std::shared_ptr<ASM_BasicBlock> block) {
+    std::shared_ptr<ASM_BasicBlock> block, CondType cond) {
   auto b = std::make_shared<BInst>(block);
+  b->m_cond = cond;
   m_cur_block->insert(b);
   return b;
 }
 
 // appendCALL
-std::shared_ptr<CALLInst> ASM_Builder::appendCALL(CALLInst::FuncType type,
+std::shared_ptr<CALLInst> ASM_Builder::appendCALL(VarType type,
                                                   std::string label, int n) {
   auto call = std::make_shared<CALLInst>(type, label, n);
   m_cur_block->insert(call);
@@ -151,7 +154,9 @@ std::shared_ptr<BITInst> ASM_Builder::appendBIT(
 }
 
 // appendCT
-std::shared_ptr<CTInst> ASM_Builder::appendCT(InstOp op, std::shared_ptr<Operand> operand1, std::shared_ptr<Operand> operand2) {
+std::shared_ptr<CTInst> ASM_Builder::appendCT(
+    InstOp op, std::shared_ptr<Operand> operand1,
+    std::shared_ptr<Operand> operand2) {
   auto ct = std::make_shared<CTInst>(op, operand1, operand2);
   m_cur_block->insert(ct);
   return ct;

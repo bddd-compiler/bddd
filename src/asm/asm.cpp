@@ -31,7 +31,7 @@ Shift::Shift(ShiftType t, int v) : s_type(t), s_val(v) {
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
   m_type = Type::LABEL;
   m_dest = dest;
-  m_src = std::make_shared<Operand>(label);
+  m_label = label;
 }
 
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
@@ -73,6 +73,12 @@ BInst::BInst(std::shared_ptr<ASM_BasicBlock> block) {
   m_target = block;
 }
 
+CALLInst::CALLInst(VarType type, std::string label, int n) {
+  m_type = type;
+  m_label = label;
+  m_params = n;
+}
+
 ShiftInst::ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
                      std::shared_ptr<Operand> src,
                      std::shared_ptr<Operand> sval) {
@@ -94,7 +100,7 @@ ASInst::ASInst(InstOp op, std::shared_ptr<Operand> dest,
 MULInst::MULInst(InstOp op, std::shared_ptr<Operand> dest,
                  std::shared_ptr<Operand> operand1,
                  std::shared_ptr<Operand> operand2,
-                 std::shared_ptr<Operand> append = nullptr) {
+                 std::shared_ptr<Operand> append) {
   m_op = op;
   m_dest = dest;
   m_operand1 = operand1;
