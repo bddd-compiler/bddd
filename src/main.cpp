@@ -3,6 +3,7 @@
 
 #include "ast/symbol-table.h"
 #include "exceptions.h"
+#include "ir/ir-pass-manager.h"
 #include "ir/ir.h"
 #include "parser/driver.h"
 
@@ -11,9 +12,9 @@ int main(int argc, char **argv) {
   if (argc == 2) {
     filename = argv[1];
   } else if (argc == 1) {
-    std::cout << "input source code file: >";
-    std::cin >> filename;
-    // filename = "../testSource/buaa/part12/test3.c";
+    // std::cout << "input source code file: >";
+    // std::cin >> filename;
+    filename = "../testSource/buaa/mem2reg/test.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -55,12 +56,18 @@ int main(int argc, char **argv) {
     std::cerr << "exception during codegen: " << e.Msg() << std::endl;
     return 1;
   }
+  builder->m_module->Check();
 
-  module = std::move(builder->m_module);  // take it back
-  module->Check();
   std::ofstream ofs2(filename.substr(0, filename.rfind('.')) + "_ir.out");
-  module->ExportIR(ofs2, 0);
+  builder->m_module->ExportIR(ofs2, 0);
   ofs2.close();
+
+  // auto pass_manager = std::make_unique<IRPassManager>(builder);
+  // pass_manager->Mem2RegPass();
+  //
+  // std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_ir2.out");
+  // builder->m_module->ExportIR(ofs3, 0);
+  // ofs3.close();
 
   return 0;
 }

@@ -6,255 +6,61 @@
 #include <utility>
 #include <vector>
 
-#include "ast/ast.h"
+// value and use
 
-// use, user, value
+// warning: instances of Use should be initialized only via std::make_unique
 
-void Use::SetUser(std::shared_ptr<Value> user) {
+void Use::InitUser(std::shared_ptr<Value> user) {
   if (m_value) {
     m_user = std::move(user);
-    m_value->AppendUse(*this);
+    m_value->AddUse(m_user);
   }
 }
 
-// IRBuilder
+void Use::UseValue(std::shared_ptr<Value> value) {
+  assert(value != nullptr);
 
-std::shared_ptr<Value> IRBuilder::GetIntConstant(int int_val) {
-  auto it = m_module->m_const_ints.find(int_val);
-  if (it != m_module->m_const_ints.end()) {
-    return it->second;
-  } else {
-    auto constant = std::make_shared<Constant>(int_val);
-    m_module->m_const_ints[int_val] = constant;
-    return constant;
-  }
-}
-std::shared_ptr<Value> IRBuilder::GetFloatConstant(float float_val) {
-  auto it = m_module->m_const_floats.find(float_val);
-  if (it != m_module->m_const_floats.end()) {
-    return it->second;
-  } else {
-    auto constant = std::make_shared<Constant>(float_val);
-    m_module->m_const_floats[float_val] = constant;
-    return constant;
-  }
-}
-std::shared_ptr<IntGlobalVariable> IRBuilder::CreateIntGlobalVariable(
-    std::shared_ptr<DeclAST> decl) {
-  std::vector<int> init_vals;
+  // 别别别，我杀我自己是吧
+  // if (m_value) {
+  //   m_value->KillUse(m_user);
+  //   m_value = nullptr;
+  // }
+  // m_value = value;
+  // m_value->AddUse(m_user);
 
-  for (const auto& expr : decl->m_flatten_vals) {
-    if (expr == nullptr) {
-      init_vals.push_back(0);
-    } else {
-      init_vals.push_back(expr->IntVal());
+  m_value = value;
+}
+
+void Use::RemoveFromUseList() {
+  auto it = std::find_if(m_value->m_use_list.begin(), m_value->m_use_list.end(),
+                         [=](const auto& ptr) { return *ptr == *this; });
+  assert(it != m_value->m_use_list.end());
+  m_value->m_use_list.erase(it);
+}
+
+void Value::AddUse(const std::shared_ptr<Value>& user) {
+  auto this_ptr = shared_from_this();
+  assert(this_ptr != user);
+  m_use_list.push_back(std::make_shared<Use>(this_ptr, user));
+}
+
+void Value::KillUse(const std::shared_ptr<Value>& user) {
+  for (auto it = m_use_list.begin(); it != m_use_list.end(); ++it) {
+    if ((*it)->m_user == user) {
+      m_use_list.erase(it);
+      return;
     }
   }
-
-  auto global_variable = std::make_shared<IntGlobalVariable>(std::move(decl));
-  m_module->AppendGlobalVariable(global_variable);
-  return global_variable;
-}
-std::shared_ptr<FloatGlobalVariable> IRBuilder::CreateFloatGlobalVariable(
-    std::shared_ptr<DeclAST> decl) {
-  // TODO(garen): unimplemented yet
-  std::vector<float> init_vals;
-  assert(false);
-}
-std::shared_ptr<GlobalVariable> IRBuilder::CreateGlobalVariable(
-    const std::shared_ptr<DeclAST>& decl) {
-  if (decl->GetVarType() == VarType::INT) {
-    auto addr = CreateIntGlobalVariable(decl);
-    decl->m_addr = addr;
-    return addr;
-  } else if (decl->GetVarType() == VarType::FLOAT) {
-    auto addr = CreateFloatGlobalVariable(decl);
-    decl->m_addr = addr;
-    return addr;
-  } else
-    assert(false);  // unreachable
-}
-std::shared_ptr<Instruction> IRBuilder::CreateReturnInstruction(
-    std::shared_ptr<Value> ret) {
-  auto instr = std::make_shared<ReturnInstruction>(std::move(ret));
-  instr->m_ret.SetUser(instr);
-  m_module->GetCurrentBB()->PushBackInstruction(instr);
-  return instr;
-}
-std::shared_ptr<BasicBlock> IRBuilder::CreateBasicBlock(
-    std::string block_name) {
-  auto bb = std::make_shared<BasicBlock>(std::move(block_name));
-  AppendBasicBlock(bb);
-  return bb;
-}
-std::shared_ptr<Instruction> IRBuilder::CreateBinaryInstruction(
-    IROp op, const std::shared_ptr<Value>& lhs,
-    const std::shared_ptr<Value>& rhs) {
-  auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<BinaryInstruction>(op, lhs, rhs, bb);
-  instr->m_lhs_val_use.SetUser(instr);
-  instr->m_rhs_val_use.SetUser(instr);
-
-  auto lhs_base_type = instr->m_lhs_val_use.m_value->m_type.m_base_type,
-       rhs_base_type = instr->m_rhs_val_use.m_value->m_type.m_base_type;
-  if (lhs_base_type == BaseType::BOOL && rhs_base_type == BaseType::INT) {
-    auto new_lhs = CreateZExtInstruction(instr->m_lhs_val_use.m_value,
-                                         instr->m_rhs_val_use.m_value->m_type);
-    instr->m_lhs_val_use.m_value->RemoveUse(instr->m_lhs_val_use);
-    instr->m_lhs_val_use = Use(new_lhs);
-    instr->m_lhs_val_use.SetUser(instr);
-
-  } else if (lhs_base_type == BaseType::INT
-             && rhs_base_type == BaseType::BOOL) {
-    auto new_rhs = CreateZExtInstruction(instr->m_rhs_val_use.m_value,
-                                         instr->m_lhs_val_use.m_value->m_type);
-    instr->m_rhs_val_use.m_value->RemoveUse(instr->m_rhs_val_use);
-    instr->m_rhs_val_use = Use(new_rhs);
-    instr->m_rhs_val_use.SetUser(instr);
-  } else {
-    assert(lhs_base_type == BaseType::INT || lhs_base_type == BaseType::FLOAT);
-    assert(lhs_base_type == rhs_base_type);
-  }
-  bb->PushBackInstruction(instr);
-  return instr;
-}
-std::shared_ptr<CallInstruction> IRBuilder::CreateCallInstruction(
-    VarType return_type, std::string func_name,
-    std::vector<std::shared_ptr<Value>> params) {
-  auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<CallInstruction>(return_type,
-                                                 std::move(func_name), bb);
-  std::vector<Use> param_uses;
-  for (auto& param : params) {
-    param_uses.emplace_back(param, instr);
-  }
-  instr->SetParams(std::move(param_uses));
-  bb->PushBackInstruction(instr);
-  return nullptr;
-}
-std::shared_ptr<CallInstruction> IRBuilder::CreateCallInstruction(
-    VarType return_type, std::string func_name) {
-  auto bb = m_module->GetCurrentBB();
-  std::shared_ptr<Function> function = nullptr;
-  for (auto& it : m_module->m_function_decl_list) {
-    if (it->FuncName() == func_name) {
-      function = it;
-      break;
-    }
-  }
-  if (function == nullptr) {
-    for (auto& it : m_module->m_function_list) {
-      if (it->FuncName() == func_name) {
-        function = it;
-        break;
-      }
-    }
-  }
-  assert(function != nullptr);
-  auto instr = std::make_shared<CallInstruction>(return_type,
-                                                 std::move(func_name), bb);
-  instr->m_function = std::move(function);
-  bb->PushBackInstruction(instr);
-  return instr;
-}
-std::shared_ptr<Instruction> IRBuilder::CreateJumpInstruction(
-    std::shared_ptr<BasicBlock> block) {
-  auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<JumpInstruction>(block, bb);
-  bb->PushBackInstruction(instr);
-  return instr;
-}
-std::shared_ptr<Instruction> IRBuilder::CreateBranchInstruction(
-    std::shared_ptr<Value> cond_val, std::shared_ptr<BasicBlock> true_block,
-    std::shared_ptr<BasicBlock> false_block) {
-  auto bb = m_module->GetCurrentBB();
-  if (cond_val->m_type.m_base_type != BaseType::BOOL) {
-    assert(cond_val->m_type.m_base_type == BaseType::INT);
-    auto new_cond_val
-        = CreateBinaryInstruction(IROp::NE, cond_val, GetIntConstant(0));
-    auto instr = std::make_shared<BranchInstruction>(
-        std::move(new_cond_val), std::move(true_block), std::move(false_block),
-        bb);
-    instr->m_cond.SetUser(instr);
-    bb->PushBackInstruction(instr);
-    return instr;
-  } else {
-    auto instr = std::make_shared<BranchInstruction>(
-        std::move(cond_val), std::move(true_block), std::move(false_block), bb);
-    instr->m_cond.SetUser(instr);
-    bb->PushBackInstruction(instr);
-    return instr;
-  }
-}
-std::shared_ptr<Instruction> IRBuilder::CreateStoreInstruction(
-    std::shared_ptr<Value> addr, std::shared_ptr<Value> val) {
-  auto bb = m_module->GetCurrentBB();
-  auto instr
-      = std::make_shared<StoreInstruction>(std::move(addr), std::move(val), bb);
-  instr->m_addr.SetUser(instr);
-  instr->m_val.SetUser(instr);
-  bb->PushBackInstruction(instr);
-  return instr;
-}
-std::shared_ptr<Instruction> IRBuilder::CreateGetElementPtrInstruction(
-    std::shared_ptr<Value> addr, std::vector<std::shared_ptr<Value>> indices) {
-  auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<GetElementPtrInstruction>(
-      std::move(addr), std::move(indices), bb);
-  bb->PushBackInstruction(instr);
-  return instr;
-}
-std::shared_ptr<Instruction> IRBuilder::CreateLoadInstruction(
-    std::shared_ptr<Value> addr) {
-  auto instr = std::make_shared<LoadInstruction>(addr);
-  instr->m_addr.SetUser(instr);
-  m_module->GetCurrentBB()->PushBackInstruction(instr);
-  return instr;
-}
-std::shared_ptr<Function> IRBuilder::CreateFunction(
-    std::shared_ptr<FuncDefAST> func_ast) {
-  auto func = std::make_shared<Function>(func_ast);
-  m_module->AppendFunction(func);
-  return func;
-}
-std::shared_ptr<Instruction> IRBuilder::CreateAllocaInstruction(
-    std::shared_ptr<DeclAST> decl, std::shared_ptr<Value> init_val) {
-  auto bb = m_module->GetCurrentBB();
-
-  if (decl->IsArray()) {
-    std::vector<int> dimensions;
-    int ptr_cnt = 1;
-    if (decl->m_dimensions[0] == nullptr) {
-      ++ptr_cnt;
-    } else
-      dimensions.push_back(decl->m_dimensions[0]->IntVal());
-
-    for (int i = 1; i < decl->m_dimensions.size(); ++i) {
-      dimensions.push_back(decl->m_dimensions[i]->IntVal());
-    }
-    auto value_type
-        = ValueType(decl->GetVarType(), std::move(dimensions), ptr_cnt);
-    // if (decl->IsParam()) {
-    //   value_type = value_type.Reduce(1).Reference(1);
-    // }
-    auto instr = std::make_shared<AllocaInstruction>(value_type, init_val, bb);
-    bb->PushBackInstruction(instr);
-    return instr;
-  } else {
-    ValueType value_type(decl->GetVarType(), true);
-    auto instr = std::make_shared<AllocaInstruction>(std::move(value_type),
-                                                     init_val, bb);
-    bb->PushBackInstruction(instr);
-    return instr;
-  }
+  assert(false);  // not found! what happen?
 }
 
-std::shared_ptr<Value> IRBuilder::CreateZExtInstruction(
-    std::shared_ptr<Value> from, ValueType type_to) {
-  auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<ZExtInstruction>(std::move(from), type_to, bb);
-  bb->PushBackInstruction(instr);
-  return instr;
+void Value::ReplaceUseBy(const std::shared_ptr<Value>& new_val) {
+  for (auto& use : m_use_list) {
+    auto this_ptr = shared_from_this();
+    assert(use->m_value == this_ptr);
+    // if (use->m_user != this_ptr) use->UseValue(new_val);
+    use->UseValue(new_val);
+  }
 }
 
 // module, function, basic block
@@ -276,6 +82,8 @@ void Module::AppendBasicBlock(std::shared_ptr<BasicBlock> bb) {
 void Module::Check() {
   for (auto& function : m_function_list) {
     for (auto& basic_block : function->m_bb_list) {
+      assert(!basic_block->m_instr_list.empty());
+
       for (auto it = basic_block->m_instr_list.begin();
            it != basic_block->m_instr_list.end(); ++it) {
         if ((*it)->IsTerminator()) {
@@ -284,15 +92,13 @@ void Module::Check() {
                                           basic_block->m_instr_list.end());
         }
       }
+      assert(basic_block->LastInstruction()->IsTerminator());
     }
   }
 }
 void Function::AppendBasicBlock(std::shared_ptr<BasicBlock> bb) {
   m_bb_list.push_back(std::move(bb));
   m_current_bb = m_bb_list.back();
-}
-void IRBuilder::AppendBasicBlock(std::shared_ptr<BasicBlock> bb) {
-  m_module->AppendBasicBlock(std::move(bb));
 }
 void BasicBlock::PushBackInstruction(std::shared_ptr<Instruction> instr) {
   instr->m_bb = shared_from_base<BasicBlock>();
@@ -318,4 +124,41 @@ void BasicBlock::InsertBackInstruction(const std::shared_ptr<Instruction>& elem,
   assert(it != m_instr_list.end());
   instr->m_bb = shared_from_base<BasicBlock>();
   m_instr_list.insert(it, std::move(instr));
+}
+void BasicBlock::RemoveInstruction(const std::shared_ptr<Instruction>& elem) {
+  auto it = std::find_if(m_instr_list.begin(), m_instr_list.end(),
+                         [=](auto x) { return x.get() == elem.get(); });
+  if (it != m_instr_list.end()) {
+    m_instr_list.erase(it);
+  }
+}
+std::vector<std::shared_ptr<BasicBlock>> BasicBlock::Successors() {
+  if (m_instr_list.empty()) return {};
+  auto last_instr = LastInstruction();
+  switch (last_instr->m_op) {
+    case IROp::BRANCH: {
+      auto br_instr = last_instr->shared_from_base<BranchInstruction>();
+      return {br_instr->m_true_block, br_instr->m_false_block};
+    }
+    case IROp::JUMP: {
+      auto jump_instr = last_instr->shared_from_base<JumpInstruction>();
+      return {jump_instr->m_target_block};
+    }
+    default:
+      return {};
+  }
+}
+
+bool Instruction::HasSideEffect() {
+  switch (m_op) {
+    case IROp::CALL:
+      return shared_from_base<CallInstruction>()->m_function->HasSideEffect();
+    case IROp::BRANCH:
+    case IROp::JUMP:
+    case IROp::RETURN:
+    case IROp::STORE:
+      return true;
+    default:
+      return false;
+  }
 }

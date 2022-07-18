@@ -214,9 +214,9 @@ void BinaryInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
   ofs << g_allocator.GetValueName(shared_from_this()) << " = ";
   ofs << BinaryOpToString(m_op) << " "
-      << m_lhs_val_use.m_value->m_type.ToString() << " ";
-  ofs << g_allocator.GetValueName(m_lhs_val_use.m_value) << ", "
-      << g_allocator.GetValueName(m_rhs_val_use.m_value) << std::endl;
+      << m_lhs_val_use->m_value->m_type.ToString() << " ";
+  ofs << g_allocator.GetValueName(m_lhs_val_use->m_value) << ", "
+      << g_allocator.GetValueName(m_rhs_val_use->m_value) << std::endl;
 }
 void CallInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
@@ -232,15 +232,15 @@ void CallInstruction::ExportIR(std::ofstream& ofs, int depth) {
     else
       ofs << ", ";
 
-    ofs << param.m_value->m_type.ToString() << " "
-        << g_allocator.GetValueName(param.m_value);
+    ofs << param->m_value->m_type.ToString() << " "
+        << g_allocator.GetValueName(param->m_value);
   }
   ofs << ")" << std::endl;
 }
 void BranchInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ') << "br ";
-  ofs << m_cond.m_value->m_type.ToString() << " "
-      << g_allocator.GetValueName(m_cond.m_value) << ", ";
+  ofs << m_cond->m_value->m_type.ToString() << " "
+      << g_allocator.GetValueName(m_cond->m_value) << ", ";
   ofs << m_true_block->m_type.ToString() << " "
       << g_allocator.GetValueName(m_true_block) << ", ";
   ofs << m_false_block->m_type.ToString() << " "
@@ -253,7 +253,7 @@ void JumpInstruction::ExportIR(std::ofstream& ofs, int depth) {
 }
 void ReturnInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
-  auto ret_val = m_ret.m_value;
+  auto ret_val = m_ret->m_value;
   if (ret_val == nullptr) {
     ofs << "ret void" << std::endl;
   } else if (IsConstant()) {
@@ -287,22 +287,22 @@ void LoadInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
   ofs << g_allocator.GetValueName(shared_from_this()) << " = ";
   // auto stack_addr = GetStackAddr(m_addr.m_value);
-  auto stack_addr = m_addr.m_value;
+  auto stack_addr = m_addr->m_value;
   ofs << "load " << m_type.ToString() << ", " << stack_addr->m_type.ToString()
       << " " << g_allocator.GetValueName(stack_addr);
   ofs << std::endl;
 }
 void StoreInstruction::ExportIR(std::ofstream& ofs, int depth) {
   // TODO(garen):
-  assert(m_val.m_value != nullptr);
-  assert(m_addr.m_value != nullptr);
+  assert(m_val->m_value != nullptr);
+  assert(m_addr->m_value != nullptr);
 
   ofs << std::string(depth * 2, ' ');
-  ofs << "store " << m_val.m_value->m_type.ToString() << " "
-      << g_allocator.GetValueName(m_val.m_value);
+  ofs << "store " << m_val->m_value->m_type.ToString() << " "
+      << g_allocator.GetValueName(m_val->m_value);
   // m_val.m_value->ExportIR(ofs, depth);
-  ofs << ", " << m_addr.m_value->GetType().ToString() << " "
-      << g_allocator.GetValueName(m_addr.m_value);
+  ofs << ", " << m_addr->m_value->GetType().ToString() << " "
+      << g_allocator.GetValueName(m_addr->m_value);
   ofs << std::endl;
 }
 void AllocaInstruction::ExportIR(std::ofstream& ofs, int depth) {
@@ -316,7 +316,19 @@ void AllocaInstruction::ExportIR(std::ofstream& ofs, int depth) {
 }
 void PhiInstruction::ExportIR(std::ofstream& ofs, int depth) {
   // TODO(garen):
-  ofs << "(TODO): PhiInstruction" << std::endl;
+  ofs << std::string(depth * 2, ' ');
+  ofs << g_allocator.GetValueName(shared_from_this()) << " = phi ";
+  ofs << "i32 ";  // TODO(garen): float
+  bool first = true;
+  for (auto& [from, val] : m_contents) {
+    if (first)
+      first = false;
+    else
+      ofs << ", ";
+    ofs << "[ " << g_allocator.GetValueName(val.m_value) << ", "
+        << g_allocator.GetValueName(from) << " ]";
+  }
+  ofs << std::endl;
 }
 // NOT a complete instruction, cannot be invoked independently
 void Constant::ExportIR(std::ofstream& ofs, int depth) {
@@ -333,8 +345,8 @@ void Constant::ExportIR(std::ofstream& ofs, int depth) {
 void ZExtInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
   ofs << g_allocator.GetValueName(shared_from_this()) << " = zext ";
-  ofs << m_val.m_value->m_type.ToString() << " "
-      << g_allocator.GetValueName(m_val.m_value) << " to "
+  ofs << m_val->m_value->m_type.ToString() << " "
+      << g_allocator.GetValueName(m_val->m_value) << " to "
       << m_target_type.ToString() << std::endl;
 }
 void FunctionArg::ExportIR(std::ofstream& ofs, int depth) {
