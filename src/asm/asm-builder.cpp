@@ -2,6 +2,12 @@
 
 ASM_Builder::ASM_Builder(std::shared_ptr<ASM_Module> m) : m_module(m) {}
 
+void ASM_Builder::init() {
+  m_value_map.clear();
+  m_block_map.clear();
+  m_filled_block.clear();
+}
+
 void ASM_Builder::setIrModule(std::shared_ptr<Module> ir_module) {
   m_module->m_ir_module = ir_module;
 }
@@ -9,6 +15,9 @@ void ASM_Builder::setIrModule(std::shared_ptr<Module> ir_module) {
 void ASM_Builder::appendFunction(std::shared_ptr<ASM_Function> func) {
   m_module->m_funcs.push_back(func);
   setCurFunction(func);
+
+  // TODO(Huang): initialize
+  init();
 }
 
 void ASM_Builder::setCurFunction(std::shared_ptr<ASM_Function> func) {
@@ -25,8 +34,18 @@ void ASM_Builder::setCurBlock(std::shared_ptr<ASM_BasicBlock> block) {
 }
 
 std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value) {
-  return m_value_map.find(value) != m_value_map.end() ? m_value_map[value]
-                                                      : nullptr;
+  auto ret = m_value_map.find(value) != m_value_map.end() ? m_value_map[value]
+                                                          : nullptr;
+  if (ret) {
+    return ret;
+  }
+  if ((std::dynamic_pointer_cast<Constant>(value) != nullptr)) {
+    auto val = std::dynamic_pointer_cast<Constant>(value);
+    ret = appendMOV(std::make_shared<Operand>(OperandType::VREG),
+                    val->m_int_val)
+              ->m_dest;
+  }
+  return ret;
 }
 
 std::shared_ptr<Operand> ASM_Builder::createOperand(
@@ -161,34 +180,3 @@ std::shared_ptr<CTInst> ASM_Builder::appendCT(
   m_cur_block->insert(ct);
   return ct;
 }
-
-#if 0
-void ASM_Builder::appendASInst(std::shared_ptr<Instruction> ir_inst) {
-  std::shared_ptr<BinaryInstruction> inst
-      = std::dynamic_pointer_cast<BinaryInstruction>(ir_inst);
-  std::shared_ptr<Operand> operand1, operand2;
-  std::shared_ptr<Value> val1 = inst->m_lhs_val_use.m_value;
-  std::shared_ptr<Value> val2 = inst->m_rhs_val_use.m_value;
-  InstOp op = ir_inst->m_op == IROp::ADD ? InstOp::ADD : InstOp::SUB;
-
-  bool is_const1 = (std::dynamic_pointer_cast<Constant>(val1) != nullptr);
-  bool is_const2 = (std::dynamic_pointer_cast<Constant>(val2) != nullptr);
-
-  if (is_const1) {
-    int imm = std::dynamic_pointer_cast<Constant>(val1)->m_int_val;
-    operand1 = Operand::newVReg();
-    auto newMOV = std::make_shared<MOVInst>(operand1, imm);
-    m_cur_block->insert(newMOV);
-  }
-
-  if (is_const2) {
-    int imm = std::dynamic_pointer_cast<Constant>(val2)->m_int_val;
-    operand2 = std::make_shared<Operand>(imm);
-  } else {
-    operand2 = getOperand(val2);
-  }
-
-  auto newAS = std::make_shared<ASInst>(op, operand1, operand2);
-  m_cur_block->insert(newAS);
-}
-#endif

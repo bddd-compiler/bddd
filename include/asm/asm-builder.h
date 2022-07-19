@@ -23,6 +23,8 @@ public:
 
   ASM_Builder(std::shared_ptr<ASM_Module> m);
 
+  void init();
+
   void setIrModule(std::shared_ptr<Module> ir_module);
 
   void appendFunction(std::shared_ptr<ASM_Function> func);
@@ -103,8 +105,6 @@ public:
   // appendCT
   std::shared_ptr<CTInst> appendCT(InstOp op, std::shared_ptr<Operand> operand1,
                                    std::shared_ptr<Operand> operand2);
-
-  void appendASInst(std::shared_ptr<Instruction> ir_inst);
 };
 
 void GenerateModule(std::shared_ptr<Module> ir_module,

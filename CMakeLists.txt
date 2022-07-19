@@ -37,6 +37,9 @@ set(AST_SOURCE
 set(IR_SOURCE
   src/ir/ir.cpp
   src/ir/export.cpp
+  src/ir/builder.cpp
+  src/ir/ir-pass-manager.cpp
+  src/ir/pass/mem2reg.cpp
 )
 
 set(ASM_SOURCE

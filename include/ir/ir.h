@@ -5,6 +5,7 @@
 #include <list>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 #include "ast/ast.h"
@@ -36,31 +37,47 @@ enum class IROp {
 
 class Value;
 
+// can only be initialized using make_unique
 class Use {
 public:
-  std::shared_ptr<Value> m_value;
-  std::shared_ptr<Value> m_user;
+  std::shared_ptr<Value> m_value;  // the value
+  std::shared_ptr<Value> m_user;   // who use the value
 
-  explicit Use(std::shared_ptr<Value> value,
+  explicit Use(std::shared_ptr<Value> value = nullptr,
                std::shared_ptr<Value> user = nullptr)
       : m_value(std::move(value)), m_user(std::move(user)) {}
+
+  Use(const Use &) = delete;
 
   // IMPORTANT:
   // must be done after construction in IRBuilder::CreateXXX
   // only after this function, the whole initialization is complete
-  void SetUser(std::shared_ptr<Value> user);
+  void InitUser(std::shared_ptr<Value> user);
+
+  // modify the value
+  void UseValue(std::shared_ptr<Value> value);
+
+  void RemoveFromUseList();
+
+  bool operator==(const Use &rhs) const {
+    return m_value == rhs.m_value && m_user == rhs.m_user;
+  }
 };
 
 // for simplification, value and user are composite together
 class Value : public std::enable_shared_from_this<Value> {
-protected:
-  std::list<Use> m_use_list;  // users that use this value (def-use)
+public:
+  // record who use me (but maybe replaced, i.e. m_value may not be itself)
+  // user should be unique in m_use_list (promise me)
+  std::list<std::shared_ptr<Use>> m_use_list;
+  ValueType m_type;
+
+  // new things
+  std::shared_ptr<Value> m_reaching_def;
+
   template <typename Derived> std::shared_ptr<Derived> shared_from_base() {
     return std::static_pointer_cast<Derived>(shared_from_this());
   }
-
-public:
-  ValueType m_type;
 
   explicit Value() : m_type(BaseType::VOID) {}
   explicit Value(BaseType base_type) : m_type(base_type) {}
@@ -77,16 +94,12 @@ public:
 
   std::string GetTypeString() { return m_type.ToString(); }
 
-  void AppendUse(const Use &use) { m_use_list.push_back(use); }
-  void RemoveUse(const Use &use) {
-    for (auto it = m_use_list.begin(); it != m_use_list.end(); ++it) {
-      if (it->m_value == use.m_value && it->m_user == use.m_user) {
-        m_use_list.erase(it);
-        return;
-      }
-    }
-    assert(false);  // not found! what happen?
-  }
+  void AddUse(const std::shared_ptr<Value> &user);
+
+  void KillUse(const std::shared_ptr<Value> &user);
+
+  void ReplaceUseBy(const std::shared_ptr<Value> &new_val);
+
   virtual void ExportIR(std::ofstream &ofs, int depth) = 0;
 };
 
@@ -166,7 +179,9 @@ public:
 
   void ExportIR(std::ofstream &ofs, int depth) override;
 };
+
 class BasicBlock;
+class CallInstruction;
 
 class Instruction : public Value {
 public:
@@ -176,20 +191,22 @@ public:
   explicit Instruction(IROp op, std::shared_ptr<BasicBlock> bb = nullptr)
       : Value(), m_op(op), m_bb(std::move(bb)) {}
 
+  bool HasSideEffect();
+
   virtual bool IsTerminator() = 0;
 };
 
 class BinaryInstruction : public Instruction {
 public:
-  Use m_lhs_val_use;
-  Use m_rhs_val_use;
+  std::shared_ptr<Use> m_lhs_val_use;
+  std::shared_ptr<Use> m_rhs_val_use;
 
   explicit BinaryInstruction(IROp op, std::shared_ptr<Value> lhs_val,
                              std::shared_ptr<Value> rhs_val,
                              std::shared_ptr<BasicBlock> bb = nullptr)
       : Instruction(op, std::move(bb)),
-        m_lhs_val_use(std::move(lhs_val)),
-        m_rhs_val_use(std::move(rhs_val)) {
+        m_lhs_val_use(std::make_shared<Use>(std::move(lhs_val))),
+        m_rhs_val_use(std::make_shared<Use>(std::move(rhs_val))) {
     // assert(m_lhs_val_use.m_value->m_type == m_rhs_val_use.m_value->m_type);
     switch (op) {
       case IROp::ADD:
@@ -234,7 +251,7 @@ class Function;
 class CallInstruction : public Instruction {
 public:
   std::string m_func_name;
-  std::vector<Use> m_params;
+  std::vector<std::shared_ptr<Use>> m_params;
 
   std::shared_ptr<Function> m_function;
 
@@ -263,12 +280,14 @@ public:
   bool IsTerminator() override { return false; }  // seems not terminator
 
   // should be called if params are needed
-  void SetParams(std::vector<Use> params) { m_params = std::move(params); }
+  void SetParams(std::vector<std::shared_ptr<Use>> params) {
+    m_params = std::move(params);
+  }
 };
 
 class BranchInstruction : public Instruction {
 public:
-  Use m_cond;
+  std::shared_ptr<Use> m_cond;
   std::shared_ptr<BasicBlock> m_true_block, m_false_block;
 
   explicit BranchInstruction(std::shared_ptr<Value> cond,
@@ -276,7 +295,7 @@ public:
                              std::shared_ptr<BasicBlock> false_block,
                              std::shared_ptr<BasicBlock> bb = nullptr)
       : Instruction(IROp::BRANCH, std::move(bb)),
-        m_cond(std::move(cond)),
+        m_cond(std::make_shared<Use>(std::move(cond))),
         m_true_block(std::move(true_block)),
         m_false_block(std::move(false_block)) {}
 
@@ -299,17 +318,18 @@ public:
 
 class ReturnInstruction : public Instruction {
 public:
-  Use m_ret;
+  std::shared_ptr<Use> m_ret;
 
   explicit ReturnInstruction(std::shared_ptr<Value> ret = nullptr,
                              std::shared_ptr<BasicBlock> bb = nullptr)
-      : Instruction(IROp::RETURN, std::move(bb)), m_ret(std::move(ret)) {}
+      : Instruction(IROp::RETURN, std::move(bb)),
+        m_ret(std::make_shared<Use>(std::move(ret))) {}
 
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return true; }
 
   bool IsConstant() const {
-    return std::dynamic_pointer_cast<Constant>(m_ret.m_value) != nullptr;
+    return std::dynamic_pointer_cast<Constant>(m_ret->m_value) != nullptr;
   }
 };
 
@@ -347,12 +367,13 @@ public:
 
 class LoadInstruction : public AccessInstruction {
 public:
-  Use m_addr;
+  std::shared_ptr<Use> m_addr;
   explicit LoadInstruction(std::shared_ptr<Value> addr,
                            std::shared_ptr<BasicBlock> bb = nullptr)
-      : AccessInstruction(IROp::LOAD, std::move(bb)), m_addr(std::move(addr)) {
-    assert(m_addr.m_value->m_type.m_num_star >= 1);
-    m_type = m_addr.m_value->m_type.Dereference();
+      : AccessInstruction(IROp::LOAD, std::move(bb)),
+        m_addr(std::make_shared<Use>(std::move(addr))) {
+    assert(m_addr->m_value->m_type.m_num_star >= 1);
+    m_type = m_addr->m_value->m_type.Dereference();
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
@@ -361,14 +382,15 @@ public:
 
 class StoreInstruction : public AccessInstruction {
 public:
-  Use m_addr, m_val;
+  std::shared_ptr<Use> m_addr;
+  std::shared_ptr<Use> m_val;
 
   explicit StoreInstruction(std::shared_ptr<Value> addr,
                             std::shared_ptr<Value> val,
                             std::shared_ptr<BasicBlock> bb = nullptr)
       : AccessInstruction(IROp::STORE, std::move(bb)),
-        m_addr(std::move(addr)),
-        m_val(std::move(val)) {}
+        m_addr(std::make_shared<Use>(std::move(addr))),
+        m_val(std::make_shared<Use>(std::move(val))) {}
 
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return false; }
@@ -378,11 +400,16 @@ class AllocaInstruction : public Instruction {
 public:
   std::shared_ptr<Value> m_init_val;
 
+  // new things
+  size_t m_alloca_id;
+  std::vector<std::shared_ptr<BasicBlock>> m_defs;
+
   explicit AllocaInstruction(ValueType value_type,
                              std::shared_ptr<Value> init_val = nullptr,
                              std::shared_ptr<BasicBlock> bb = nullptr)
       : Instruction(IROp::ALLOCA, std::move(bb)),
-        m_init_val(std::move(init_val)) {
+        m_init_val(std::move(init_val)),
+        m_alloca_id(0) {
     m_type = std::move(value_type);
   }
 
@@ -390,21 +417,42 @@ public:
   bool IsTerminator() override { return false; }
 };
 
+// TODO(garen): initialization from IRBuilder
 class PhiInstruction : public Instruction {
 public:
+  std::unordered_map<std::shared_ptr<BasicBlock>, Use> m_contents;
+
+  explicit PhiInstruction(std::shared_ptr<BasicBlock> bb)
+      : Instruction(IROp::PHI, std::move(bb)) {}
+
+  std::shared_ptr<Value> GetValue(std::shared_ptr<BasicBlock> bb) {
+    auto it = m_contents.find(bb);
+    if (it == m_contents.end())
+      return nullptr;
+    else
+      it->second.m_value;
+  }
+
+  void Add(std::shared_ptr<BasicBlock> bb, std::shared_ptr<Value> val) {
+    // TODO(garen): how to add?
+    assert(false);
+  }
+
+  void Remove(std::shared_ptr<BasicBlock> bb) { m_contents.erase(bb); }
+
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return false; }
 };
 
 class ZExtInstruction : public Instruction {
 public:
-  Use m_val;
+  std::shared_ptr<Use> m_val;
   ValueType m_target_type;
 
   explicit ZExtInstruction(std::shared_ptr<Value> val, ValueType target_type,
                            std::shared_ptr<BasicBlock> bb = nullptr)
       : Instruction(IROp::ZEXT, std::move(bb)),
-        m_val(std::move(val)),
+        m_val(std::make_shared<Use>(std::move(val))),
         m_target_type(std::move(target_type)) {
     m_type = m_target_type;
   }
@@ -417,11 +465,19 @@ class BasicBlock : public Value {
 private:
   std::string m_name;
 
+public:
   std::list<std::shared_ptr<Instruction>> m_instr_list;
 
-public:
+  // new things
+  size_t m_id;                         // for calculating dominance relationship
+  std::shared_ptr<BasicBlock> m_idom;  // immediate dominator
+  std::vector<std::shared_ptr<BasicBlock>> m_dominators;  // who dominate me
+  std::unordered_set<std::shared_ptr<BasicBlock>> m_dominance_frontier;
+
+  // methods
+
   explicit BasicBlock(std::string name)
-      : Value(BaseType::LABEL), m_name(std::move(name)) {}
+      : Value(BaseType::LABEL), m_name(std::move(name)), m_id(0) {}
 
   void PushBackInstruction(std::shared_ptr<Instruction> instr);
   void PushFrontInstruction(std::shared_ptr<Instruction> instr);
@@ -430,8 +486,11 @@ public:
                               std::shared_ptr<Instruction> instr);
   void InsertBackInstruction(const std::shared_ptr<Instruction> &elem,
                              std::shared_ptr<Instruction> instr);
+  void RemoveInstruction(const std::shared_ptr<Instruction> &elem);
 
   std::shared_ptr<Instruction> LastInstruction() { return m_instr_list.back(); }
+
+  std::vector<std::shared_ptr<BasicBlock>> Successors();
 
   void ExportIR(std::ofstream &ofs, int depth) override;
 
@@ -447,7 +506,7 @@ public:
   explicit FunctionArg(std::unique_ptr<FuncFParamAST> &arg)
       : m_decl(arg->m_decl) {
     std::vector<int> dimensions;
-    if (m_decl->m_dimensions.size() >= 1) {
+    if (!m_decl->m_dimensions.empty()) {
       assert(m_decl->m_dimensions[0] == nullptr);
     }
     for (int i = 1; i < m_decl->m_dimensions.size(); ++i) {
@@ -476,11 +535,11 @@ private:
   std::string m_func_name;
   std::shared_ptr<FuncDefAST> m_func_ast;
 
-  std::list<std::shared_ptr<BasicBlock>> m_bb_list;
   std::shared_ptr<BasicBlock> m_current_bb;
 
 public:
   std::vector<std::shared_ptr<FunctionArg>> m_args;
+  std::list<std::shared_ptr<BasicBlock>> m_bb_list;
 
   explicit Function(const std::shared_ptr<FuncDefAST> &func_ast)
       : m_func_ast(func_ast),
@@ -512,6 +571,11 @@ public:
   [[nodiscard]] VarType ReturnType() const { return m_func_ast->ReturnType(); }
 
   std::shared_ptr<BasicBlock> GetCurrentBB() { return m_current_bb; }
+
+  bool HasSideEffect() {
+    // TODO(garen): unimplemented
+    assert(false);
+  }
 
   void AppendBasicBlock(std::shared_ptr<BasicBlock> bb);
 
@@ -546,77 +610,6 @@ public:
 
   void Check();
   void ExportIR(std::ofstream &ofs, int depth);
-};
-
-class IRBuilder : public std::enable_shared_from_this<IRBuilder> {
-public:
-  std::unique_ptr<Module> m_module;
-  std::shared_ptr<BasicBlock> m_if_true, m_if_false, m_if_exit;
-  std::shared_ptr<BasicBlock> m_while_entry, m_while_header, m_while_exit;
-
-public:
-  explicit IRBuilder(std::unique_ptr<Module> module)
-      : m_module(std::move(module)),
-        m_if_true(nullptr),
-        m_if_false(nullptr),
-        m_if_exit(nullptr),
-        m_while_entry(nullptr),
-        m_while_header(nullptr),
-        m_while_exit(nullptr) {}
-
-  std::shared_ptr<BasicBlock> CreateBasicBlock(std::string block_name);
-
-  void AppendBasicBlock(std::shared_ptr<BasicBlock> bb);
-
-  std::shared_ptr<Function> CreateFunction(std::shared_ptr<FuncDefAST> func);
-
-  // std::unique_ptr<PhiInstruction> CreatePhiInstruction();
-
-  std::shared_ptr<Instruction> CreateBinaryInstruction(
-      IROp op, const std::shared_ptr<Value> &lhs,
-      const std::shared_ptr<Value> &rhs);
-
-  std::shared_ptr<CallInstruction> CreateCallInstruction(VarType return_type,
-                                                         std::string func_name);
-
-  std::shared_ptr<CallInstruction> CreateCallInstruction(
-      VarType return_type, std::string func_name,
-      std::vector<std::shared_ptr<Value>> params);
-
-  std::shared_ptr<Instruction> CreateBranchInstruction(
-      std::shared_ptr<Value> cond_val, std::shared_ptr<BasicBlock> true_block,
-      std::shared_ptr<BasicBlock> false_block);
-
-  std::shared_ptr<Instruction> CreateJumpInstruction(
-      std::shared_ptr<BasicBlock> block);
-
-  std::shared_ptr<Instruction> CreateReturnInstruction(
-      std::shared_ptr<Value> ret = nullptr);
-
-  std::shared_ptr<Instruction> CreateGetElementPtrInstruction(
-      std::shared_ptr<Value> addr, std::vector<std::shared_ptr<Value>> indices);
-
-  std::shared_ptr<Instruction> CreateLoadInstruction(
-      std::shared_ptr<Value> addr);
-
-  std::shared_ptr<Instruction> CreateStoreInstruction(
-      std::shared_ptr<Value> addr, std::shared_ptr<Value> val);
-
-  std::shared_ptr<Instruction> CreateAllocaInstruction(
-      std::shared_ptr<DeclAST> decl, std::shared_ptr<Value> init_val = nullptr);
-
-  std::shared_ptr<GlobalVariable> CreateGlobalVariable(
-      const std::shared_ptr<DeclAST> &decl);
-  std::shared_ptr<IntGlobalVariable> CreateIntGlobalVariable(
-      std::shared_ptr<DeclAST> decl);
-  std::shared_ptr<FloatGlobalVariable> CreateFloatGlobalVariable(
-      std::shared_ptr<DeclAST> decl);
-
-  std::shared_ptr<Value> CreateZExtInstruction(std::shared_ptr<Value> from,
-                                               ValueType type_to);
-
-  std::shared_ptr<Value> GetIntConstant(int int_val);
-  std::shared_ptr<Value> GetFloatConstant(float float_val);
 };
 
 #endif  // BDDD_IR_H

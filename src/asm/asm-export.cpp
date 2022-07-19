@@ -29,7 +29,8 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
   ofs << "\t.align 2" << std::endl;
   ofs << "\t.type " << m_name << ", \%function" << std::endl;
   ofs << m_name << ":" << std::endl;
-  m_push->exportASM(ofs);
+
+  // TODO(Huang): push
 
   // TODO(Huang): stack allocate
 
@@ -39,7 +40,8 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
 
   // TODO(Huang): stack reclaim
 
-  m_pop->exportASM(ofs);
+  // TODO(Huang): pop
+
   ofs << "\t.pool" << std::endl;
   ofs << "\t.size " << m_name << ", .-" << m_name << std::endl;
 }
@@ -72,7 +74,7 @@ void LDRInst::exportASM(std::ofstream& ofs) {
 }
 
 void STRInst::exportASM(std::ofstream& ofs) {
-  ofs << m_src->getName() << "[" << m_dest->getName() << ", "
+  ofs << m_src->getName() << ", [" << m_dest->getName() << ", "
       << m_offs->getName();
   if (m_shift) {
     // TODO(Huang): export shift here
@@ -88,8 +90,7 @@ void PInst::exportASM(std::ofstream& ofs) {
   ofs << "{";
   for (int i = 0; i < m_regs.size(); i++) {
     ofs << m_regs[i]->getName();
-    if (i != m_regs.size() - 1)
-      ofs << ", ";
+    if (i != m_regs.size() - 1) ofs << ", ";
   }
   ofs << "}" << std::endl;
 }
@@ -98,16 +99,16 @@ void BInst::exportASM(std::ofstream& ofs) {
   ofs << m_target->m_label << std::endl;
 }
 
-void CALLInst::exportASM(std::ofstream& ofs) {
-  ofs << m_label << std::endl;
-}
+void CALLInst::exportASM(std::ofstream& ofs) { ofs << m_label << std::endl; }
 
 void ShiftInst::exportASM(std::ofstream& ofs) {
-  ofs << m_dest->getName() << ", " << m_src->getName() << ", " << m_sval->getName() << std::endl;
+  ofs << m_dest->getName() << ", " << m_src->getName() << ", "
+      << m_sval->getName() << std::endl;
 }
 
 void ASInst::exportASM(std::ofstream& ofs) {
-  ofs << m_dest->getName() << ", " << m_operand1->getName() << ", " << m_operand2->getName();
+  ofs << m_dest->getName() << ", " << m_operand1->getName() << ", "
+      << m_operand2->getName();
   if (m_shift) {
     // TODO(Huang): export shift here
   }
@@ -115,7 +116,8 @@ void ASInst::exportASM(std::ofstream& ofs) {
 }
 
 void MULInst::exportASM(std::ofstream& ofs) {
-  ofs << m_dest->getName() << ", " << m_operand1->getName() << ", " << m_operand2->getName();
+  ofs << m_dest->getName() << ", " << m_operand1->getName() << ", "
+      << m_operand2->getName();
   if (m_append) {
     ofs << ", " << m_append->getName();
   }
@@ -123,7 +125,8 @@ void MULInst::exportASM(std::ofstream& ofs) {
 }
 
 void SDIVInst::exportASM(std::ofstream& ofs) {
-  ofs << m_dest->getName() << ", " << m_devidend->getName() << ", " << m_devisor->getName() << std::endl;
+  ofs << m_dest->getName() << ", " << m_devidend->getName() << ", "
+      << m_devisor->getName() << std::endl;
 }
 
 void BITInst::exportASM(std::ofstream& ofs) {

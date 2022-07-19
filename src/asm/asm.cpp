@@ -1,5 +1,9 @@
 #include "asm/asm.h"
 
+int Operand::vreg_cnt = 0;
+int ASM_BasicBlock::block_cnt = 0;
+std::unordered_map<std::shared_ptr<Operand>, std::string> Operand::vreg_map;
+
 void ASM_BasicBlock::insert(std::shared_ptr<ASM_Instruction> inst) {
   m_insts.push_back(inst);
 }
@@ -27,38 +31,33 @@ std::string Operand::getName() {
     case OperandType::IMM:
       return ("#" + std::to_string(m_immval));
     case OperandType::REG:
-      return m_is_rreg ? getRegName(m_rreg) : getRegName(m_sreg);
+      return getRegName();
     case OperandType::VREG:
       return getVRegName();
   }
   return "";  // unreachable, just write to avoid warning
 }
 
-std::string Operand::getRegName(RReg reg) {
-  std::string name;
-  int i = (int)reg;
-  switch (i) {
-    case 13:
-      name = "SP";
-    case 14:
-      name = "LR";
-    case 15:
-      name = "PC";
-    default:
-      name = "R" + std::to_string(i);
+std::string Operand::getRegName() {
+  // rreg
+  if (m_is_rreg) {
+    switch (m_rreg) {
+      case RReg::SP:
+        return "SP";
+      case RReg::LR:
+        return "LR";
+      case RReg::PC:
+        return "PC";
+      default:
+        return "R" + std::to_string((int)m_rreg);
+    }
   }
-  return name;
-}
-
-std::string Operand::getRegName(SReg reg) {
-  std::string name;
-  int i = (int)reg;
-  name = "S" + std::to_string(i);
-  return name;
+  // sreg
+  return "S" + std::to_string((int)m_sreg);
 }
 
 std::string Operand::getVRegName() {
-  std::shared_ptr<Operand> _this(this);
+  std::shared_ptr<Operand> _this = shared_from_this();
   auto it = vreg_map.find(_this);
   if (it != vreg_map.end()) {
     return it->second;
@@ -173,6 +172,7 @@ std::string ASM_Instruction::getCondName() {
 }
 
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
+  m_op = InstOp::LDR;
   m_type = Type::LABEL;
   m_dest = dest;
   m_label = label;
@@ -180,6 +180,7 @@ LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
 
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
                  std::shared_ptr<Operand> offs) {
+  m_op = InstOp::LDR;
   m_type = Type::REG;
   m_dest = dest;
   m_src = src;
@@ -188,18 +189,21 @@ LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
 
 STRInst::STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
                  std::shared_ptr<Operand> offs) {
+  m_op = InstOp::STR;
   m_dest = dest;
   m_src = src;
   m_offs = offs;
 }
 
 MOVInst::MOVInst(std::shared_ptr<Operand> dest, int imm) {
+  m_op = InstOp::MOV;
   m_type = RIType::IMM;
   m_dest = dest;
   m_src = std::make_shared<Operand>(imm);
 }
 
 MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
+  m_op = InstOp::MOV;
   m_type = RIType::REG;
   m_dest = dest;
   m_src = src;
@@ -256,6 +260,7 @@ MULInst::MULInst(InstOp op, std::shared_ptr<Operand> dest,
 SDIVInst::SDIVInst(std::shared_ptr<Operand> dest,
                    std::shared_ptr<Operand> devidend,
                    std::shared_ptr<Operand> devisor) {
+  m_op = InstOp::SDIV;
   m_dest = dest;
   m_devidend = devidend;
   m_devisor = devisor;
@@ -283,3 +288,7 @@ CTInst::CTInst(InstOp op, std::shared_ptr<Operand> operand1,
   m_operand1 = operand1;
   m_operand2 = operand2;
 }
+
+unsigned int ASM_Function::getStackSize() { return m_stack_size; }
+
+void ASM_Function::allocateStack(unsigned int size) { m_stack_size += size; }

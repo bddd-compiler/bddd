@@ -119,7 +119,7 @@ enum class RIType { REG, IMM };
 
 class ASM_Instruction;
 
-class Operand {
+class Operand : public std::enable_shared_from_this<Operand> {
 public:
   static int vreg_cnt;
   static std::unordered_map<std::shared_ptr<Operand>, std::string> vreg_map;
@@ -132,22 +132,19 @@ public:
   bool m_is_rreg;
   int m_immval;
 
-  Operand(OperandType t) : m_op_type(t) {}
+  Operand(OperandType t, bool r = true) : m_op_type(t), m_is_rreg(r) {}
 
-  Operand(int val) : m_op_type(OperandType::IMM), m_immval(val) {}
+  Operand(int val, bool r = true)
+      : m_op_type(OperandType::IMM), m_immval(val), m_is_rreg(r) {}
 
   std::string getName();
 
-  std::string getRegName(RReg reg);
-
-  std::string getRegName(SReg reg);
+  std::string getRegName();
 
   std::string getVRegName();
 
   static bool immCheck(int imm);
 };
-
-int Operand::vreg_cnt = 0;
 
 class ASM_Instruction;
 class ASM_BasicBlock;
@@ -175,7 +172,15 @@ public:
   std::unique_ptr<PInst> m_push, m_pop;
   unsigned int m_stack_size;
 
-  ASM_Function(std::shared_ptr<Function> ir_func) : m_ir_func(ir_func) {}
+  ASM_Function(std::shared_ptr<Function> ir_func)
+      : m_ir_func(ir_func),
+        m_name(ir_func->FuncName()),
+        m_rblock(std::make_shared<ASM_BasicBlock>()),
+        m_stack_size(0) {}
+
+  unsigned int getStackSize();
+
+  void allocateStack(unsigned int size);
 
   void exportASM(std::ofstream& ofs);
 };
@@ -195,8 +200,6 @@ public:
 
   void insert(std::shared_ptr<ASM_Instruction> inst);
 };
-
-int ASM_BasicBlock::block_cnt = 0;
 
 class Shift {
 public:

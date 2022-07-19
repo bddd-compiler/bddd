@@ -1,7 +1,7 @@
 #include <cassert>
 
 #include "ast/ast.h"
-#include "ir/ir.h"
+#include "ir/builder.h"
 
 std::shared_ptr<Value> InitValAST::CodeGen(std::shared_ptr<IRBuilder> builder) {
   assert(false);  // nothing generated here
@@ -233,46 +233,8 @@ std::shared_ptr<Value> DeclAST::CodeGen(std::shared_ptr<IRBuilder> builder) {
 
 std::shared_ptr<Value> FuncCallAST::CodeGen(
     std::shared_ptr<IRBuilder> builder) {
-  // search from declarations
-  auto it = std::find_if(builder->m_module->m_function_decl_list.begin(),
-                         builder->m_module->m_function_decl_list.end(),
-                         [=](const std::shared_ptr<Function> &ptr) {
-                           return ptr->FuncName() == m_func_name;
-                         });
-  if (it == builder->m_module->m_function_decl_list.end()) {
-    it = std::find_if(builder->m_module->m_function_list.begin(),
-                      builder->m_module->m_function_list.end(),
-                      [=](const std::shared_ptr<Function> &ptr) {
-                        return ptr->FuncName() == m_func_name;
-                      });
-    assert(it != builder->m_module->m_function_list.end());
-  }
-  auto ptr = *it;
-  std::vector<Use> param_uses;
-  assert(m_params.size() == ptr->m_args.size());
-  for (int i = 0; i < m_params.size(); ++i) {
-    auto val = m_params[i]->CodeGen(builder);
-    if (val->m_type.m_dimensions.size()
-            > ptr->m_args[i]->m_type.m_dimensions.size()
-        && val->m_type.m_num_star == ptr->m_args[i]->m_type.m_num_star) {
-      // fat pointer to thin pointer
-      std::vector<std::shared_ptr<Value>> gep_params(
-          val->m_type.m_dimensions.size() + 1
-              - ptr->m_args[i]->m_type.m_dimensions.size(),
-          builder->GetIntConstant(0));
-      val = builder->CreateGetElementPtrInstruction(val, std::move(gep_params));
-    }
-    assert(val->m_type == ptr->m_args[i]->m_type);
-
-    auto use = Use(val);
-    param_uses.push_back(use);
-  }
-  auto ret
-      = builder->CreateCallInstruction(m_func_def->ReturnType(), m_func_name);
-  for (auto &param : param_uses) {
-    param.SetUser(ret);
-  }
-  ret->SetParams(std::move(param_uses));
+  auto ret = builder->CreateCallInstruction(m_func_def->ReturnType(),
+                                            m_func_name, m_params);
   return ret;
 }
 
