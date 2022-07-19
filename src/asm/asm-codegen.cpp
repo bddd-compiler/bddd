@@ -1,17 +1,27 @@
 #include "asm/asm-builder.h"
 #include "ir/ir.h"
 
-std::shared_ptr<Operand> GenerateConstant(
-    std::shared_ptr<Constant> value, std::shared_ptr<ASM_Builder> builder) {
-  std::shared_ptr<Operand> ret = builder->getOperand(value);
-  if (ret == nullptr) {
-    if (value->m_is_float) {
-      // TODO(Huang): Generate float constant
-    } else {
-      auto mov = builder->appendMOV(
-          std::make_shared<Operand>(OperandType::VREG), value->m_int_val);
-      ret = mov->m_dest;
+std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
+    std::shared_ptr<Constant> value, bool genimm) {
+  // std::shared_ptr<Operand> ret = builder->getOperand(value);
+  // if (ret == nullptr) {
+  //   if (value->m_is_float) {
+  //     // TODO(Huang): Generate float constant
+  //   } else {
+  //     auto mov = builder->appendMOV(
+  //         std::make_shared<Operand>(OperandType::VREG), value->m_int_val);
+  //     ret = mov->m_dest;
+  //   }
+  // }
+  std::shared_ptr<Operand> ret;
+  if (value->m_is_float) {
+    // TODO(Huang): float
+  } else {
+    int imm = value->m_int_val;
+    if (genimm && Operand::immCheck(imm)) {
+      return std::make_shared<Operand>(imm);
     }
+    ret = appendMOV(std::make_shared<Operand>(OperandType::VREG), imm)->m_dest;
   }
   return ret;
 }
@@ -22,15 +32,12 @@ std::shared_ptr<Operand> GenerateAddInstruction(
   std::shared_ptr<Operand> operand1, operand2;
   std::shared_ptr<Value> val1 = inst->m_lhs_val_use->m_value;
   std::shared_ptr<Value> val2 = inst->m_rhs_val_use->m_value;
-  bool is_const1 = (std::dynamic_pointer_cast<Constant>(val1) != nullptr);
-  bool is_const2 = (std::dynamic_pointer_cast<Constant>(val2) != nullptr);
 
-  operand1 = is_const1 ? std::make_shared<Operand>(
-                 std::dynamic_pointer_cast<Constant>(val1)->m_int_val)
-                       : builder->getOperand(val1);
-  operand2 = is_const2 ? std::make_shared<Operand>(
-                 std::dynamic_pointer_cast<Constant>(val2)->m_int_val)
-                       : builder->getOperand(val2);
+  if (std::dynamic_pointer_cast<Constant>(val1)) {
+    std::swap(val1, val2);
+  }
+  operand1 = builder->getOperand(val1);
+  operand2 = builder->getOperand(val2, true);
 
   auto res = builder
                  ->appendAS(InstOp::ADD,
@@ -53,16 +60,12 @@ std::shared_ptr<Operand> GenerateSubInstruction(
   InstOp op;
   if (is_const1) {
     op = InstOp::RSB;
-    operand2 = std::make_shared<Operand>(
-        std::dynamic_pointer_cast<Constant>(val1)->m_int_val);
-    operand1 = builder->getOperand(val2);
+    std::swap(val1, val2);
   } else {
     op = InstOp::SUB;
-    operand1 = builder->getOperand(val1);
-    operand2 = is_const2 ? std::make_shared<Operand>(
-                   std::dynamic_pointer_cast<Constant>(val2)->m_int_val)
-                         : builder->getOperand(val2);
   }
+  operand1 = builder->getOperand(val1);
+  operand2 = builder->getOperand(val2, true);
 
   auto res = builder
                  ->appendAS(op, std::make_shared<Operand>(OperandType::VREG),
@@ -146,7 +149,7 @@ std::shared_ptr<Operand> GenerateCallInstruction(
     std::shared_ptr<Value> value = inst->m_params[i]->m_value;
     std::shared_ptr<Operand> reg = std::make_shared<Operand>(OperandType::REG);
     reg->m_rreg = (RReg)i;
-    builder->appendMOV(reg, builder->getOperand(value));
+    builder->appendMOV(reg, builder->getOperand(value, true));
   }
   // save params to stack
   std::shared_ptr<Operand> sp = std::make_shared<Operand>(OperandType::REG);
@@ -216,7 +219,7 @@ std::shared_ptr<Operand> GenerateReturnInstruction(
   if (ret_val != nullptr) {
     std::shared_ptr<Operand> r0 = std::make_shared<Operand>(OperandType::REG);
     r0->m_rreg = RReg::R0;
-    builder->appendMOV(r0, builder->getOperand(ret_val));
+    builder->appendMOV(r0, builder->getOperand(ret_val, true));
   }
   builder->appendB(builder->m_cur_func->m_rblock, CondType::NONE);
   builder->m_cur_block = nullptr;
@@ -285,7 +288,7 @@ void GenerateInstruction(std::shared_ptr<Value> ir_value,
                          std::shared_ptr<ASM_Builder> builder) {
   if ((std::dynamic_pointer_cast<Constant>(ir_value)) != nullptr) {
     auto value = std::dynamic_pointer_cast<Constant>(ir_value);
-    GenerateConstant(value, builder);
+    builder->GenerateConstant(value, true);
   } else if ((std::dynamic_pointer_cast<BinaryInstruction>(ir_value))
              != nullptr) {
     auto inst = std::dynamic_pointer_cast<BinaryInstruction>(ir_value);

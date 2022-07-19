@@ -176,11 +176,17 @@ public:
       : m_ir_func(ir_func),
         m_name(ir_func->FuncName()),
         m_rblock(std::make_shared<ASM_BasicBlock>()),
-        m_stack_size(0) {}
+        m_stack_size(0),
+        m_push(std::make_unique<PInst>(InstOp::PUSH)),
+        m_pop(std::make_unique<PInst>(InstOp::POP)) {}
 
   unsigned int getStackSize();
 
   void allocateStack(unsigned int size);
+
+  void appendPush(std::shared_ptr<Operand> reg);
+
+  void appendPop(std::shared_ptr<Operand> reg);
 
   void exportASM(std::ofstream& ofs);
 };
@@ -279,7 +285,7 @@ class PInst : public ASM_Instruction {
 public:
   std::vector<std::shared_ptr<Operand>> m_regs;
 
-  PInst(InstOp op, std::vector<std::shared_ptr<Operand>> regs);
+  PInst(InstOp op);
 
   void exportASM(std::ofstream& ofs) override;
 };

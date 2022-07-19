@@ -209,12 +209,7 @@ MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
   m_src = src;
 }
 
-PInst::PInst(InstOp op, std::vector<std::shared_ptr<Operand>> regs) {
-  m_op = op;
-  for (int i = 0; i < regs.size(); i++) {
-    m_regs.push_back(move(regs[i]));
-  }
-}
+PInst::PInst(InstOp op) { m_op = op; }
 
 BInst::BInst(std::shared_ptr<ASM_BasicBlock> block) {
   m_op = InstOp::B;
@@ -292,3 +287,11 @@ CTInst::CTInst(InstOp op, std::shared_ptr<Operand> operand1,
 unsigned int ASM_Function::getStackSize() { return m_stack_size; }
 
 void ASM_Function::allocateStack(unsigned int size) { m_stack_size += size; }
+
+void ASM_Function::appendPush(std::shared_ptr<Operand> reg) {
+  m_push->m_regs.push_back(reg);
+}
+
+void ASM_Function::appendPop(std::shared_ptr<Operand> reg) {
+  m_pop->m_regs.push_back(reg);
+}

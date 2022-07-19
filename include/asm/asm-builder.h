@@ -35,7 +35,7 @@ public:
 
   void setCurBlock(std::shared_ptr<ASM_BasicBlock> block);
 
-  std::shared_ptr<Operand> getOperand(std::shared_ptr<Value> value);
+  std::shared_ptr<Operand> getOperand(std::shared_ptr<Value> value, bool genimm = false);
 
   std::shared_ptr<Operand> createOperand(std::shared_ptr<Value> value);
 
@@ -105,9 +105,13 @@ public:
   // appendCT
   std::shared_ptr<CTInst> appendCT(InstOp op, std::shared_ptr<Operand> operand1,
                                    std::shared_ptr<Operand> operand2);
+
+  std::shared_ptr<Operand> GenerateConstant(std::shared_ptr<Constant> value, bool genimm);
 };
 
 void GenerateModule(std::shared_ptr<Module> ir_module,
                     std::shared_ptr<ASM_Builder> builder);
+
+
 
 #endif  // BDDD_ASM_BUILDER_H
