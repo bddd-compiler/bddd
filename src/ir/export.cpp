@@ -1,3 +1,4 @@
+#include "ir/ir-name-allocator.h"
 #include "ir/ir.h"
 
 // export LLVM IR
@@ -43,121 +44,6 @@ std::string BinaryOpToString(IROp op) {
   }
 }
 
-class ValueNameAllocator {
-private:
-  std::unordered_map<std::shared_ptr<Value>, std::string> m_name_of_global_vars;
-  std::unordered_map<std::shared_ptr<Value>, std::string> m_name_of_labels;
-  std::unordered_map<std::shared_ptr<Value>, std::string> m_name_of_local_vars;
-
-  int m_local_var_cnt;
-  int m_label_cnt;
-
-public:
-  explicit ValueNameAllocator()
-      : m_name_of_global_vars(),
-        m_name_of_labels(),
-        m_name_of_local_vars(),
-        m_local_var_cnt(0),
-        m_label_cnt(0) {}
-
-  void SetGlobalVarName(const std::shared_ptr<Value>& val, std::string name) {
-    assert(m_name_of_global_vars.find(val) == m_name_of_global_vars.end());
-    m_name_of_global_vars[val] = std::move(name);
-  }
-
-  // return in string
-  // example: %1, %L1
-  std::string GetValueName(const std::shared_ptr<Value>& val) {
-    assert(val != nullptr);
-
-    // check if the value is constant
-    if (auto constant = std::dynamic_pointer_cast<Constant>(val)) {
-      if (constant->m_is_float)
-        return std::to_string(constant->m_float_val);
-      else
-        return std::to_string(constant->m_int_val);
-    }
-
-    if (val->m_type.m_base_type == BaseType::LABEL) {
-      auto it = m_name_of_labels.find(val);
-      if (it == m_name_of_labels.end())
-        m_name_of_labels[val] = "%L" + std::to_string(m_label_cnt++);
-      return m_name_of_labels[val];
-    }
-    // try finding in global variables
-    auto it = m_name_of_global_vars.find(val);
-    if (it != m_name_of_global_vars.end()) {
-      return it->second;
-    }
-
-    auto it2 = m_name_of_local_vars.find(val);
-    if (it2 == m_name_of_local_vars.end())
-      m_name_of_local_vars[val] = "%" + std::to_string(m_local_var_cnt++);
-
-    return m_name_of_local_vars[val];
-  }
-
-  void ClearLocalVariables() {
-    m_name_of_local_vars.clear();
-    m_local_var_cnt = 0;
-  }
-};
-
-ValueNameAllocator g_allocator;
-
-void Module::ExportIR(std::ofstream& ofs, int depth) {
-  for (auto& global_variable : m_global_variable_list) {
-    global_variable->ExportIR(ofs, depth);
-  }
-  for (auto& func_decl : m_function_decl_list) {
-    func_decl->ExportIR(ofs, depth);
-  }
-  for (auto& func_def : m_function_list) {
-    func_def->ExportIR(ofs, depth);
-  }
-}
-void Function::ExportIR(std::ofstream& ofs, int depth) {
-  ofs << std::string(depth * 2, ' ');
-  if (m_is_decl) {
-    ofs << "declare ";
-  } else {
-    ofs << "define dso_local ";
-  }
-  ofs << VarTypeToString(ReturnType());
-  ofs << " @" << FuncName() << "(";
-  bool first = true;
-  for (auto& arg : m_args) {
-    if (first)
-      first = false;
-    else
-      ofs << ", ";
-    // ofs << arg->ToString();
-    arg->ExportIR(ofs, depth);
-    if (!m_is_decl) {
-      ofs << " " << g_allocator.GetValueName(arg);
-    }
-  }
-  ofs << ")";
-  if (!m_is_decl) {
-    ofs << " {" << std::endl;
-    // TODO(garen): print function body
-    for (auto& bb : m_bb_list) {
-      bb->ExportIR(ofs, depth + 1);
-    }
-    ofs << "}" << std::endl;
-  } else {
-    ofs << std::endl;
-  }
-  g_allocator.ClearLocalVariables();
-}
-void BasicBlock::ExportIR(std::ofstream& ofs, int depth) {
-  ofs << g_allocator.GetValueName(shared_from_this()).substr(1) << ":"
-      << std::endl;
-  for (auto& instr : m_instr_list) {
-    instr->ExportIR(ofs, depth);
-    ofs << std::endl;
-  }
-}
 void PrintGlobalArrayValues(std::ofstream& ofs, int n, int& offset,
                             const std::vector<int>& sizes,
                             const std::shared_ptr<IntGlobalVariable>& gv) {
@@ -177,15 +63,96 @@ void PrintGlobalArrayValues(std::ofstream& ofs, int n, int& offset,
     ofs << "]";
   }
 }
+// allocate name
+// export ir
+
+void Module::AllocateName(std::shared_ptr<IRNameAllocator> allocator) {
+  for (auto& global_variable : m_global_variable_list) {
+    global_variable->AllocateName(allocator);
+  }
+  for (auto& func_decl : m_function_decl_list) {
+    func_decl->AllocateName(allocator);
+  }
+  for (auto& func_def : m_function_list) {
+    func_def->AllocateName(allocator);
+  }
+}
+void Module::ExportIR(std::ofstream& ofs, int depth) {
+  for (auto& global_variable : m_global_variable_list) {
+    global_variable->ExportIR(ofs, depth);
+  }
+  for (auto& func_decl : m_function_decl_list) {
+    func_decl->ExportIR(ofs, depth);
+  }
+  for (auto& func_def : m_function_list) {
+    func_def->ExportIR(ofs, depth);
+  }
+}
+void Function::AllocateName(std::shared_ptr<IRNameAllocator> allocator) {
+  if (m_is_decl) return;  // no need to allocate names
+  for (auto& arg : m_args) {
+    arg->AllocateName(allocator);
+  }
+  for (auto& bb : m_bb_list) {
+    bb->AllocateName(allocator);
+  }
+  allocator->ClearLocalVariables();
+}
+void Function::ExportIR(std::ofstream& ofs, int depth) {
+  ofs << std::string(depth * 2, ' ');
+  if (m_is_decl) {
+    ofs << "declare ";
+  } else {
+    ofs << "define dso_local ";
+  }
+  ofs << VarTypeToString(ReturnType());
+  ofs << " @" << FuncName() << "(";
+  bool first = true;
+  for (auto& arg : m_args) {
+    if (first)
+      first = false;
+    else
+      ofs << ", ";
+    arg->ExportIR(ofs, depth);
+  }
+  ofs << ")";
+  if (!m_is_decl) {
+    ofs << " {" << std::endl;
+    // print function body
+    for (auto& bb : m_bb_list) {
+      bb->ExportIR(ofs, depth + 1);
+    }
+    ofs << "}" << std::endl;
+  } else {
+    ofs << std::endl;
+  }
+}
+void BasicBlock::AllocateName(std::shared_ptr<IRNameAllocator> allocator) {
+  allocator->GetValueName(shared_from_this());
+  for (auto& instr : m_instr_list) {
+    instr->AllocateName(allocator);
+  }
+}
+void BasicBlock::ExportIR(std::ofstream& ofs, int depth) {
+  ofs << m_allocated_name.substr(1) << ": ";
+  ofs << "; " << m_name << std::endl;
+  for (auto& instr : m_instr_list) {
+    instr->ExportIR(ofs, depth);
+    ofs << std::endl;
+  }
+}
+void GlobalVariable::AllocateName(std::shared_ptr<IRNameAllocator> allocator) {
+  allocator->SetGlobalVarName(shared_from_this(), "@" + m_name);
+}
 void IntGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
   // depth is useless here
   if (m_is_const) return;
-  g_allocator.SetGlobalVarName(shared_from_this(), "@" + m_varname);
+  // g_allocator.SetGlobalVarName(shared_from_this(), "@" + m_allocated_name);
   if (m_init_vals.size() == 1) {
-    ofs << "@" << m_varname << " = dso_local global i32 " << m_init_vals[0]
+    ofs << m_allocated_name << " = dso_local global i32 " << m_init_vals[0]
         << std::endl;
   } else {
-    ofs << "@" << m_varname << " = dso_local global ";
+    ofs << m_allocated_name << " = dso_local global ";
     int offset = 0;
     int tot = 1;
     std::vector<int> sizes(m_type.m_dimensions.size());
@@ -199,12 +166,19 @@ void IntGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
   }
 }
 void FloatGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
+  assert(false);  // TODO
   if (m_is_const) return;
   // depth is useless here
   assert(m_init_vals.size() == 1);
-  g_allocator.SetGlobalVarName(shared_from_this(), "@" + m_varname);
-  ofs << g_allocator.GetValueName(shared_from_this())
-      << " = dso_local global float " << m_init_vals[0] << std::endl;
+  // g_allocator.SetGlobalVarName(shared_from_this(), "@" + m_allocated_name);
+  ofs << m_allocated_name << " = dso_local global float " << m_init_vals[0]
+      << std::endl;
+}
+void BinaryInstruction::AllocateName(
+    std::shared_ptr<IRNameAllocator> allocator) {
+  allocator->GetValueName(shared_from_this());
+  allocator->GetValueName(m_lhs_val_use->m_value);
+  allocator->GetValueName(m_rhs_val_use->m_value);
 }
 void BinaryInstruction::ExportIR(std::ofstream& ofs, int depth) {
   // assert(m_lhs_val_use.m_value->m_type == ValueType::INT
@@ -212,16 +186,26 @@ void BinaryInstruction::ExportIR(std::ofstream& ofs, int depth) {
   // assert(m_lhs_val_use.m_value->m_type == m_rhs_val_use.m_value->m_type);
 
   ofs << std::string(depth * 2, ' ');
-  ofs << g_allocator.GetValueName(shared_from_this()) << " = ";
+  ofs << m_allocated_name << " = ";
   ofs << BinaryOpToString(m_op) << " "
       << m_lhs_val_use->m_value->m_type.ToString() << " ";
-  ofs << g_allocator.GetValueName(m_lhs_val_use->m_value) << ", "
-      << g_allocator.GetValueName(m_rhs_val_use->m_value) << std::endl;
+  ofs << m_lhs_val_use->m_value->m_allocated_name << ", "
+      << m_rhs_val_use->m_value->m_allocated_name << std::endl;
+}
+void CallInstruction::AllocateName(std::shared_ptr<IRNameAllocator> allocator) {
+  if (m_type.m_base_type != BaseType::VOID) {
+    allocator->GetValueName(shared_from_this());
+  }
+
+  for (auto& param : m_params) {
+    // since it may be constant, otherwise constant is empty
+    allocator->GetValueName(param->m_value);
+  }
 }
 void CallInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
   if (m_type.m_base_type != BaseType::VOID) {
-    ofs << g_allocator.GetValueName(shared_from_this()) << " = ";
+    ofs << m_allocated_name << " = ";
   }
   ofs << "call " << m_type.ToString() << " @" << m_func_name << "(";
   // params
@@ -233,64 +217,95 @@ void CallInstruction::ExportIR(std::ofstream& ofs, int depth) {
       ofs << ", ";
 
     ofs << param->m_value->m_type.ToString() << " "
-        << g_allocator.GetValueName(param->m_value);
+        << param->m_value->m_allocated_name;
   }
   ofs << ")" << std::endl;
+}
+void BranchInstruction::AllocateName(
+    std::shared_ptr<IRNameAllocator> allocator) {
+  allocator->GetValueName(m_cond->m_value);
+  // allocator->GetValueName(m_true_block);
+  // allocator->GetValueName(m_false_block);
 }
 void BranchInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ') << "br ";
   ofs << m_cond->m_value->m_type.ToString() << " "
-      << g_allocator.GetValueName(m_cond->m_value) << ", ";
+      << m_cond->m_value->m_allocated_name << ", ";
   ofs << m_true_block->m_type.ToString() << " "
-      << g_allocator.GetValueName(m_true_block) << ", ";
+      << m_true_block->m_allocated_name << ", ";
   ofs << m_false_block->m_type.ToString() << " "
-      << g_allocator.GetValueName(m_false_block) << std::endl;
+      << m_false_block->m_allocated_name << std::endl;
+}
+void JumpInstruction::AllocateName(std::shared_ptr<IRNameAllocator> allocator) {
+  // allocator->GetValueName(m_target_block);
 }
 void JumpInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ') << "br ";
   ofs << m_target_block->m_type.ToString() << " "
-      << g_allocator.GetValueName(m_target_block) << std::endl;
+      << m_target_block->m_allocated_name << std::endl;
+}
+void ReturnInstruction::AllocateName(
+    std::shared_ptr<IRNameAllocator> allocator) {
+  if (m_ret != nullptr && m_ret->m_value != nullptr) {
+    allocator->GetValueName(m_ret->m_value);
+  }
 }
 void ReturnInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
-  auto ret_val = m_ret->m_value;
-  if (ret_val == nullptr) {
+  if (m_ret == nullptr || m_ret->m_value == nullptr) {
     ofs << "ret void" << std::endl;
   } else if (IsConstant()) {
-    ofs << "ret ";
-    ret_val->ExportIR(ofs, depth);
+    ofs << "ret " << m_ret->m_value->m_type.ToString() << " ";
+    m_ret->m_value->ExportIR(ofs, depth);
     ofs << std::endl;
   } else {
     // ret_val->ExportIR(ofs, depth);
-    ofs << "ret " << ret_val->GetTypeString()
-        << g_allocator.GetValueName(ret_val) << std::endl;
+    ofs << "ret " << m_ret->m_value->m_type.ToString() << " "
+        << m_ret->m_value->m_allocated_name << std::endl;
+  }
+}
+void GetElementPtrInstruction::AllocateName(
+    std::shared_ptr<IRNameAllocator> allocator) {
+  allocator->GetValueName(shared_from_this());
+  allocator->GetValueName(m_addr->m_value);
+  for (const auto& index : m_indices) {
+    allocator->GetValueName(index->m_value);
   }
 }
 void GetElementPtrInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
-  ofs << g_allocator.GetValueName(shared_from_this()) << " = ";
-  ofs << "getelementptr " << m_addr->m_type.Dereference().ToString() << ", ";
-  ofs << m_addr->m_type.ToString() << " " << g_allocator.GetValueName(m_addr)
+  ofs << m_allocated_name << " = ";
+  ofs << "getelementptr " << m_addr->m_value->m_type.Dereference().ToString()
       << ", ";
+  ofs << m_addr->m_value->m_type.ToString() << " "
+      << m_addr->m_value->m_allocated_name << ", ";
   bool first = true;
-  for (const auto& val : m_indices) {
+  for (const auto& index : m_indices) {
     if (first)
       first = false;
     else
       ofs << ", ";
-    ofs << val->m_type.ToString() << " " << g_allocator.GetValueName(val);
+    ofs << index->m_value->m_type.ToString() << " "
+        << index->m_value->m_allocated_name;
   }
   ofs << std::endl;
 }
+void LoadInstruction::AllocateName(std::shared_ptr<IRNameAllocator> allocator) {
+  allocator->GetValueName(shared_from_this());
+  allocator->GetValueName(m_addr->m_value);
+}
 void LoadInstruction::ExportIR(std::ofstream& ofs, int depth) {
-  // TODO(garen):
   ofs << std::string(depth * 2, ' ');
-  ofs << g_allocator.GetValueName(shared_from_this()) << " = ";
-  // auto stack_addr = GetStackAddr(m_addr.m_value);
-  auto stack_addr = m_addr->m_value;
-  ofs << "load " << m_type.ToString() << ", " << stack_addr->m_type.ToString()
-      << " " << g_allocator.GetValueName(stack_addr);
+  ofs << m_allocated_name << " = ";
+  ofs << "load " << m_type.ToString() << ", "
+      << m_addr->m_value->m_type.ToString() << " "
+      << m_addr->m_value->m_allocated_name;
   ofs << std::endl;
+}
+void StoreInstruction::AllocateName(
+    std::shared_ptr<IRNameAllocator> allocator) {
+  allocator->GetValueName(m_val->m_value);
+  allocator->GetValueName(m_addr->m_value);
 }
 void StoreInstruction::ExportIR(std::ofstream& ofs, int depth) {
   // TODO(garen):
@@ -299,57 +314,85 @@ void StoreInstruction::ExportIR(std::ofstream& ofs, int depth) {
 
   ofs << std::string(depth * 2, ' ');
   ofs << "store " << m_val->m_value->m_type.ToString() << " "
-      << g_allocator.GetValueName(m_val->m_value);
+      << m_val->m_value->m_allocated_name;
   // m_val.m_value->ExportIR(ofs, depth);
   ofs << ", " << m_addr->m_value->GetType().ToString() << " "
-      << g_allocator.GetValueName(m_addr->m_value);
+      << m_addr->m_value->m_allocated_name;
   ofs << std::endl;
+}
+void AllocaInstruction::AllocateName(
+    std::shared_ptr<IRNameAllocator> allocator) {
+  allocator->GetValueName(shared_from_this());
 }
 void AllocaInstruction::ExportIR(std::ofstream& ofs, int depth) {
   assert(m_type.m_num_star > 0);
   ofs << std::string(depth * 2, ' ');
 
-  ofs << g_allocator.GetValueName(shared_from_this()) << " = alloca "
-      << m_type.Dereference().ToString() << std::endl;
+  ofs << m_allocated_name << " = alloca " << m_type.Dereference().ToString()
+      << std::endl;
 
-  // TODO(garen): assign init vals
+  // init vals are not initialized here
+}
+void PhiInstruction::AllocateName(std::shared_ptr<IRNameAllocator> allocator) {
+  allocator->GetValueName(shared_from_this());
+  // only itself, no need to generate its incoming values (some still not
+  // appeared yet)
 }
 void PhiInstruction::ExportIR(std::ofstream& ofs, int depth) {
   // TODO(garen):
   ofs << std::string(depth * 2, ' ');
-  ofs << g_allocator.GetValueName(shared_from_this()) << " = phi ";
+  ofs << m_allocated_name << " = phi ";
   ofs << "i32 ";  // TODO(garen): float
   bool first = true;
-  for (auto& [from, val] : m_contents) {
+  for (auto& [bb, incoming_val] : m_contents) {
     if (first)
       first = false;
     else
       ofs << ", ";
-    ofs << "[ " << g_allocator.GetValueName(val.m_value) << ", "
-        << g_allocator.GetValueName(from) << " ]";
+    ofs << "[ ";
+    if (incoming_val->m_value->m_allocated_name.empty()) {
+      incoming_val->m_value->ExportIR(ofs, depth);  // name not generated
+    } else {
+      ofs << incoming_val->m_value->m_allocated_name;
+    }
+    ofs << ", " << bb->m_allocated_name << " ]";
   }
   ofs << std::endl;
+}
+void Constant::AllocateName(std::shared_ptr<IRNameAllocator> allocator) {
+  // do nothing here
 }
 // NOT a complete instruction, cannot be invoked independently
 void Constant::ExportIR(std::ofstream& ofs, int depth) {
   // TODO(garen):
   if (m_is_float) {
-    ofs << "float " << m_float_val;
+    ofs << m_float_val;
   } else {
-    ofs << "i32 " << m_int_val;
+    ofs << m_int_val;
   }
 }
-// void FunctionArg::ExportIR(std::ofstream& ofs, int depth) {
-//   ofs << m_type.ToString();
-// }
+void ZExtInstruction::AllocateName(std::shared_ptr<IRNameAllocator> allocator) {
+  allocator->GetValueName(shared_from_this());
+  allocator->GetValueName(m_val->m_value);
+}
 void ZExtInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
-  ofs << g_allocator.GetValueName(shared_from_this()) << " = zext ";
+  ofs << m_allocated_name << " = zext ";
   ofs << m_val->m_value->m_type.ToString() << " "
-      << g_allocator.GetValueName(m_val->m_value) << " to "
-      << m_target_type.ToString() << std::endl;
+      << m_val->m_value->m_allocated_name << " to " << m_target_type.ToString()
+      << std::endl;
+}
+
+void FunctionArg::AllocateName(std::shared_ptr<IRNameAllocator> allocator) {
+  if (!m_is_decl) {
+    allocator->GetValueName(shared_from_this());
+  }
 }
 void FunctionArg::ExportIR(std::ofstream& ofs, int depth) {
   // depth is useless here
+  // only Function can know whether declaration or definition
   ofs << m_type.ToString();
+  if (!m_is_decl) {
+    ofs << " " << m_allocated_name;
+  }
 }

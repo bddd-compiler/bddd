@@ -10,13 +10,13 @@
 
 // warning: instances of Use should be initialized only via std::make_unique
 
-void Use::InitUser(std::shared_ptr<Value> user) {
-  if (m_value) {
-    m_user = std::move(user);
-    m_value->AddUse(m_user);
-  }
-}
-
+// void Use::InitUser(std::shared_ptr<Value> user) {
+//   if (m_value) {
+//     m_user = std::move(user);
+//     m_value->AddUse(m_user);
+//   }
+// }
+//
 void Use::UseValue(std::shared_ptr<Value> value) {
   assert(value != nullptr);
 
@@ -28,7 +28,7 @@ void Use::UseValue(std::shared_ptr<Value> value) {
   // m_value = value;
   // m_value->AddUse(m_user);
 
-  m_value = value;
+  m_value = std::move(value);
 }
 
 void Use::RemoveFromUseList() {
@@ -38,10 +38,13 @@ void Use::RemoveFromUseList() {
   m_value->m_use_list.erase(it);
 }
 
-void Value::AddUse(const std::shared_ptr<Value>& user) {
+std::shared_ptr<Use> Value::AddUse(const std::shared_ptr<Value>& user) {
   auto this_ptr = shared_from_this();
-  assert(this_ptr != user);
-  m_use_list.push_back(std::make_shared<Use>(this_ptr, user));
+  // maybe phi instruction can use itself
+  // assert(this_ptr != user);
+  auto ret = std::make_shared<Use>(this_ptr, user);
+  m_use_list.push_back(ret);
+  return ret;
 }
 
 void Value::KillUse(const std::shared_ptr<Value>& user) {
@@ -54,12 +57,16 @@ void Value::KillUse(const std::shared_ptr<Value>& user) {
   assert(false);  // not found! what happen?
 }
 
+// move from val's m_use_list to new_val's m_use_list
 void Value::ReplaceUseBy(const std::shared_ptr<Value>& new_val) {
-  for (auto& use : m_use_list) {
-    auto this_ptr = shared_from_this();
-    assert(use->m_value == this_ptr);
+  for (auto it = m_use_list.begin(); it != m_use_list.end();) {
+    auto use = *it;
+    ++it;
+    assert(use->m_value == shared_from_this());
+    KillUse(use->m_user);
     // if (use->m_user != this_ptr) use->UseValue(new_val);
     use->UseValue(new_val);
+    new_val->m_use_list.push_back(use);
   }
 }
 

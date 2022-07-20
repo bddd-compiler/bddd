@@ -78,7 +78,7 @@ public:
 
   // create an empty phi instruction and insert at the prehead of bb
   std::shared_ptr<PhiInstruction> CreatePhiInstruction(
-      std::shared_ptr<BasicBlock> bb);
+      ValueType type, std::shared_ptr<BasicBlock> bb);
 };
 
 #endif  // BDDD_BUILDER_H

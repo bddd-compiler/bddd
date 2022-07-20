@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    filename = "../testSource/buaa/mem2reg/test.c";
+    filename = "../testSource/buaa/part11/test2.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -58,16 +58,21 @@ int main(int argc, char **argv) {
   }
   builder->m_module->Check();
 
-  std::ofstream ofs2(filename.substr(0, filename.rfind('.')) + "_ir.out");
+  std::ofstream ofs2(filename.substr(0, filename.rfind('.'))
+                     + "_ir_example.out");
+  auto allocator = std::make_shared<IRNameAllocator>();
+  builder->m_module->AllocateName(allocator);
   builder->m_module->ExportIR(ofs2, 0);
   ofs2.close();
 
-  // auto pass_manager = std::make_unique<IRPassManager>(builder);
-  // pass_manager->Mem2RegPass();
-  //
-  // std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_ir2.out");
-  // builder->m_module->ExportIR(ofs3, 0);
-  // ofs3.close();
+  auto pass_manager = std::make_unique<IRPassManager>(builder);
+  pass_manager->Mem2RegPass();
+
+  std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_ir.out");
+  auto allocator2 = std::make_shared<IRNameAllocator>();
+  builder->m_module->AllocateName(allocator2);
+  builder->m_module->ExportIR(ofs3, 0);
+  ofs3.close();
 
   return 0;
 }

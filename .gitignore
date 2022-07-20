@@ -1,9 +1,10 @@
+.ccls-cache
 build
 cmake-build-debug
 .idea
 .vscode
 *_ast.out
-*_ir.out
+*_ir*.out
 *.ll
 *.exe
 *_test.out
