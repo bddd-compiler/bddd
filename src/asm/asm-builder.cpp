@@ -33,32 +33,14 @@ void ASM_Builder::setCurBlock(std::shared_ptr<ASM_BasicBlock> block) {
   m_cur_block = block;
 }
 
-std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value, bool genimm) {
-  // std::shared_ptr<Constant> const_val;
-  // if (const_val = std::dynamic_pointer_cast<Constant>(value)) {
-  //   if (const_val->m_is_float) {
-  //     // TODO(Huang): float
-  //   } else {
-  //     int imm = const_val->m_int_val;
-  //     if (Operand::immCheck(imm)) {
-  //       return std::make_shared<Operand>(imm);
-  //     }
-  //     return appendMOV(std::make_shared<Operand>(OperandType::VREG),
-  //                      std::make_shared<Operand>(imm))
-  //         ->m_dest;
-  //   }
-  // }
-
+std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value,
+                                                 bool genimm) {
   auto ret = m_value_map.find(value) != m_value_map.end() ? m_value_map[value]
                                                           : nullptr;
   if (ret) {
     return ret;
   }
-  if ((std::dynamic_pointer_cast<Constant>(value) != nullptr)) {
-    auto val = std::dynamic_pointer_cast<Constant>(value);
-    // ret = appendMOV(std::make_shared<Operand>(OperandType::VREG),
-    //                 val->m_int_val)
-    //           ->m_dest;
+  if (auto val = std::dynamic_pointer_cast<Constant>(value)) {
     ret = GenerateConstant(val, genimm);
   }
   return ret;

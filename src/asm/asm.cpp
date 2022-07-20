@@ -130,25 +130,43 @@ std::string ASM_Instruction::getOpName() {
     case InstOp::TST:
       return "TST";
     case InstOp::VMOV:
-      return "VMOV.F32";
+      return "VMOV";
     case InstOp::VADD:
-      return "VADD.F32";
+      return "VADD";
     case InstOp::VSUB:
-      return "VSUB.F32";
+      return "VSUB";
     case InstOp::VMLA:
-      return "VMLA.F32";
+      return "VMLA";
     case InstOp::VMLS:
-      return "VMLS.F32";
+      return "VMLS";
     case InstOp::VMUL:
-      return "VMUL.F32";
+      return "VMUL";
     case InstOp::VDIV:
-      return "VDIV.F32";
+      return "VDIV";
     case InstOp::VCMP:
-      return "VCMP.F32";
+      return "VCMP";
     case InstOp::VLDR:
-      return "VLDR.32";
+      return "VLDR";
     case InstOp::VSTR:
-      return "VSTR.32";
+      return "VSTR";
+  }
+  return "";
+}
+
+std::string ASM_Instruction::getOpSuffixName() {
+  switch (m_op) {
+    case InstOp::VMOV:
+    case InstOp::VADD:
+    case InstOp::VSUB:
+    case InstOp::VMLA:
+    case InstOp::VMLS:
+    case InstOp::VMUL:
+    case InstOp::VDIV:
+    case InstOp::VCMP:
+      return ".F32";
+    case InstOp::VLDR:
+    case InstOp::VSTR:
+      return ".32";
   }
   return "";
 }
@@ -173,6 +191,7 @@ std::string ASM_Instruction::getCondName() {
 
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
   m_op = InstOp::LDR;
+  m_cond = CondType::NONE;
   m_type = Type::LABEL;
   m_dest = dest;
   m_label = label;
@@ -181,6 +200,7 @@ LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
                  std::shared_ptr<Operand> offs) {
   m_op = InstOp::LDR;
+  m_cond = CondType::NONE;
   m_type = Type::REG;
   m_dest = dest;
   m_src = src;
@@ -190,6 +210,7 @@ LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
 STRInst::STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
                  std::shared_ptr<Operand> offs) {
   m_op = InstOp::STR;
+  m_cond = CondType::NONE;
   m_dest = dest;
   m_src = src;
   m_offs = offs;
@@ -197,6 +218,7 @@ STRInst::STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
 
 MOVInst::MOVInst(std::shared_ptr<Operand> dest, int imm) {
   m_op = InstOp::MOV;
+  m_cond = CondType::NONE;
   m_type = RIType::IMM;
   m_dest = dest;
   m_src = std::make_shared<Operand>(imm);
@@ -204,20 +226,26 @@ MOVInst::MOVInst(std::shared_ptr<Operand> dest, int imm) {
 
 MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
   m_op = InstOp::MOV;
+  m_cond = CondType::NONE;
   m_type = RIType::REG;
   m_dest = dest;
   m_src = src;
 }
 
-PInst::PInst(InstOp op) { m_op = op; }
+PInst::PInst(InstOp op) {
+  m_op = op;
+  m_cond = CondType::NONE;
+}
 
 BInst::BInst(std::shared_ptr<ASM_BasicBlock> block) {
   m_op = InstOp::B;
+  m_cond = CondType::NONE;
   m_target = block;
 }
 
 CALLInst::CALLInst(VarType type, std::string label, int n) {
   m_op = InstOp::BL;
+  m_cond = CondType::NONE;
   m_type = type;
   m_label = label;
   m_params = n;
@@ -227,6 +255,7 @@ ShiftInst::ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
                      std::shared_ptr<Operand> src,
                      std::shared_ptr<Operand> sval) {
   m_op = op;
+  m_cond = CondType::NONE;
   m_dest = dest;
   m_src = src;
   m_sval = sval;
@@ -236,6 +265,7 @@ ASInst::ASInst(InstOp op, std::shared_ptr<Operand> dest,
                std::shared_ptr<Operand> operand1,
                std::shared_ptr<Operand> operand2) {
   m_op = op;
+  m_cond = CondType::NONE;
   m_dest = dest;
   m_operand1 = operand1;
   m_operand2 = operand2;
@@ -246,6 +276,7 @@ MULInst::MULInst(InstOp op, std::shared_ptr<Operand> dest,
                  std::shared_ptr<Operand> operand2,
                  std::shared_ptr<Operand> append) {
   m_op = op;
+  m_cond = CondType::NONE;
   m_dest = dest;
   m_operand1 = operand1;
   m_operand2 = operand2;
@@ -256,6 +287,7 @@ SDIVInst::SDIVInst(std::shared_ptr<Operand> dest,
                    std::shared_ptr<Operand> devidend,
                    std::shared_ptr<Operand> devisor) {
   m_op = InstOp::SDIV;
+  m_cond = CondType::NONE;
   m_dest = dest;
   m_devidend = devidend;
   m_devisor = devisor;
@@ -265,6 +297,7 @@ BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,
                  std::shared_ptr<Operand> operand1,
                  std::shared_ptr<Operand> operand2) {
   m_op = op;
+  m_cond = CondType::NONE;
   m_dest = dest;
   m_operand1 = operand1;
   m_operand2 = operand2;
@@ -273,6 +306,7 @@ BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,
 BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,
                  std::shared_ptr<Operand> operand1) {
   m_op = op;
+  m_cond = CondType::NONE;
   m_dest = dest;
   m_operand1 = operand1;
 }
@@ -280,6 +314,7 @@ BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,
 CTInst::CTInst(InstOp op, std::shared_ptr<Operand> operand1,
                std::shared_ptr<Operand> operand2) {
   m_op = op;
+  m_cond = CondType::NONE;
   m_operand1 = operand1;
   m_operand2 = operand2;
 }

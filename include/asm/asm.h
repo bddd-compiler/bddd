@@ -113,7 +113,7 @@ enum class InstOp {
 
 enum class OperandType { REG, VREG, IMM };
 
-enum class CondType { EQ, NE, LT, LE, GT, GE, NONE };
+enum class CondType { NONE, NE, LT, LE, GT, GE, EQ };
 
 enum class RIType { REG, IMM };
 
@@ -226,6 +226,8 @@ public:
 
   std::string getOpName();
 
+  std::string getOpSuffixName();
+
   std::string getCondName();
 
   void exportInstHead(std::ofstream& ofs);
@@ -308,7 +310,6 @@ public:
 
   int m_params;
 
-  // TODO(Huang): CALLInst implement
   CALLInst(VarType t, std::string l, int n);
 
   void exportASM(std::ofstream& ofs) override;

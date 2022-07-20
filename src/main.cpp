@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
   auto asm_module = std::make_shared<ASM_Module>();
   auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
   GenerateModule(std::move(builder->m_module), asm_builder);
-  std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_tmp_asm.out");
+  std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_tmp_asm.s");
   asm_module->exportASM(ofs3);
   ofs3.close();
 

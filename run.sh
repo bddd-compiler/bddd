@@ -1,6 +1,6 @@
 #!/bin/sh
 
-for filename in $(ls ./testSource/functional/*.sy); do
+for filename in $(ls ./testSource/functional/*.c); do
   ./build/bddd $filename
   ret=$?
   if [ $ret -ne 0 ]; then

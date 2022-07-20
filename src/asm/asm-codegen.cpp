@@ -3,16 +3,6 @@
 
 std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
     std::shared_ptr<Constant> value, bool genimm) {
-  // std::shared_ptr<Operand> ret = builder->getOperand(value);
-  // if (ret == nullptr) {
-  //   if (value->m_is_float) {
-  //     // TODO(Huang): Generate float constant
-  //   } else {
-  //     auto mov = builder->appendMOV(
-  //         std::make_shared<Operand>(OperandType::VREG), value->m_int_val);
-  //     ret = mov->m_dest;
-  //   }
-  // }
   std::shared_ptr<Operand> ret;
   if (value->m_is_float) {
     // TODO(Huang): float
@@ -150,6 +140,7 @@ std::shared_ptr<Operand> GenerateCallInstruction(
     std::shared_ptr<Operand> reg = std::make_shared<Operand>(OperandType::REG);
     reg->m_rreg = (RReg)i;
     builder->appendMOV(reg, builder->getOperand(value, true));
+    i++;
   }
   // save params to stack
   std::shared_ptr<Operand> sp = std::make_shared<Operand>(OperandType::REG);
@@ -159,6 +150,7 @@ std::shared_ptr<Operand> GenerateCallInstruction(
     int offs = -(i - 3) * 4;
     builder->appendSTR(builder->getOperand(value), sp,
                        std::make_shared<Operand>(offs));
+    i++;
   }
 
   // calculate the stack move size
@@ -226,17 +218,51 @@ std::shared_ptr<Operand> GenerateReturnInstruction(
   return nullptr;
 }
 
-// GetEPtrInstruction to generate
 std::shared_ptr<Operand> getAddr(std::shared_ptr<Value> value,
                                  std::shared_ptr<ASM_Builder> builder) {
-  if (std::dynamic_pointer_cast<GlobalVariable>(value) != nullptr) {
-    auto var = std::dynamic_pointer_cast<GlobalVariable>(value);
+  if (auto var = std::dynamic_pointer_cast<GlobalVariable>(value)) {
     return builder
         ->appendLDR(std::make_shared<Operand>(OperandType::VREG),
                     var->m_varname)
         ->m_dest;
   }
   return builder->getOperand(value);
+}
+
+std::shared_ptr<Operand> GenerateGepInstruction(
+    std::shared_ptr<GetElementPtrInstruction> inst,
+    std::shared_ptr<ASM_Builder> builder) {
+  auto dimensions = inst->m_addr->m_type.m_dimensions;
+  auto indices = inst->m_indices;
+  int offs = 0;
+  int attribute = 1;
+  for (int i = dimensions.size() - 1; i >= 0; i--) {
+    offs += std::dynamic_pointer_cast<Constant>(indices[i + 1])->m_int_val
+            * attribute;
+    attribute *= dimensions[i];
+  }
+  offs *= 4;
+
+  std::shared_ptr<Operand> offsOp;
+  if (Operand::immCheck(offs)) {
+    offsOp = std::make_shared<Operand>(offs);
+  } else {
+    offsOp
+        = builder->appendMOV(std::make_shared<Operand>(OperandType::VREG), offs)
+              ->m_dest;
+  }
+
+  // store the absolute address in register, then return it
+  // actually, it would be better to return an offset form, like [Rn, Rm]
+  // so that we can reduce the add instruction
+  // TODO(Huang): optimize to offset form
+  auto ret = builder
+                 ->appendAS(InstOp::ADD,
+                            std::make_shared<Operand>(OperandType::VREG),
+                            getAddr(inst->m_addr, builder), offsOp)
+                 ->m_dest;
+  builder->m_value_map.insert(std::make_pair(inst, ret));
+  return ret;
 }
 
 std::shared_ptr<Operand> GenerateLoadInstruction(
@@ -286,40 +312,31 @@ std::shared_ptr<Operand> GenerateAllocaInstruction(
 
 void GenerateInstruction(std::shared_ptr<Value> ir_value,
                          std::shared_ptr<ASM_Builder> builder) {
-  if ((std::dynamic_pointer_cast<Constant>(ir_value)) != nullptr) {
-    auto value = std::dynamic_pointer_cast<Constant>(ir_value);
+  if (auto value = std::dynamic_pointer_cast<Constant>(ir_value)) {
     builder->GenerateConstant(value, true);
-  } else if ((std::dynamic_pointer_cast<BinaryInstruction>(ir_value))
-             != nullptr) {
-    auto inst = std::dynamic_pointer_cast<BinaryInstruction>(ir_value);
+  } else if (auto inst
+             = std::dynamic_pointer_cast<BinaryInstruction>(ir_value)) {
     GenerateBinaryInstruction(inst, builder);
-  } else if ((std::dynamic_pointer_cast<CallInstruction>(ir_value))
-             != nullptr) {
-    auto inst = std::dynamic_pointer_cast<CallInstruction>(ir_value);
+  } else if (auto inst = std::dynamic_pointer_cast<CallInstruction>(ir_value)) {
     GenerateCallInstruction(inst, builder);
-  } else if ((std::dynamic_pointer_cast<BranchInstruction>(ir_value))
-             != nullptr) {
-    auto inst = std::dynamic_pointer_cast<BranchInstruction>(ir_value);
+  } else if (auto inst
+             = std::dynamic_pointer_cast<BranchInstruction>(ir_value)) {
     GenerateBranchInstruction(inst, builder);
-  } else if ((std::dynamic_pointer_cast<JumpInstruction>(ir_value))
-             != nullptr) {
-    auto inst = std::dynamic_pointer_cast<JumpInstruction>(ir_value);
+  } else if (auto inst = std::dynamic_pointer_cast<JumpInstruction>(ir_value)) {
     GenerateJumpInstruction(inst, builder);
-  } else if ((std::dynamic_pointer_cast<ReturnInstruction>(ir_value))
-             != nullptr) {
-    auto inst = std::dynamic_pointer_cast<ReturnInstruction>(ir_value);
+  } else if (auto inst
+             = std::dynamic_pointer_cast<ReturnInstruction>(ir_value)) {
     GenerateReturnInstruction(inst, builder);
-  } else if ((std::dynamic_pointer_cast<LoadInstruction>(ir_value))
-             != nullptr) {
-    auto inst = std::dynamic_pointer_cast<LoadInstruction>(ir_value);
+  } else if (auto inst
+             = std::dynamic_pointer_cast<GetElementPtrInstruction>(ir_value)) {
+    GenerateGepInstruction(inst, builder);
+  } else if (auto inst = std::dynamic_pointer_cast<LoadInstruction>(ir_value)) {
     GenerateLoadInstruction(inst, builder);
-  } else if ((std::dynamic_pointer_cast<StoreInstruction>(ir_value))
-             != nullptr) {
-    auto inst = std::dynamic_pointer_cast<StoreInstruction>(ir_value);
+  } else if (auto inst
+             = std::dynamic_pointer_cast<StoreInstruction>(ir_value)) {
     GenerateStoreInstruction(inst, builder);
-  } else if ((std::dynamic_pointer_cast<AllocaInstruction>(ir_value))
-             != nullptr) {
-    auto inst = std::dynamic_pointer_cast<AllocaInstruction>(ir_value);
+  } else if (auto inst
+             = std::dynamic_pointer_cast<AllocaInstruction>(ir_value)) {
     GenerateAllocaInstruction(inst, builder);
   }
 }

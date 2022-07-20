@@ -2,8 +2,6 @@
 
 // Module part
 void ASM_Module::exportGlobalVar(std::ofstream& ofs) {
-  // TODO(Huang): wait for completion of global_var in ir module
-
   for (auto& var : m_ir_module->m_global_variable_list) {
     ofs << "\t.data" << std::endl;
     ofs << "\t.global " << var->m_varname << std::endl;
@@ -26,12 +24,17 @@ void ASM_Module::exportGlobalVar(std::ofstream& ofs) {
           ofs << std::to_string((i - left) * 4) << std::endl;
         } else {
           ofs << "\t.float ";
-          int left = i;
+          int first = true;
           while (i < init_size && float_val->m_init_vals[i] != 0) {
-            if (left != i) std::cout << ",";
-            ofs << std::to_string(float_val->m_init_vals[i]) << std::endl;
+            if (!first) {
+              first = false;
+            } else {
+              ofs << ",";
+            }
+            ofs << std::to_string(float_val->m_init_vals[i]);
             i++;
           }
+          ofs << std::endl;
         }
       }
     } else {
@@ -50,12 +53,17 @@ void ASM_Module::exportGlobalVar(std::ofstream& ofs) {
           ofs << std::to_string((i - left) * 4) << std::endl;
         } else {
           ofs << "\t.word ";
-          int left = i;
+          bool first = true;
           while (i < init_size && int_val->m_init_vals[i] != 0) {
-            if (left != i) std::cout << ",";
-            ofs << std::to_string(int_val->m_init_vals[i]) << std::endl;
+            if (first) {
+              first = false;
+            } else {
+              ofs << ",";
+            }
+            ofs << std::to_string(int_val->m_init_vals[i]);
             i++;
           }
+          ofs << std::endl;
         }
       }
     }
@@ -110,9 +118,7 @@ void ASM_BasicBlock::exportASM(std::ofstream& ofs) {
 }
 
 void ASM_Instruction::exportInstHead(std::ofstream& ofs) {
-  ofs << "\t" << getOpName() << " ";
-
-  // TODO(Huang): export cond
+  ofs << "\t" << getOpName() << getCondName() << getOpSuffixName() << " ";
 }
 
 void LDRInst::exportASM(std::ofstream& ofs) {
