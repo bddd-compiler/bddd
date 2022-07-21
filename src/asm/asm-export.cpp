@@ -94,8 +94,8 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
   ofs << "\t.align 2" << std::endl;
   ofs << "\t.type " << m_name << ", \%function" << std::endl;
   ofs << m_name << ":" << std::endl;
-  m_push->exportASM(ofs);    
-  
+  m_push->exportASM(ofs);
+
   // load params
   for (auto& i : m_params_set_list) {
     i->exportInstHead(ofs);
@@ -103,13 +103,37 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
   }
 
   // allocate stack
-  
+  int size = m_local_alloc;
+  if (size) {
+    if (size & 7) {
+      size &= ~(unsigned int)7;
+      size += 8;
+    }
+
+    // this part is taken from tinbaccc directly
+    if (Operand::immCheck(size)) {
+      ofs << "\tSUB SP, SP, #" << std::to_string(size) << std::endl;
+    } else {
+      ofs << "\tMOV r12, #" << (size & 0xffff) << std::endl;
+      if (size & 0xffff0000)
+        ofs << "\tMOVT r12, #" << ((unsigned int)size >> 16) << std::endl;
+      ofs << "\tSUB sp, sp, r12" << std::endl;
+    }
+  }
 
   for (auto& b : m_blocks) {
     b->exportASM(ofs);
   }
 
-  // TODO(Huang): stack reclaim
+  if (size) {
+    // this part is taken from tinbaccc directly
+    if (Operand::immCheck(size)) {
+      ofs << "\tADD SP, SP, #" << std::to_string(size) << std::endl;
+    } else {
+      ofs << "\tLDR R12, =" << std::to_string(size) << std::endl;
+      ofs << "\tADD sp, sp, r12" << std::endl;
+    }
+  }
 
   m_pop->exportASM(ofs);
   ofs << "\t.pool" << std::endl;

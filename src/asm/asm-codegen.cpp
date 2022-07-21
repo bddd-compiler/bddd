@@ -181,7 +181,7 @@ std::shared_ptr<Operand> GenerateCallInstruction(
 
   // reclaim sp
   if (stack_move_size) {
-    builder->allocSP(stack_move_size);
+    builder->reclaimSP();
   }
   return dest;
 }
