@@ -68,12 +68,8 @@ std::shared_ptr<Operand> GenerateSubInstruction(
 std::shared_ptr<Operand> GenerateMulInstruction(
     std::shared_ptr<BinaryInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  std::shared_ptr<Operand> operand1, operand2;
-  std::shared_ptr<Value> val1 = inst->m_lhs_val_use->m_value;
-  std::shared_ptr<Value> val2 = inst->m_rhs_val_use->m_value;
-  operand1 = builder->getOperand(val1);
-  operand2 = builder->getOperand(val2);
-
+  auto operand1 = builder->getOperand(inst->m_lhs_val_use->m_value);
+  auto operand2 = builder->getOperand(inst->m_rhs_val_use->m_value);
   auto res = builder
                  ->appendMUL(InstOp::MUL,
                              std::make_shared<Operand>(OperandType::VREG),
@@ -86,12 +82,8 @@ std::shared_ptr<Operand> GenerateMulInstruction(
 std::shared_ptr<Operand> GenerateDivInstruction(
     std::shared_ptr<BinaryInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  std::shared_ptr<Operand> operand1, operand2;
-  std::shared_ptr<Value> val1 = inst->m_lhs_val_use->m_value;
-  std::shared_ptr<Value> val2 = inst->m_rhs_val_use->m_value;
-  operand1 = builder->getOperand(val1);
-  operand2 = builder->getOperand(val2);
-
+  auto operand1 = builder->getOperand(inst->m_lhs_val_use->m_value);
+  auto operand2 = builder->getOperand(inst->m_rhs_val_use->m_value);
   auto res = builder
                  ->appendMUL(InstOp::SDIV,
                              std::make_shared<Operand>(OperandType::VREG),
@@ -99,6 +91,24 @@ std::shared_ptr<Operand> GenerateDivInstruction(
                  ->m_dest;
   builder->m_value_map.insert(std::make_pair(inst, res));
   return res;
+}
+
+std::shared_ptr<Operand> GenerateModInstruction(
+    std::shared_ptr<BinaryInstruction> inst,
+    std::shared_ptr<ASM_Builder> builder) {
+  auto devidend = builder->getOperand(inst->m_lhs_val_use->m_value);
+  auto devisor = builder->getOperand(inst->m_rhs_val_use->m_value);
+  auto div_ret = builder
+                     ->appendSDIV(std::make_shared<Operand>(OperandType::VREG),
+                                  devidend, devisor)
+                     ->m_dest;
+  auto ret = builder
+                 ->appendMUL(InstOp::MLS,
+                             std::make_shared<Operand>(OperandType::VREG),
+                             div_ret, devisor, devidend)
+                 ->m_dest;
+  builder->m_value_map.insert(std::make_pair(inst, ret));
+  return ret;
 }
 
 // TODO(Huang): mod to generate
@@ -116,7 +126,7 @@ std::shared_ptr<Operand> GenerateBinaryInstruction(
     case IROp::SDIV:
       return GenerateDivInstruction(inst, builder);
     case IROp::SREM:
-    //
+      return GenerateModInstruction(inst, builder);
     case IROp::SGEQ:
     case IROp::SGE:
     case IROp::SLEQ:
