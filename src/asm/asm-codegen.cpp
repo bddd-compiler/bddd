@@ -114,6 +114,7 @@ std::shared_ptr<Operand> GenerateBinaryInstruction(
     case IROp::MUL:
       return GenerateMulInstruction(inst, builder);
     case IROp::SDIV:
+      return GenerateDivInstruction(inst, builder);
     case IROp::SREM:
     //
     case IROp::SGEQ:
@@ -132,9 +133,14 @@ std::shared_ptr<Operand> GenerateCallInstruction(
     std::shared_ptr<CallInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
   int n = inst->m_params.size();
+  // calculate the stack move size
+  unsigned int stack_move_size = std::max(n - 4, 0) * 4;
+  if (stack_move_size) {
+    builder->allocSP(stack_move_size);
+  }
 
   int i = 0;
-  // save params to r0, r1, r2, r3
+  // save params to r0 ~ r3
   while (i < 4 && i < n) {
     std::shared_ptr<Value> value = inst->m_params[i]->m_value;
     std::shared_ptr<Operand> reg = std::make_shared<Operand>(OperandType::REG);
@@ -144,20 +150,21 @@ std::shared_ptr<Operand> GenerateCallInstruction(
   }
   // save params to stack
   std::shared_ptr<Operand> sp = std::make_shared<Operand>(OperandType::REG);
+  sp->m_rreg = RReg::SP;
   while (i < n) {
     std::shared_ptr<Value> value = inst->m_params[i]->m_value;
-    sp->m_rreg = RReg::SP;
-    int offs = -(i - 3) * 4;
-    builder->appendSTR(builder->getOperand(value), sp,
-                       std::make_shared<Operand>(offs));
+    int sp_offs = (i - 4) * 4;
+    std::shared_ptr<Operand> offs;
+    if (Operand::immCheck(sp_offs)) {
+      offs = std::make_shared<Operand>(sp_offs);
+    } else {
+      offs = builder
+                 ->appendMOV(std::make_shared<Operand>(OperandType::VREG),
+                             sp_offs)
+                 ->m_dest;
+    }
+    builder->appendSTR(builder->getOperand(value), sp, offs);
     i++;
-  }
-
-  // calculate the stack move size
-  int stack_move_size = std::max(n - 4, 0) * 4;
-  if (stack_move_size) {
-    auto move = std::make_shared<Operand>(stack_move_size);
-    builder->appendAS(InstOp::SUB, sp, sp, move);
   }
 
   VarType return_type = (VarType)inst->m_type.m_base_type;
@@ -172,12 +179,10 @@ std::shared_ptr<Operand> GenerateCallInstruction(
     builder->m_value_map.insert(std::make_pair(inst, dest));
   }
 
-  // recover sp
+  // reclaim sp
   if (stack_move_size) {
-    auto move = std::make_shared<Operand>(stack_move_size);
-    builder->appendAS(InstOp::ADD, sp, sp, move);
+    builder->allocSP(stack_move_size);
   }
-
   return dest;
 }
 
@@ -222,8 +227,7 @@ std::shared_ptr<Operand> getAddr(std::shared_ptr<Value> value,
                                  std::shared_ptr<ASM_Builder> builder) {
   if (auto var = std::dynamic_pointer_cast<GlobalVariable>(value)) {
     return builder
-        ->appendLDR(std::make_shared<Operand>(OperandType::VREG),
-                    var->m_varname)
+        ->appendLDR(std::make_shared<Operand>(OperandType::VREG), var->m_name)
         ->m_dest;
   }
   return builder->getOperand(value);
@@ -232,12 +236,14 @@ std::shared_ptr<Operand> getAddr(std::shared_ptr<Value> value,
 std::shared_ptr<Operand> GenerateGepInstruction(
     std::shared_ptr<GetElementPtrInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  auto dimensions = inst->m_addr->m_type.m_dimensions;
+  auto base_addr = inst->m_addr->m_value;
+  auto dimensions = base_addr->m_type.m_dimensions;
   auto indices = inst->m_indices;
   int offs = 0;
   int attribute = 1;
   for (int i = dimensions.size() - 1; i >= 0; i--) {
-    offs += std::dynamic_pointer_cast<Constant>(indices[i + 1])->m_int_val
+    offs += std::dynamic_pointer_cast<Constant>(indices[i + 1]->m_value)
+                ->m_int_val
             * attribute;
     attribute *= dimensions[i];
   }
@@ -259,7 +265,7 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   auto ret = builder
                  ->appendAS(InstOp::ADD,
                             std::make_shared<Operand>(OperandType::VREG),
-                            getAddr(inst->m_addr, builder), offsOp)
+                            getAddr(base_addr, builder), offsOp)
                  ->m_dest;
   builder->m_value_map.insert(std::make_pair(inst, ret));
   return ret;
@@ -296,14 +302,23 @@ std::shared_ptr<Operand> GenerateAllocaInstruction(
     std::shared_ptr<ASM_Builder> builder) {
   // TODO(Huang): alloc_size = 4 is temporary
   unsigned int alloc_size = 4;
-  builder->m_cur_func->allocateStack(alloc_size);
+
   unsigned int sp_offs = builder->m_cur_func->getStackSize();
-  std::shared_ptr<Operand> offs = std::make_shared<Operand>(sp_offs);
+  builder->m_cur_func->allocateStack(alloc_size);
+  std::shared_ptr<Operand> offs;
+  if (Operand::immCheck(sp_offs)) {
+    offs = std::make_shared<Operand>(sp_offs);
+  } else {
+    offs
+        = builder
+              ->appendMOV(std::make_shared<Operand>(OperandType::VREG), sp_offs)
+              ->m_dest;
+  }
   std::shared_ptr<Operand> sp = std::make_shared<Operand>(OperandType::REG);
   sp->m_rreg = RReg::SP;
   auto ret
       = builder
-            ->appendAS(InstOp::SUB,
+            ->appendAS(InstOp::ADD,
                        std::make_shared<Operand>(OperandType::VREG), sp, offs)
             ->m_dest;
   builder->m_value_map.insert(std::make_pair(inst, ret));
@@ -357,6 +372,7 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
   for (auto &b : ir_func->GetBlockList()) {
     GenerateBasicblock(b, builder);
   }
+  builder->fixedStackParams();
   builder->m_cur_func->m_blocks.push_back(builder->m_cur_func->m_rblock);
 }
 

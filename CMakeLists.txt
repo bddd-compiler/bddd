@@ -40,6 +40,7 @@ set(IR_SOURCE
   src/ir/builder.cpp
   src/ir/ir-pass-manager.cpp
   src/ir/pass/mem2reg.cpp
+  src/ir/ir-name-allocator.cpp
 )
 
 set(ASM_SOURCE

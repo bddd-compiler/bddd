@@ -319,9 +319,9 @@ CTInst::CTInst(InstOp op, std::shared_ptr<Operand> operand1,
   m_operand2 = operand2;
 }
 
-unsigned int ASM_Function::getStackSize() { return m_stack_size; }
+unsigned int ASM_Function::getStackSize() { return m_local_alloc; }
 
-void ASM_Function::allocateStack(unsigned int size) { m_stack_size += size; }
+void ASM_Function::allocateStack(unsigned int size) { m_local_alloc += size; }
 
 void ASM_Function::appendPush(std::shared_ptr<Operand> reg) {
   m_push->m_regs.push_back(reg);

@@ -15,13 +15,60 @@ void ASM_Builder::setIrModule(std::shared_ptr<Module> ir_module) {
 void ASM_Builder::appendFunction(std::shared_ptr<ASM_Function> func) {
   m_module->m_funcs.push_back(func);
   setCurFunction(func);
-
-  // TODO(Huang): initialize
   init();
+  setParams();
 }
 
 void ASM_Builder::setCurFunction(std::shared_ptr<ASM_Function> func) {
   m_cur_func = func;
+}
+
+void ASM_Builder::setParams() {
+  int i = 0;
+  int n = m_cur_func->m_ir_func->m_args.size();
+  std::shared_ptr<Value> value;
+
+  // set params in r0 ~ r3
+  std::shared_ptr<Operand> reg;
+  while (i < 4 && i < n) {
+    value = m_cur_func->m_ir_func->m_args[i];
+    reg = std::make_shared<Operand>(OperandType::REG);
+    reg->m_rreg = (RReg)i;
+    m_value_map.insert(std::make_pair(value, reg));
+    i++;
+  }
+
+  // set params in stack
+  while (i < n) {
+    value = m_cur_func->m_ir_func->m_args[i];
+    auto ret = std::make_shared<Operand>(OperandType::VREG);
+    m_value_map.insert(std::make_pair(value, ret));
+    i++;
+  }
+}
+
+void ASM_Builder::fixedStackParams() {
+  // fixed offset of params in stack
+  int n = m_cur_func->m_ir_func->m_args.size();
+  std::shared_ptr<Value> value;
+  std::shared_ptr<Operand> sp = std::make_shared<Operand>(OperandType::REG);
+  sp->m_rreg = RReg::SP;
+  for (int i = 4; i < n; i++) {
+    value = m_cur_func->m_ir_func->m_args[i];
+
+    // maybe wrong if push/pop is changed
+    int sp_offs = (i - 3 + m_cur_func->m_push->m_regs.size()) * 4;
+    std::shared_ptr<Operand> offs;
+    if (Operand::immCheck(sp_offs)) {
+      offs = std::make_shared<Operand>(sp_offs);
+    } else {
+      auto mov = std::make_shared<MOVInst>(std::make_shared<Operand>(OperandType::VREG), sp_offs);
+      offs = mov->m_dest;
+      m_cur_func->m_params_set_list.push_back(mov);
+    }
+    auto ldr = std::make_shared<LDRInst>(getOperand(value), sp, offs);
+    m_cur_func->m_params_set_list.push_back(ldr);
+  }
 }
 
 void ASM_Builder::appendBlock(std::shared_ptr<ASM_BasicBlock> block) {
@@ -31,6 +78,31 @@ void ASM_Builder::appendBlock(std::shared_ptr<ASM_BasicBlock> block) {
 
 void ASM_Builder::setCurBlock(std::shared_ptr<ASM_BasicBlock> block) {
   m_cur_block = block;
+}
+
+void ASM_Builder::allocSP(unsigned int size) {
+  if (size & 7) {
+    size &= ~(unsigned int)7;
+    size += 8;
+  }
+  std::shared_ptr<Operand> offs;
+  if (Operand::immCheck(size)) {
+    offs = std::make_shared<Operand>(size);
+  } else {
+    offs
+        = appendMOV(std::make_shared<Operand>(OperandType::VREG), size)->m_dest;
+  }
+  auto sp = std::make_shared<Operand>(OperandType::REG);
+  sp->m_rreg = RReg::SP;
+  appendAS(InstOp::SUB, sp, sp, offs);
+  m_cur_func->m_sp_alloc_size.push(offs);
+}
+
+void ASM_Builder::reclaimSP() {
+  auto sp = std::make_shared<Operand>(OperandType::REG);
+  sp->m_rreg = RReg::SP;
+  appendAS(InstOp::SUB, sp, sp, m_cur_func->m_sp_alloc_size.top());
+  m_cur_func->m_sp_alloc_size.pop();
 }
 
 std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value,

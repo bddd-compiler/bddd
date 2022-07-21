@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include <stack>
 
 #include "ir/ir.h"
 
@@ -168,15 +169,16 @@ public:
   std::shared_ptr<Function> m_ir_func;
   std::list<std::shared_ptr<ASM_BasicBlock>> m_blocks;
   std::shared_ptr<ASM_BasicBlock> m_rblock;
-  std::list<std::shared_ptr<Operand>> m_params;
   std::unique_ptr<PInst> m_push, m_pop;
-  unsigned int m_stack_size;
+  std::list<std::shared_ptr<ASM_Instruction>> m_params_set_list;
+  unsigned int m_local_alloc;
+  std::stack<std::shared_ptr<Operand>> m_sp_alloc_size;
 
   ASM_Function(std::shared_ptr<Function> ir_func)
       : m_ir_func(ir_func),
         m_name(ir_func->FuncName()),
         m_rblock(std::make_shared<ASM_BasicBlock>()),
-        m_stack_size(0),
+        m_local_alloc(0),
         m_push(std::make_unique<PInst>(InstOp::PUSH)),
         m_pop(std::make_unique<PInst>(InstOp::POP)) {}
 

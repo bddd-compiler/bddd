@@ -4,15 +4,15 @@
 void ASM_Module::exportGlobalVar(std::ofstream& ofs) {
   for (auto& var : m_ir_module->m_global_variable_list) {
     ofs << "\t.data" << std::endl;
-    ofs << "\t.global " << var->m_varname << std::endl;
+    ofs << "\t.global " << var->m_name << std::endl;
     ofs << "\t.align 2" << std::endl;
-    ofs << "\t.type " << var->m_varname << ", \%object" << std::endl;
-    ofs << "\t.size " << var->m_varname << ", ";
+    ofs << "\t.type " << var->m_name << ", \%object" << std::endl;
+    ofs << "\t.size " << var->m_name << ", ";
     if (var->m_is_float) {
       auto float_val = std::dynamic_pointer_cast<FloatGlobalVariable>(var);
       int init_size = float_val->m_init_vals.size();
       ofs << std::to_string(init_size * 4) << std::endl;
-      ofs << var->m_varname << ":" << std::endl;
+      ofs << var->m_name << ":" << std::endl;
       int i = 0;
       while (i < init_size) {
         if (float_val->m_init_vals[i] == 0) {
@@ -41,7 +41,7 @@ void ASM_Module::exportGlobalVar(std::ofstream& ofs) {
       auto int_val = std::dynamic_pointer_cast<IntGlobalVariable>(var);
       int init_size = int_val->m_init_vals.size();
       ofs << std::to_string(init_size * 4) << std::endl;
-      ofs << var->m_varname << ":" << std::endl;
+      ofs << var->m_name << ":" << std::endl;
       int i = 0;
       while (i < init_size) {
         if (int_val->m_init_vals[i] == 0) {
@@ -94,9 +94,16 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
   ofs << "\t.align 2" << std::endl;
   ofs << "\t.type " << m_name << ", \%function" << std::endl;
   ofs << m_name << ":" << std::endl;
-  m_push->exportASM(ofs);
+  m_push->exportASM(ofs);    
+  
+  // load params
+  for (auto& i : m_params_set_list) {
+    i->exportInstHead(ofs);
+    i->exportASM(ofs);
+  }
 
-  // TODO(Huang): stack allocate
+  // allocate stack
+  
 
   for (auto& b : m_blocks) {
     b->exportASM(ofs);

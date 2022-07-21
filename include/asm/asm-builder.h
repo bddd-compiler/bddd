@@ -2,6 +2,7 @@
 #define BDDD_ASM_BUILDER_H
 
 #include <unordered_map>
+#include <stack>
 
 #include "asm/asm.h"
 
@@ -31,9 +32,17 @@ public:
 
   void setCurFunction(std::shared_ptr<ASM_Function> func);
 
+  void setParams();
+
+  void fixedStackParams();
+
   void appendBlock(std::shared_ptr<ASM_BasicBlock> block);
 
   void setCurBlock(std::shared_ptr<ASM_BasicBlock> block);
+
+  void allocSP(unsigned int size);
+
+  void reclaimSP();
 
   std::shared_ptr<Operand> getOperand(std::shared_ptr<Value> value, bool genimm = false);
 
