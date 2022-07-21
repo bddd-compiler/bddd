@@ -372,7 +372,9 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
   for (auto &b : ir_func->GetBlockList()) {
     GenerateBasicblock(b, builder);
   }
+#ifdef SP_FOR_PARAM
   builder->fixedStackParams();
+#endif
   builder->m_cur_func->m_blocks.push_back(builder->m_cur_func->m_rblock);
 }
 

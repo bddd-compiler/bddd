@@ -8,6 +8,12 @@ void ASM_Module::exportGlobalVar(std::ofstream& ofs) {
     ofs << "\t.align 2" << std::endl;
     ofs << "\t.type " << var->m_name << ", \%object" << std::endl;
     ofs << "\t.size " << var->m_name << ", ";
+    if (var->m_is_float)
+      exportVarBody(ofs, std::dynamic_pointer_cast<FloatGlobalVariable>(var));
+    else 
+      exportVarBody(ofs, std::dynamic_pointer_cast<IntGlobalVariable>(var));
+
+#if 0
     if (var->m_is_float) {
       auto float_val = std::dynamic_pointer_cast<FloatGlobalVariable>(var);
       int init_size = float_val->m_init_vals.size();
@@ -67,6 +73,40 @@ void ASM_Module::exportGlobalVar(std::ofstream& ofs) {
         }
       }
     }
+#endif
+  
+  }
+}
+
+template <class T> void ASM_Module::exportVarBody(std::ofstream& ofs,
+                                                  std::shared_ptr<T> init_val) {
+  assert(std::static_pointer_cast<GlobalVariable>(init_val));
+  int size = init_val->m_init_vals.size();
+  ofs << std::to_string(size * 4) << std::endl;
+  ofs << init_val->m_name << ":" << std::endl;
+  int i = 0;
+  while (i < size) {
+    if (init_val->m_init_vals[i] == 0) {
+      ofs << "\t.space ";
+      int left = i;
+      while (i < size && init_val->m_init_vals[i] == 0) {
+        i++;
+      }
+      ofs << std::to_string((i - left) * 4) << std::endl;
+    } else {
+      ofs << (init_val->m_is_float ? "\t.float " : "\t.word ");
+      int first = true;
+      while (i < size && init_val->m_init_vals[i] != 0) {
+        if (!first) {
+          ofs << ",";
+        } else {
+          first = false;
+        }
+        ofs << std::to_string(init_val->m_init_vals[i]);
+        i++;
+      }
+      ofs << std::endl;
+    }
   }
 }
 
@@ -95,6 +135,16 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
   ofs << "\t.type " << m_name << ", \%function" << std::endl;
   ofs << m_name << ":" << std::endl;
   m_push->exportASM(ofs);
+
+#ifndef SP_FOR_PARAM
+  if (m_params_set_list.size()) {
+    int sp_offs = m_push->m_regs.size() * 4;
+    if (sp_offs)
+      ofs << "\tADD FP, SP, #" << std::to_string(sp_offs) << std::endl;
+    else
+      ofs << "\tMOV FP, SP" << std::endl;
+  }
+#endif
 
   // load params
   for (auto& i : m_params_set_list) {

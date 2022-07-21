@@ -158,6 +158,9 @@ public:
 
   void exportGlobalVar(std::ofstream& ofs);
 
+  template<class T>
+  void exportVarBody(std::ofstream& ofs, std::shared_ptr<T> init_val);
+
   void exportASM(std::ofstream& ofs);
 };
 

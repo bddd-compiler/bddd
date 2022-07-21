@@ -39,12 +39,33 @@ void ASM_Builder::setParams() {
   }
 
   // set params in stack
+#ifndef SP_FOR_PARAM
+  // use r11 as the frame pointer register
+  std::shared_ptr<Operand> fp = std::make_shared<Operand>(OperandType::REG);
+  fp->m_rreg = RReg::R11;
+  while (i < n) {
+    value = m_cur_func->m_ir_func->m_args[i];
+    std::shared_ptr<Operand> offs;
+    int fp_offs = (i - 4) * 4;
+    if (Operand::immCheck(fp_offs)) {
+      offs = std::make_shared<Operand>(fp_offs);
+    }
+    else {
+      auto mov = std::make_shared<MOVInst>(std::make_shared<Operand>(OperandType::VREG), fp_offs);
+      offs = mov->m_dest;
+      m_cur_func->m_params_set_list.push_back(mov);
+    }
+    auto ldr = std::make_shared<LDRInst>(getOperand(value), fp, offs);
+    m_cur_func->m_params_set_list.push_back(ldr);
+  }
+#else
   while (i < n) {
     value = m_cur_func->m_ir_func->m_args[i];
     auto ret = std::make_shared<Operand>(OperandType::VREG);
     m_value_map.insert(std::make_pair(value, ret));
     i++;
   }
+#endif
 }
 
 void ASM_Builder::fixedStackParams() {
