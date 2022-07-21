@@ -8,6 +8,10 @@ void ASM_BasicBlock::insert(std::shared_ptr<ASM_Instruction> inst) {
   m_insts.push_back(inst);
 }
 
+void ASM_BasicBlock::insertPhiMOV(std::shared_ptr<ASM_Instruction> mov) {
+  m_insts.insert(m_branch_pos, mov);
+}
+
 // arm instruction use a 12-bit immediate
 // 4 bits rotation, 8 bits value
 // check whether the imm is valid

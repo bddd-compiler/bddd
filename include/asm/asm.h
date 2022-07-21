@@ -5,10 +5,10 @@
 #include <iostream>
 #include <list>
 #include <memory>
+#include <stack>
 #include <string>
 #include <unordered_set>
 #include <vector>
-#include <stack>
 
 #include "ir/ir.h"
 
@@ -158,7 +158,7 @@ public:
 
   void exportGlobalVar(std::ofstream& ofs);
 
-  template<class T>
+  template <class T>
   void exportVarBody(std::ofstream& ofs, std::shared_ptr<T> init_val);
 
   void exportASM(std::ofstream& ofs);
@@ -201,15 +201,20 @@ public:
   static int block_cnt;
   std::string m_label;
   std::list<std::shared_ptr<ASM_Instruction>> m_insts;
+  std::list<std::shared_ptr<ASM_Instruction>>::iterator m_branch_pos;
 
   std::unordered_set<std::shared_ptr<Operand>> m_def;
   std::unordered_set<std::shared_ptr<Operand>> m_use;
 
-  ASM_BasicBlock() : m_label(".L" + std::to_string(block_cnt++)) {}
+  ASM_BasicBlock()
+      : m_label(".L" + std::to_string(block_cnt++)),
+        m_branch_pos(m_insts.end()) {}
 
   void exportASM(std::ofstream& ofs);
 
   void insert(std::shared_ptr<ASM_Instruction> inst);
+
+  void insertPhiMOV(std::shared_ptr<ASM_Instruction> mov);
 };
 
 class Shift {

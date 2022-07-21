@@ -335,6 +335,21 @@ std::shared_ptr<Operand> GenerateAllocaInstruction(
   return ret;
 }
 
+std::shared_ptr<Operand> GeneratePhiInstruction(
+    std::shared_ptr<PhiInstruction> inst,
+    std::shared_ptr<ASM_Builder> builder) {
+  auto ret = std::make_shared<Operand>(OperandType::VREG);
+  for (auto &[ir_block, value] : inst->m_contents) {
+    std::shared_ptr<ASM_BasicBlock> block = builder->getBlock(ir_block);
+    std::shared_ptr<Operand> src = builder->getOperand(value->m_value);
+    auto mov = std::make_shared<MOVInst>(ret, src);
+    assert(block && block->m_branch_pos != block->m_insts.end());
+    block->insertPhiMOV(mov);
+  }
+  builder->m_value_map.insert(std::make_pair(inst, ret));
+  return ret;
+}
+
 void GenerateInstruction(std::shared_ptr<Value> ir_value,
                          std::shared_ptr<ASM_Builder> builder) {
   if (auto value = std::dynamic_pointer_cast<Constant>(ir_value)) {
@@ -363,6 +378,8 @@ void GenerateInstruction(std::shared_ptr<Value> ir_value,
   } else if (auto inst
              = std::dynamic_pointer_cast<AllocaInstruction>(ir_value)) {
     GenerateAllocaInstruction(inst, builder);
+  } else if (auto inst = std::dynamic_pointer_cast<PhiInstruction>(ir_value)) {
+    GeneratePhiInstruction(inst, builder);
   }
 }
 
@@ -371,6 +388,7 @@ void GenerateBasicblock(std::shared_ptr<BasicBlock> ir_block,
   std::shared_ptr<ASM_BasicBlock> block = std::make_shared<ASM_BasicBlock>();
   builder->appendBlock(block);
   for (auto &i : ir_block->GetInstList()) {
+    builder->m_block_map.insert(std::make_pair(ir_block, block));
     GenerateInstruction(i, builder);
   }
 }
@@ -382,9 +400,11 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
   for (auto &b : ir_func->GetBlockList()) {
     GenerateBasicblock(b, builder);
   }
+
 #ifdef SP_FOR_PARAM
   builder->fixedStackParams();
 #endif
+
   builder->m_cur_func->m_blocks.push_back(builder->m_cur_func->m_rblock);
 }
 

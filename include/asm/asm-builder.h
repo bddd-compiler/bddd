@@ -48,7 +48,7 @@ public:
 
   std::shared_ptr<Operand> createOperand(std::shared_ptr<Value> value);
 
-  std::shared_ptr<ASM_BasicBlock> getBlock(std::shared_ptr<BasicBlock> block);
+  std::shared_ptr<ASM_BasicBlock> getBlock(std::shared_ptr<BasicBlock> ir_block);
 
   // appendLDR
   std::shared_ptr<LDRInst> appendLDR(std::shared_ptr<Operand> dest,

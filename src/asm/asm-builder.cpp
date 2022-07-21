@@ -49,9 +49,9 @@ void ASM_Builder::setParams() {
     int fp_offs = (i - 4) * 4;
     if (Operand::immCheck(fp_offs)) {
       offs = std::make_shared<Operand>(fp_offs);
-    }
-    else {
-      auto mov = std::make_shared<MOVInst>(std::make_shared<Operand>(OperandType::VREG), fp_offs);
+    } else {
+      auto mov = std::make_shared<MOVInst>(
+          std::make_shared<Operand>(OperandType::VREG), fp_offs);
       offs = mov->m_dest;
       m_cur_func->m_params_set_list.push_back(mov);
     }
@@ -83,7 +83,8 @@ void ASM_Builder::fixedStackParams() {
     if (Operand::immCheck(sp_offs)) {
       offs = std::make_shared<Operand>(sp_offs);
     } else {
-      auto mov = std::make_shared<MOVInst>(std::make_shared<Operand>(OperandType::VREG), sp_offs);
+      auto mov = std::make_shared<MOVInst>(
+          std::make_shared<Operand>(OperandType::VREG), sp_offs);
       offs = mov->m_dest;
       m_cur_func->m_params_set_list.push_back(mov);
     }
@@ -144,6 +145,14 @@ std::shared_ptr<Operand> ASM_Builder::createOperand(
   return nullptr;
 }
 
+std::shared_ptr<ASM_BasicBlock> ASM_Builder::getBlock(
+    std::shared_ptr<BasicBlock> ir_block) {
+  auto ret = m_block_map.find(ir_block) != m_block_map.end()
+                 ? m_block_map[ir_block]
+                 : nullptr;
+  return ret;
+}
+
 // appendLDR
 std::shared_ptr<LDRInst> ASM_Builder::appendLDR(std::shared_ptr<Operand> dest,
                                                 std::string label) {
@@ -191,6 +200,7 @@ std::shared_ptr<BInst> ASM_Builder::appendB(
   auto b = std::make_shared<BInst>(block);
   b->m_cond = cond;
   m_cur_block->insert(b);
+  m_cur_block->m_branch_pos--;
   return b;
 }
 
