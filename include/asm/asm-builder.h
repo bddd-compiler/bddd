@@ -1,8 +1,8 @@
 #ifndef BDDD_ASM_BUILDER_H
 #define BDDD_ASM_BUILDER_H
 
-#include <unordered_map>
 #include <stack>
+#include <unordered_map>
 
 #include "asm/asm.h"
 
@@ -17,10 +17,6 @@ public:
   std::unordered_map<std::shared_ptr<BasicBlock>,
                      std::shared_ptr<ASM_BasicBlock>>
       m_block_map;
-
-  std::unordered_map<std::shared_ptr<std::shared_ptr<ASM_BasicBlock>>,
-                     std::shared_ptr<BasicBlock>>
-      m_filled_block;
 
   ASM_Builder(std::shared_ptr<ASM_Module> m);
 
@@ -44,11 +40,15 @@ public:
 
   void reclaimSP();
 
-  std::shared_ptr<Operand> getOperand(std::shared_ptr<Value> value, bool genimm = false);
+  std::shared_ptr<Operand> getOperand(std::shared_ptr<Value> value,
+                                      bool genimm = false,
+                                      std::shared_ptr<ASM_BasicBlock> block
+                                      = nullptr);
 
   std::shared_ptr<Operand> createOperand(std::shared_ptr<Value> value);
 
-  std::shared_ptr<ASM_BasicBlock> getBlock(std::shared_ptr<BasicBlock> ir_block);
+  std::shared_ptr<ASM_BasicBlock> getBlock(
+      std::shared_ptr<BasicBlock> ir_block);
 
   // appendLDR
   std::shared_ptr<LDRInst> appendLDR(std::shared_ptr<Operand> dest,
@@ -115,12 +115,12 @@ public:
   std::shared_ptr<CTInst> appendCT(InstOp op, std::shared_ptr<Operand> operand1,
                                    std::shared_ptr<Operand> operand2);
 
-  std::shared_ptr<Operand> GenerateConstant(std::shared_ptr<Constant> value, bool genimm);
+  std::shared_ptr<Operand> GenerateConstant(
+      std::shared_ptr<Constant> value, bool genimm,
+      std::shared_ptr<ASM_BasicBlock> block = nullptr);
 };
 
 void GenerateModule(std::shared_ptr<Module> ir_module,
                     std::shared_ptr<ASM_Builder> builder);
-
-
 
 #endif  // BDDD_ASM_BUILDER_H

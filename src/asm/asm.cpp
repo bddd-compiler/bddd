@@ -1,5 +1,23 @@
 #include "asm/asm.h"
 
+CondType GetCondFromIR(IROp op) {
+  switch (op) {
+    case IROp::SGEQ:
+      return CondType::GE;
+    case IROp::SGE:
+      return CondType::GT;
+    case IROp::SLEQ:
+      return CondType::LE;
+    case IROp::SLE:
+      return CondType::LT;
+    case IROp::EQ:
+      return CondType::EQ;
+    case IROp::NE:
+      return CondType::NE;
+  }
+  return CondType::NONE;
+}
+
 int Operand::vreg_cnt = 0;
 int ASM_BasicBlock::block_cnt = 0;
 std::unordered_map<std::shared_ptr<Operand>, std::string> Operand::vreg_map;
@@ -9,7 +27,18 @@ void ASM_BasicBlock::insert(std::shared_ptr<ASM_Instruction> inst) {
 }
 
 void ASM_BasicBlock::insertPhiMOV(std::shared_ptr<ASM_Instruction> mov) {
+  assert(m_branch_pos != m_insts.end());
   m_insts.insert(m_branch_pos, mov);
+}
+
+void ASM_BasicBlock::appendFilledMOV(std::shared_ptr<ASM_Instruction> mov) {
+  m_mov_filled_list.push_back(mov);
+}
+
+void ASM_BasicBlock::fillMOV() {
+  for (auto& mov : m_mov_filled_list) {
+    insertPhiMOV(mov);
+  }
 }
 
 // arm instruction use a 12-bit immediate

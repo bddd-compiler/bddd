@@ -5,7 +5,6 @@ ASM_Builder::ASM_Builder(std::shared_ptr<ASM_Module> m) : m_module(m) {}
 void ASM_Builder::init() {
   m_value_map.clear();
   m_block_map.clear();
-  m_filled_block.clear();
 }
 
 void ASM_Builder::setIrModule(std::shared_ptr<Module> ir_module) {
@@ -127,22 +126,25 @@ void ASM_Builder::reclaimSP() {
   m_cur_func->m_sp_alloc_size.pop();
 }
 
-std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value,
-                                                 bool genimm) {
+std::shared_ptr<Operand> ASM_Builder::getOperand(
+    std::shared_ptr<Value> value, bool genimm,
+    std::shared_ptr<ASM_BasicBlock> block) {
+  if (auto val = std::dynamic_pointer_cast<Constant>(value)) {
+    return GenerateConstant(val, genimm, block);
+  }
   auto ret = m_value_map.find(value) != m_value_map.end() ? m_value_map[value]
                                                           : nullptr;
   if (ret) {
     return ret;
   }
-  if (auto val = std::dynamic_pointer_cast<Constant>(value)) {
-    ret = GenerateConstant(val, genimm);
-  }
-  return ret;
+  return createOperand(value);
 }
 
 std::shared_ptr<Operand> ASM_Builder::createOperand(
     std::shared_ptr<Value> value) {
-  return nullptr;
+  auto ret = std::make_shared<Operand>(OperandType::VREG);
+  m_value_map.insert(std::make_pair(value, ret));
+  return ret;
 }
 
 std::shared_ptr<ASM_BasicBlock> ASM_Builder::getBlock(
@@ -150,6 +152,10 @@ std::shared_ptr<ASM_BasicBlock> ASM_Builder::getBlock(
   auto ret = m_block_map.find(ir_block) != m_block_map.end()
                  ? m_block_map[ir_block]
                  : nullptr;
+  if (!ret) {
+    ret = std::make_shared<ASM_BasicBlock>();
+    m_block_map.insert(std::make_pair(ir_block, ret));
+  }
   return ret;
 }
 
@@ -200,7 +206,6 @@ std::shared_ptr<BInst> ASM_Builder::appendB(
   auto b = std::make_shared<BInst>(block);
   b->m_cond = cond;
   m_cur_block->insert(b);
-  m_cur_block->m_branch_pos--;
   return b;
 }
 

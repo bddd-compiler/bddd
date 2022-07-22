@@ -116,7 +116,7 @@ enum class OperandType { REG, VREG, IMM };
 
 enum class CondType { NONE, NE, LT, LE, GT, GE, EQ };
 
-enum class RIType { REG, IMM };
+CondType GetCondFromIR(IROp op);
 
 class ASM_Instruction;
 
@@ -202,6 +202,7 @@ public:
   std::string m_label;
   std::list<std::shared_ptr<ASM_Instruction>> m_insts;
   std::list<std::shared_ptr<ASM_Instruction>>::iterator m_branch_pos;
+  std::list<std::shared_ptr<ASM_Instruction>> m_mov_filled_list;
 
   std::unordered_set<std::shared_ptr<Operand>> m_def;
   std::unordered_set<std::shared_ptr<Operand>> m_use;
@@ -210,11 +211,15 @@ public:
       : m_label(".L" + std::to_string(block_cnt++)),
         m_branch_pos(m_insts.end()) {}
 
-  void exportASM(std::ofstream& ofs);
-
   void insert(std::shared_ptr<ASM_Instruction> inst);
 
   void insertPhiMOV(std::shared_ptr<ASM_Instruction> mov);
+
+  void appendFilledMOV(std::shared_ptr<ASM_Instruction> mov);
+
+  void fillMOV();
+
+  void exportASM(std::ofstream& ofs);
 };
 
 class Shift {
@@ -280,7 +285,7 @@ class ADRInst;
 
 class MOVInst : public ASM_Instruction {
 public:
-  RIType m_type;
+  enum class RIType { REG, IMM } m_type;
   std::shared_ptr<Operand> m_dest;
   std::shared_ptr<Operand> m_src;
 

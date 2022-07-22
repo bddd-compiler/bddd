@@ -2,7 +2,8 @@
 #include "ir/ir.h"
 
 std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
-    std::shared_ptr<Constant> value, bool genimm) {
+    std::shared_ptr<Constant> value, bool genimm,
+    std::shared_ptr<ASM_BasicBlock> block) {
   std::shared_ptr<Operand> ret;
   if (value->m_is_float) {
     // TODO(Huang): float
@@ -10,6 +11,12 @@ std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
     int imm = value->m_int_val;
     if (genimm && Operand::immCheck(imm)) {
       return std::make_shared<Operand>(imm);
+    }
+    if (block) {
+      auto mov = std::make_shared<MOVInst>(
+          std::make_shared<Operand>(OperandType::VREG), imm);
+      block->appendFilledMOV(mov);
+      return mov->m_dest;
     }
     ret = appendMOV(std::make_shared<Operand>(OperandType::VREG), imm)->m_dest;
   }
@@ -111,7 +118,14 @@ std::shared_ptr<Operand> GenerateModInstruction(
   return ret;
 }
 
-// TODO(Huang): mod to generate
+std::shared_ptr<Operand> GenerateCMPInstruction(
+    std::shared_ptr<BinaryInstruction> inst,
+    std::shared_ptr<ASM_Builder> builder) {
+  auto operand1 = builder->getOperand(inst->m_lhs_val_use->m_value);
+  auto operand2 = builder->getOperand(inst->m_rhs_val_use->m_value);
+  builder->appendCT(InstOp::CMP, operand1, operand2);
+  return nullptr;
+}
 
 std::shared_ptr<Operand> GenerateBinaryInstruction(
     std::shared_ptr<BinaryInstruction> inst,
@@ -133,7 +147,7 @@ std::shared_ptr<Operand> GenerateBinaryInstruction(
     case IROp::SLE:
     case IROp::EQ:
     case IROp::NE:
-      break;
+      return GenerateCMPInstruction(inst, builder);
   }
   return nullptr;
 }
@@ -199,7 +213,17 @@ std::shared_ptr<Operand> GenerateCallInstruction(
 std::shared_ptr<Operand> GenerateBranchInstruction(
     std::shared_ptr<BranchInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  std::shared_ptr<Operand> operand1, operand2;
+  std::shared_ptr<ASM_BasicBlock> true_block, false_block;
+  std::shared_ptr<BinaryInstruction> inst_cond;
+  true_block = builder->getBlock(inst->m_true_block);
+  false_block = builder->getBlock(inst->m_false_block);
+  inst_cond
+      = std::dynamic_pointer_cast<BinaryInstruction>(inst->m_cond->m_value);
+  CondType cond = GetCondFromIR(inst_cond->m_op);
+  assert(cond != CondType::NONE);
+  builder->m_cur_block->m_branch_pos = --builder->m_cur_block->m_insts.end();
+  builder->appendB(true_block, cond);
+  builder->appendB(false_block, CondType::NONE);
 
   // TODO(Huang): cond
   return nullptr;
@@ -208,11 +232,10 @@ std::shared_ptr<Operand> GenerateBranchInstruction(
 std::shared_ptr<Operand> GenerateJumpInstruction(
     std::shared_ptr<JumpInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  auto ret
-      = builder->appendB(std::make_shared<ASM_BasicBlock>(), CondType::NONE);
-  builder->m_filled_block.insert(std::make_pair(
-      std::make_shared<std::shared_ptr<ASM_BasicBlock>>(ret->m_target),
-      inst->m_bb));
+  std::shared_ptr<ASM_BasicBlock> target_block
+      = builder->getBlock(inst->m_target_block);
+  builder->appendB(target_block, CondType::NONE);
+  builder->m_cur_block->m_branch_pos = --builder->m_cur_block->m_insts.end();
 
   // TODO(Huang): deal with the cur block
 
@@ -338,13 +361,16 @@ std::shared_ptr<Operand> GenerateAllocaInstruction(
 std::shared_ptr<Operand> GeneratePhiInstruction(
     std::shared_ptr<PhiInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
+  // we need to store the temp result to make sure all PHI instruction execute
+  // in parallel
+  auto tmp = std::make_shared<Operand>(OperandType::VREG);
   auto ret = std::make_shared<Operand>(OperandType::VREG);
+  builder->appendMOV(ret, tmp);
   for (auto &[ir_block, value] : inst->m_contents) {
     std::shared_ptr<ASM_BasicBlock> block = builder->getBlock(ir_block);
-    std::shared_ptr<Operand> src = builder->getOperand(value->m_value);
-    auto mov = std::make_shared<MOVInst>(ret, src);
-    assert(block && block->m_branch_pos != block->m_insts.end());
-    block->insertPhiMOV(mov);
+    assert(block);
+    auto src = builder->getOperand(value->m_value, true, block);
+    block->appendFilledMOV(std::make_shared<MOVInst>(tmp, src));
   }
   builder->m_value_map.insert(std::make_pair(inst, ret));
   return ret;
@@ -385,10 +411,10 @@ void GenerateInstruction(std::shared_ptr<Value> ir_value,
 
 void GenerateBasicblock(std::shared_ptr<BasicBlock> ir_block,
                         std::shared_ptr<ASM_Builder> builder) {
-  std::shared_ptr<ASM_BasicBlock> block = std::make_shared<ASM_BasicBlock>();
+  std::shared_ptr<ASM_BasicBlock> block = builder->getBlock(ir_block);
   builder->appendBlock(block);
+  builder->m_block_map.insert(std::make_pair(ir_block, block));
   for (auto &i : ir_block->GetInstList()) {
-    builder->m_block_map.insert(std::make_pair(ir_block, block));
     GenerateInstruction(i, builder);
   }
 }
@@ -406,6 +432,10 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
 #endif
 
   builder->m_cur_func->m_blocks.push_back(builder->m_cur_func->m_rblock);
+  // insert MOV instruction(from PHI)
+  for (auto &b : func->m_blocks) {
+    b->fillMOV();
+  }
 }
 
 void GenerateModule(std::shared_ptr<Module> ir_module,
