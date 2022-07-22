@@ -45,7 +45,7 @@ void ASM_BasicBlock::fillMOV() {
 // 4 bits rotation, 8 bits value
 // check whether the imm is valid
 bool Operand::immCheck(int imm) {
-  if ((imm & ~0xff) == 0 || (imm & ~0xc000003f) == 0 || (imm & ~0xf000000f)
+  if ((imm & ~0xff) == 0 || (imm & ~0xc000003f) == 0 || (imm & ~0xf000000f) == 0
       || (imm & ~0xfc000003) == 0) {
     return true;
   }

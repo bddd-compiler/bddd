@@ -10,7 +10,7 @@ void ASM_Module::exportGlobalVar(std::ofstream& ofs) {
     ofs << "\t.size " << var->m_name << ", ";
     if (var->m_is_float)
       exportVarBody(ofs, std::dynamic_pointer_cast<FloatGlobalVariable>(var));
-    else 
+    else
       exportVarBody(ofs, std::dynamic_pointer_cast<IntGlobalVariable>(var));
 
 #if 0
@@ -74,7 +74,6 @@ void ASM_Module::exportGlobalVar(std::ofstream& ofs) {
       }
     }
 #endif
-  
   }
 }
 
@@ -148,7 +147,6 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
 
   // load params
   for (auto& i : m_params_set_list) {
-    i->exportInstHead(ofs);
     i->exportASM(ofs);
   }
 
@@ -193,7 +191,6 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
 void ASM_BasicBlock::exportASM(std::ofstream& ofs) {
   ofs << m_label << ":" << std::endl;
   for (auto& i : m_insts) {
-    i->exportInstHead(ofs);
     i->exportASM(ofs);
   }
 }
@@ -203,6 +200,7 @@ void ASM_Instruction::exportInstHead(std::ofstream& ofs) {
 }
 
 void LDRInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
   ofs << m_dest->getName() << ", ";
   if (m_type == Type::LABEL) {
     ofs << "=" << m_label << std::endl;
@@ -216,6 +214,7 @@ void LDRInst::exportASM(std::ofstream& ofs) {
 }
 
 void STRInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
   ofs << m_src->getName() << ", [" << m_dest->getName() << ", "
       << m_offs->getName();
   if (m_shift) {
@@ -225,6 +224,22 @@ void STRInst::exportASM(std::ofstream& ofs) {
 }
 
 void MOVInst::exportASM(std::ofstream& ofs) {
+  if (m_src->m_op_type == OperandType::IMM) {
+    int imm = m_src->m_immval;
+    if (!Operand::immCheck(imm)) {
+      if (Operand::immCheck(~imm)) {
+        ofs << "\tMVN" << getCondName() << " " << m_dest->getName() << ", #"
+            << std::to_string(~imm) << std::endl;
+      } else {
+        ofs << "\tMOVW" << getCondName() << " " << m_dest->getName() << ", #"
+            << std::to_string(imm & 65535) << std::endl;
+        ofs << "\tMOVT" << getCondName() << " " << m_dest->getName() << ", #"
+            << std::to_string((unsigned int)imm >> 16) << std::endl;
+      }
+      return;
+    }
+  }
+  exportInstHead(ofs);
   ofs << m_dest->getName() << ", " << m_src->getName() << std::endl;
 }
 
@@ -242,17 +257,23 @@ void PInst::exportASM(std::ofstream& ofs) {
 }
 
 void BInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
   ofs << m_target->m_label << std::endl;
 }
 
-void CALLInst::exportASM(std::ofstream& ofs) { ofs << m_label << std::endl; }
+void CALLInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
+  ofs << m_label << std::endl;
+}
 
 void ShiftInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
   ofs << m_dest->getName() << ", " << m_src->getName() << ", "
       << m_sval->getName() << std::endl;
 }
 
 void ASInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
   ofs << m_dest->getName() << ", " << m_operand1->getName() << ", "
       << m_operand2->getName();
   if (m_shift) {
@@ -262,6 +283,7 @@ void ASInst::exportASM(std::ofstream& ofs) {
 }
 
 void MULInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
   ofs << m_dest->getName() << ", " << m_operand1->getName() << ", "
       << m_operand2->getName();
   if (m_append) {
@@ -271,11 +293,13 @@ void MULInst::exportASM(std::ofstream& ofs) {
 }
 
 void SDIVInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
   ofs << m_dest->getName() << ", " << m_devidend->getName() << ", "
       << m_devisor->getName() << std::endl;
 }
 
 void BITInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
   ofs << m_dest->getName() << ", " << m_operand1->getName();
   if (m_operand2) {
     ofs << ", " << m_operand2->getName();
@@ -287,6 +311,7 @@ void BITInst::exportASM(std::ofstream& ofs) {
 }
 
 void CTInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
   ofs << m_operand1->getName() << ", " << m_operand2->getName();
   if (m_shift) {
     // TODO(Huang): export shift here
