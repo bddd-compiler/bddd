@@ -195,6 +195,10 @@ void ASM_BasicBlock::exportASM(std::ofstream& ofs) {
   }
 }
 
+void Shift::exportASM(std::ofstream& ofs) {
+  ofs << getShiftName() << " #" << std::to_string(s_val);
+}
+
 void ASM_Instruction::exportInstHead(std::ofstream& ofs) {
   ofs << "\t" << getOpName() << getCondName() << getOpSuffixName() << " ";
 }
@@ -207,7 +211,8 @@ void LDRInst::exportASM(std::ofstream& ofs) {
   } else {
     ofs << "[" << m_src->getName() << ", " << m_offs->getName();
     if (m_shift) {
-      // TODO(Huang): export shift here
+      ofs << ", ";
+      m_shift->exportASM(ofs);
     }
     ofs << "]" << std::endl;
   }
@@ -218,7 +223,8 @@ void STRInst::exportASM(std::ofstream& ofs) {
   ofs << m_src->getName() << ", [" << m_dest->getName() << ", "
       << m_offs->getName();
   if (m_shift) {
-    // TODO(Huang): export shift here
+    ofs << ", ";
+    m_shift->exportASM(ofs);
   }
   ofs << "]" << std::endl;
 }
@@ -277,7 +283,8 @@ void ASInst::exportASM(std::ofstream& ofs) {
   ofs << m_dest->getName() << ", " << m_operand1->getName() << ", "
       << m_operand2->getName();
   if (m_shift) {
-    // TODO(Huang): export shift here
+    ofs << ", ";
+    m_shift->exportASM(ofs);
   }
   ofs << std::endl;
 }
@@ -305,7 +312,8 @@ void BITInst::exportASM(std::ofstream& ofs) {
     ofs << ", " << m_operand2->getName();
   }
   if (m_shift) {
-    // TODO(Huang): export shift here
+    ofs << ", ";
+    m_shift->exportASM(ofs);
   }
   ofs << std::endl;
 }
@@ -314,7 +322,8 @@ void CTInst::exportASM(std::ofstream& ofs) {
   exportInstHead(ofs);
   ofs << m_operand1->getName() << ", " << m_operand2->getName();
   if (m_shift) {
-    // TODO(Huang): export shift here
+    ofs << ", ";
+    m_shift->exportASM(ofs);
   }
   ofs << std::endl;
 }

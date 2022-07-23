@@ -228,6 +228,10 @@ public:
   int s_val;
 
   Shift(ShiftType t, int v);
+
+  std::string getShiftName();
+
+  void exportASM(std::ofstream& ofs);
 };
 
 class ASM_Instruction {

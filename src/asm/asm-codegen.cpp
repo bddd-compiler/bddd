@@ -224,8 +224,6 @@ std::shared_ptr<Operand> GenerateBranchInstruction(
   builder->m_cur_block->m_branch_pos = --builder->m_cur_block->m_insts.end();
   builder->appendB(true_block, cond);
   builder->appendB(false_block, CondType::NONE);
-
-  // TODO(Huang): cond
   return nullptr;
 }
 
@@ -273,22 +271,60 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   auto dimensions = base_addr->m_type.m_dimensions;
   auto indices = inst->m_indices;
   int offs = 0;
-  int attribute = 1;
+
+  // single variable
+  if (dimensions.empty()) {
+    if (auto val = std::dynamic_pointer_cast<Constant>(indices[0]->m_value)) {
+      assert(!val->m_is_float);
+      offs = val->m_int_val * 4;
+    } else {
+      auto add = std::make_shared<ASInst>(
+          InstOp::ADD, std::make_shared<Operand>(OperandType::VREG),
+          getAddr(base_addr, builder),
+          builder->getOperand(indices[0]->m_value));
+      add->m_shift = std::make_unique<Shift>(Shift::ShiftType::LSL, 4);
+      builder->m_cur_block->insert(add);
+      builder->m_value_map.insert(std::make_pair(inst, add->m_dest));
+      return add->m_dest;
+    }
+  }
+
+  // array
+  int attribute = 4;
+  std::shared_ptr<Operand> offs_op;
+  bool first = true;
   for (int i = dimensions.size() - 1; i >= 0; i--) {
-    offs += std::dynamic_pointer_cast<Constant>(indices[i + 1]->m_value)
-                ->m_int_val
-            * attribute;
+    // TODO(Huang): bug not fixed yet:
+    // indice can be constant or variable
+    if (auto val
+        = std::dynamic_pointer_cast<Constant>(indices[i + 1]->m_value)) {
+      assert(!val->m_is_float);
+      offs += val->m_int_val * attribute;
+    } else {
+      if (first) {
+        first = false;
+        offs_op = std::make_shared<Operand>(OperandType::VREG);
+        builder->appendMUL(InstOp::MUL, offs_op,
+                           builder->getOperand(indices[i + 1]->m_value),
+                           builder->GenerateConstant(
+                               std::make_shared<Constant>(attribute), true));
+      } else {
+        builder->appendMUL(InstOp::MLA, offs_op,
+                           builder->getOperand(indices[i + 1]->m_value),
+                           builder->GenerateConstant(
+                               std::make_shared<Constant>(attribute), true),
+                           offs_op);
+      }
+    }
     attribute *= dimensions[i];
   }
-  offs *= 4;
 
-  std::shared_ptr<Operand> offsOp;
-  if (Operand::immCheck(offs)) {
-    offsOp = std::make_shared<Operand>(offs);
+  auto const_offs
+      = builder->GenerateConstant(std::make_shared<Constant>(offs), true);
+  if (!offs_op) {
+    offs_op = const_offs;
   } else {
-    offsOp
-        = builder->appendMOV(std::make_shared<Operand>(OperandType::VREG), offs)
-              ->m_dest;
+    builder->appendAS(InstOp::ADD, offs_op, offs_op, const_offs);
   }
 
   // store the absolute address in register, then return it
@@ -298,7 +334,7 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   auto ret = builder
                  ->appendAS(InstOp::ADD,
                             std::make_shared<Operand>(OperandType::VREG),
-                            getAddr(base_addr, builder), offsOp)
+                            getAddr(base_addr, builder), offs_op)
                  ->m_dest;
   builder->m_value_map.insert(std::make_pair(inst, ret));
   return ret;
@@ -333,8 +369,10 @@ std::shared_ptr<Operand> GenerateStoreInstruction(
 std::shared_ptr<Operand> GenerateAllocaInstruction(
     std::shared_ptr<AllocaInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  // TODO(Huang): alloc_size = 4 is temporary
   unsigned int alloc_size = 4;
+  for (int i : inst->m_type.m_dimensions) {
+    alloc_size *= i;
+  }
 
   unsigned int sp_offs = builder->m_cur_func->getStackSize();
   builder->m_cur_func->allocateStack(alloc_size);

@@ -101,9 +101,28 @@ std::string Operand::getVRegName() {
 }
 
 Shift::Shift(ShiftType t, int v) : s_type(t), s_val(v) {
-  if (v < 0 || v > 32) {
-    std::cout << "invalid shift value!" << std::endl;
+  if (t != ShiftType::RRX) {
+    int upbound = 31;
+    if (t == ShiftType::ASR || t == ShiftType::LSR) upbound++;
+    assert(1 <= v && v <= upbound);
   }
+}
+
+std::string Shift::getShiftName() {
+  switch (s_type) {
+    case ShiftType::ASR:
+      return "ASR";
+    case ShiftType::LSL:
+      return "LSL";
+    case ShiftType::LSR:
+      return "LSR";
+    case ShiftType::ROR:
+      return "ROR";
+    case ShiftType::RRX:
+      return "RRX";
+  }
+  assert(false);
+  return "";
 }
 
 std::string ASM_Instruction::getOpName() {
