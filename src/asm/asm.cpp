@@ -18,9 +18,24 @@ CondType GetCondFromIR(IROp op) {
   return CondType::NONE;
 }
 
-int Operand::vreg_cnt = 0;
-int ASM_BasicBlock::block_cnt = 0;
+int Operand::vrreg_cnt = 0;
+int Operand::vsreg_cnt = 0;
 std::unordered_map<std::shared_ptr<Operand>, std::string> Operand::vreg_map;
+std::unordered_map<RReg, std::shared_ptr<Operand>> Operand::rreg_map;
+
+unsigned int ASM_Function::getStackSize() { return m_local_alloc; }
+
+void ASM_Function::allocateStack(unsigned int size) { m_local_alloc += size; }
+
+void ASM_Function::appendPush(std::shared_ptr<Operand> reg) {
+  m_push->m_regs.push_back(reg);
+}
+
+void ASM_Function::appendPop(std::shared_ptr<Operand> reg) {
+  m_pop->m_regs.push_back(reg);
+}
+
+int ASM_BasicBlock::block_cnt = 0;
 
 void ASM_BasicBlock::insert(std::shared_ptr<ASM_Instruction> inst) {
   m_insts.push_back(inst);
@@ -41,6 +56,23 @@ void ASM_BasicBlock::fillMOV() {
   }
 }
 
+void ASM_BasicBlock::appendSuccessor(std::shared_ptr<ASM_BasicBlock> succ) {
+  m_successors.push_back(succ);
+}
+
+void ASM_BasicBlock::appendPredecessor(std::shared_ptr<ASM_BasicBlock> pred) {
+  m_predecessors.push_back(pred);
+}
+
+std::vector<std::shared_ptr<ASM_BasicBlock>> ASM_BasicBlock::getSuccessors() {
+  return m_successors;
+}
+
+std::vector<std::shared_ptr<ASM_BasicBlock>> ASM_BasicBlock::getPredecessors() {
+  return m_predecessors;
+}
+
+// int type immediate check
 // arm instruction use a 12-bit immediate
 // 4 bits rotation, 8 bits value
 // check whether the imm is valid
@@ -59,10 +91,37 @@ bool Operand::immCheck(int imm) {
   return false;
 }
 
+/*
+  float type immediate check
+  arm floating-poing process instruction use a a 8-bit imm to represent IEEE-754
+  32-bit value from 8-bit: abcd efgh -> 32-bit: aBbbbbbc defgh000 00000000
+  00000000 (B = not(b)) so the valid constant for imm is:
+
+  imm = (-1)^S * 2^exp * mantissa
+        S = a,
+        exp = Bcd - 3(equals Bbbbbbcd - 127),
+        mantissa = 1.efgh
+
+  so imm = (+/-)(bin)(1.0000 ~ 1.1111) * 2^(-3 ~ 4)
+  or imm = (+/-)(int)(16 ~ 31) * 2^(-7 ~ 0)
+*/
+bool Operand::immCheck(float imm) {
+  // fast check the lower bound and upper bound
+  if (imm < 0.125 || imm > 31) return false;
+  int i = 0;
+  while (i < 8) {
+    if (imm >= 16 && imm <= 31) {
+      return std::ceil(imm) == std::floor(imm);
+    }
+    imm *= 2;
+  }
+  return false;
+}
+
 std::string Operand::getName() {
   switch (m_op_type) {
     case OperandType::IMM:
-      return ("#" + std::to_string(m_immval));
+      return ("#" + std::to_string(m_int_val));
     case OperandType::REG:
       return getRegName();
     case OperandType::VREG:
@@ -95,9 +154,20 @@ std::string Operand::getVRegName() {
   if (it != vreg_map.end()) {
     return it->second;
   }
-  std::string name = "VR" + std::to_string(vreg_cnt++);
+  std::string name = m_is_rreg ? "VR" + std::to_string(vrreg_cnt++)
+                               : "VS" + std::to_string(vsreg_cnt++);
   vreg_map.insert(std::make_pair(_this, name));
   return name;
+}
+
+std::shared_ptr<Operand> Operand::getRReg(RReg r) {
+  if (Operand::rreg_map.find(r) != Operand::rreg_map.end()) {
+    return Operand::rreg_map[r];
+  }
+  auto ret = std::make_shared<Operand>(OperandType::REG);
+  ret->m_rreg = r;
+  Operand::rreg_map[r] = ret;
+  return ret;
 }
 
 Shift::Shift(ShiftType t, int v) : s_type(t), s_val(v) {
@@ -241,12 +311,23 @@ std::string ASM_Instruction::getCondName() {
   return "";
 }
 
+void ASM_Instruction::addDef(std::shared_ptr<Operand> def) {
+  m_def.insert(def);
+}
+
+void ASM_Instruction::addUse(std::shared_ptr<Operand> use) {
+  if (use->m_op_type == OperandType::IMM) return;
+  m_use.insert(use);
+}
+
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
   m_op = InstOp::LDR;
   m_cond = CondType::NONE;
   m_type = Type::LABEL;
   m_dest = dest;
   m_label = label;
+
+  addDef(dest);
 }
 
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
@@ -257,6 +338,10 @@ LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
   m_dest = dest;
   m_src = src;
   m_offs = offs;
+
+  addDef(dest);
+  addUse(src);
+  addUse(offs);
 }
 
 STRInst::STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
@@ -266,6 +351,10 @@ STRInst::STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
   m_dest = dest;
   m_src = src;
   m_offs = offs;
+
+  addUse(src);
+  addUse(dest);
+  addUse(offs);
 }
 
 MOVInst::MOVInst(std::shared_ptr<Operand> dest, int imm) {
@@ -274,6 +363,8 @@ MOVInst::MOVInst(std::shared_ptr<Operand> dest, int imm) {
   m_type = RIType::IMM;
   m_dest = dest;
   m_src = std::make_shared<Operand>(imm);
+
+  addDef(dest);
 }
 
 MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
@@ -282,6 +373,9 @@ MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
   m_type = RIType::REG;
   m_dest = dest;
   m_src = src;
+
+  addDef(dest);
+  addUse(src);
 }
 
 PInst::PInst(InstOp op) {
@@ -301,6 +395,9 @@ CALLInst::CALLInst(VarType type, std::string label, int n) {
   m_type = type;
   m_label = label;
   m_params = n;
+
+  auto r0 = Operand::getRReg(RReg::R0);
+  addDef(r0);
 }
 
 ShiftInst::ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
@@ -311,6 +408,10 @@ ShiftInst::ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
   m_dest = dest;
   m_src = src;
   m_sval = sval;
+
+  addDef(dest);
+  addUse(src);
+  addUse(sval);
 }
 
 ASInst::ASInst(InstOp op, std::shared_ptr<Operand> dest,
@@ -321,6 +422,10 @@ ASInst::ASInst(InstOp op, std::shared_ptr<Operand> dest,
   m_dest = dest;
   m_operand1 = operand1;
   m_operand2 = operand2;
+
+  addDef(dest);
+  addUse(operand1);
+  addUse(operand2);
 }
 
 MULInst::MULInst(InstOp op, std::shared_ptr<Operand> dest,
@@ -333,6 +438,11 @@ MULInst::MULInst(InstOp op, std::shared_ptr<Operand> dest,
   m_operand1 = operand1;
   m_operand2 = operand2;
   m_append = append;
+
+  addDef(dest);
+  addUse(operand1);
+  addUse(operand2);
+  if (m_append) addUse(append);
 }
 
 SDIVInst::SDIVInst(std::shared_ptr<Operand> dest,
@@ -343,6 +453,10 @@ SDIVInst::SDIVInst(std::shared_ptr<Operand> dest,
   m_dest = dest;
   m_devidend = devidend;
   m_devisor = devisor;
+
+  addDef(dest);
+  addUse(devidend);
+  addUse(devisor);
 }
 
 BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,
@@ -353,6 +467,10 @@ BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,
   m_dest = dest;
   m_operand1 = operand1;
   m_operand2 = operand2;
+
+  addDef(dest);
+  addUse(operand1);
+  addUse(operand2);
 }
 
 BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,
@@ -361,6 +479,9 @@ BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,
   m_cond = CondType::NONE;
   m_dest = dest;
   m_operand1 = operand1;
+
+  addDef(dest);
+  addUse(operand1);
 }
 
 CTInst::CTInst(InstOp op, std::shared_ptr<Operand> operand1,
@@ -369,16 +490,7 @@ CTInst::CTInst(InstOp op, std::shared_ptr<Operand> operand1,
   m_cond = CondType::NONE;
   m_operand1 = operand1;
   m_operand2 = operand2;
-}
 
-unsigned int ASM_Function::getStackSize() { return m_local_alloc; }
-
-void ASM_Function::allocateStack(unsigned int size) { m_local_alloc += size; }
-
-void ASM_Function::appendPush(std::shared_ptr<Operand> reg) {
-  m_push->m_regs.push_back(reg);
-}
-
-void ASM_Function::appendPop(std::shared_ptr<Operand> reg) {
-  m_pop->m_regs.push_back(reg);
+  addUse(operand1);
+  addUse(operand2);
 }

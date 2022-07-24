@@ -608,9 +608,6 @@ void DeclAST::TypeCheck(SymbolTable& symbol_table) {
     } else {
       // temporarily all set to nullptr
       // TODO(garen): insert *tot* random values
-      for (auto i = 0; i < tot; ++i) {
-        m_flatten_vals.push_back(nullptr);
-      }
     }
   }
 

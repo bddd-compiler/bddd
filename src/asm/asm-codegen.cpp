@@ -167,14 +167,12 @@ std::shared_ptr<Operand> GenerateCallInstruction(
   // save params to r0 ~ r3
   while (i < 4 && i < n) {
     std::shared_ptr<Value> value = inst->m_params[i]->m_value;
-    std::shared_ptr<Operand> reg = std::make_shared<Operand>(OperandType::REG);
-    reg->m_rreg = (RReg)i;
+    std::shared_ptr<Operand> reg = Operand::getRReg((RReg)i);
     builder->appendMOV(reg, builder->getOperand(value, true));
     i++;
   }
   // save params to stack
-  std::shared_ptr<Operand> sp = std::make_shared<Operand>(OperandType::REG);
-  sp->m_rreg = RReg::SP;
+  std::shared_ptr<Operand> sp = Operand::getRReg(RReg::SP);
   while (i < n) {
     std::shared_ptr<Value> value = inst->m_params[i]->m_value;
     int sp_offs = (i - 4) * 4;
@@ -197,8 +195,7 @@ std::shared_ptr<Operand> GenerateCallInstruction(
   std::shared_ptr<Operand> dest;
   if (return_type == VarType::INT || return_type == VarType::FLOAT) {
     dest = std::make_shared<Operand>(OperandType::VREG);
-    std::shared_ptr<Operand> r0 = std::make_shared<Operand>(OperandType::REG);
-    r0->m_rreg = RReg::R0;
+    std::shared_ptr<Operand> r0 = Operand::getRReg(RReg::R0);
     builder->appendMOV(dest, r0);
     builder->m_value_map.insert(std::make_pair(inst, dest));
   }
@@ -245,8 +242,7 @@ std::shared_ptr<Operand> GenerateReturnInstruction(
     std::shared_ptr<ASM_Builder> builder) {
   auto ret_val = inst->m_ret->m_value;
   if (ret_val != nullptr) {
-    std::shared_ptr<Operand> r0 = std::make_shared<Operand>(OperandType::REG);
-    r0->m_rreg = RReg::R0;
+    std::shared_ptr<Operand> r0 = Operand::getRReg(RReg::R0);
     builder->appendMOV(r0, builder->getOperand(ret_val, true));
   }
   builder->appendB(builder->m_cur_func->m_rblock, CondType::NONE);
@@ -271,25 +267,6 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   auto dimensions = base_addr->m_type.m_dimensions;
   auto indices = inst->m_indices;
   int offs = 0;
-
-  // single variable
-  if (dimensions.empty()) {
-    if (auto val = std::dynamic_pointer_cast<Constant>(indices[0]->m_value)) {
-      assert(!val->m_is_float);
-      offs = val->m_int_val * 4;
-    } else {
-      auto add = std::make_shared<ASInst>(
-          InstOp::ADD, std::make_shared<Operand>(OperandType::VREG),
-          getAddr(base_addr, builder),
-          builder->getOperand(indices[0]->m_value));
-      add->m_shift = std::make_unique<Shift>(Shift::ShiftType::LSL, 4);
-      builder->m_cur_block->insert(add);
-      builder->m_value_map.insert(std::make_pair(inst, add->m_dest));
-      return add->m_dest;
-    }
-  }
-
-  // array
   int attribute = 4;
   std::shared_ptr<Operand> offs_op;
   bool first = true;
@@ -307,12 +284,12 @@ std::shared_ptr<Operand> GenerateGepInstruction(
         builder->appendMUL(InstOp::MUL, offs_op,
                            builder->getOperand(indices[i + 1]->m_value),
                            builder->GenerateConstant(
-                               std::make_shared<Constant>(attribute), true));
+                               std::make_shared<Constant>(attribute), false));
       } else {
         builder->appendMUL(InstOp::MLA, offs_op,
                            builder->getOperand(indices[i + 1]->m_value),
                            builder->GenerateConstant(
-                               std::make_shared<Constant>(attribute), true),
+                               std::make_shared<Constant>(attribute), false),
                            offs_op);
       }
     }
@@ -369,12 +346,12 @@ std::shared_ptr<Operand> GenerateStoreInstruction(
 std::shared_ptr<Operand> GenerateAllocaInstruction(
     std::shared_ptr<AllocaInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  unsigned int alloc_size = 4;
+  int alloc_size = 4;
   for (int i : inst->m_type.m_dimensions) {
     alloc_size *= i;
   }
 
-  unsigned int sp_offs = builder->m_cur_func->getStackSize();
+  int sp_offs = builder->m_cur_func->getStackSize();
   builder->m_cur_func->allocateStack(alloc_size);
   std::shared_ptr<Operand> offs;
   if (Operand::immCheck(sp_offs)) {
@@ -385,8 +362,7 @@ std::shared_ptr<Operand> GenerateAllocaInstruction(
               ->appendMOV(std::make_shared<Operand>(OperandType::VREG), sp_offs)
               ->m_dest;
   }
-  std::shared_ptr<Operand> sp = std::make_shared<Operand>(OperandType::REG);
-  sp->m_rreg = RReg::SP;
+  std::shared_ptr<Operand> sp = Operand::getRReg(RReg::SP);
   auto ret
       = builder
             ->appendAS(InstOp::ADD,

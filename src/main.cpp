@@ -2,6 +2,7 @@
 #include <memory>
 
 #include "asm/asm-builder.h"
+#include "asm/asm-register.h"
 #include "asm/asm.h"
 #include "ast/symbol-table.h"
 #include "exceptions.h"
@@ -89,6 +90,11 @@ int main(int argc, char **argv) {
   std::ofstream ofs4(filename.substr(0, filename.rfind('.')) + "_tmp_asm.s");
   asm_module->exportASM(ofs4);
   ofs4.close();
+  std::cout << filename << std::endl;
+  RegisterAllocator(asm_module).Allocate();
+  std::ofstream ofs5(filename.substr(0, filename.rfind('.')) + "_asm.s");
+  asm_module->exportASM(ofs5);
+  ofs5.close();
 
   return 0;
 }

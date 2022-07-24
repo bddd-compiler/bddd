@@ -136,12 +136,12 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
   m_push->exportASM(ofs);
 
 #ifndef SP_FOR_PARAM
-  if (m_params_set_list.size()) {
-    int sp_offs = m_push->m_regs.size() * 4;
+  if (!m_params_set_list.empty()) {
+    int sp_offs = (m_push->m_regs.size() + 1) * 4;
     if (sp_offs)
-      ofs << "\tADD FP, SP, #" << std::to_string(sp_offs) << std::endl;
+      ofs << "\tADD R11, SP, #" << std::to_string(sp_offs) << std::endl;
     else
-      ofs << "\tMOV FP, SP" << std::endl;
+      ofs << "\tMOV R11, SP" << std::endl;
   }
 #endif
 
@@ -231,7 +231,7 @@ void STRInst::exportASM(std::ofstream& ofs) {
 
 void MOVInst::exportASM(std::ofstream& ofs) {
   if (m_src->m_op_type == OperandType::IMM) {
-    int imm = m_src->m_immval;
+    int imm = m_src->m_int_val;
     if (!Operand::immCheck(imm)) {
       if (Operand::immCheck(~imm)) {
         ofs << "\tMVN" << getCondName() << " " << m_dest->getName() << ", #"

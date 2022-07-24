@@ -48,6 +48,7 @@ set(ASM_SOURCE
   src/asm/asm-builder.cpp
   src/asm/asm-codegen.cpp
   src/asm/asm-export.cpp
+  src/asm/asm-register.cpp
 )
 
 add_executable(bddd

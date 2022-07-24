@@ -9,6 +9,7 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include <cmath>
 
 #include "ir/ir.h"
 
@@ -122,8 +123,10 @@ class ASM_Instruction;
 
 class Operand : public std::enable_shared_from_this<Operand> {
 public:
-  static int vreg_cnt;
+  static int vrreg_cnt;
+  static int vsreg_cnt;
   static std::unordered_map<std::shared_ptr<Operand>, std::string> vreg_map;
+  static std::unordered_map<RReg, std::shared_ptr<Operand>> rreg_map;
 
   std::shared_ptr<ASM_Instruction> m_inst;
   OperandType m_op_type;
@@ -131,12 +134,16 @@ public:
   RReg m_rreg;
   SReg m_sreg;
   bool m_is_rreg;
-  int m_immval;
+  int m_int_val;
+  float m_float_val;
 
   Operand(OperandType t, bool r = true) : m_op_type(t), m_is_rreg(r) {}
 
-  Operand(int val, bool r = true)
-      : m_op_type(OperandType::IMM), m_immval(val), m_is_rreg(r) {}
+  Operand(int val)
+      : m_op_type(OperandType::IMM), m_int_val(val), m_is_rreg(true) {}
+
+  Operand(float val)
+      : m_op_type(OperandType::IMM), m_float_val(val), m_is_rreg(false) {}
 
   std::string getName();
 
@@ -144,7 +151,11 @@ public:
 
   std::string getVRegName();
 
+  static std::shared_ptr<Operand> getRReg(RReg r);
+
   static bool immCheck(int imm);
+
+  static bool immCheck(float imm);
 };
 
 class ASM_Instruction;
@@ -206,6 +217,10 @@ public:
 
   std::unordered_set<std::shared_ptr<Operand>> m_def;
   std::unordered_set<std::shared_ptr<Operand>> m_use;
+  std::unordered_set<std::shared_ptr<Operand>> m_livein;
+  std::unordered_set<std::shared_ptr<Operand>> m_liveout;
+  std::vector<std::shared_ptr<ASM_BasicBlock>> m_predecessors;
+  std::vector<std::shared_ptr<ASM_BasicBlock>> m_successors;
 
   ASM_BasicBlock()
       : m_label(".L" + std::to_string(block_cnt++)),
@@ -218,6 +233,14 @@ public:
   void appendFilledMOV(std::shared_ptr<ASM_Instruction> mov);
 
   void fillMOV();
+
+  void appendSuccessor(std::shared_ptr<ASM_BasicBlock> succ);
+
+  void appendPredecessor(std::shared_ptr<ASM_BasicBlock> pred); 
+
+  std::vector<std::shared_ptr<ASM_BasicBlock>> getSuccessors();
+
+  std::vector<std::shared_ptr<ASM_BasicBlock>> getPredecessors();
 
   void exportASM(std::ofstream& ofs);
 };
@@ -252,6 +275,10 @@ public:
   void exportInstHead(std::ofstream& ofs);
 
   virtual void exportASM(std::ofstream& ofs) = 0;
+
+  void addDef(std::shared_ptr<Operand> def);
+  
+  void addUse(std::shared_ptr<Operand> use);
 };
 
 class LDRInst : public ASM_Instruction {

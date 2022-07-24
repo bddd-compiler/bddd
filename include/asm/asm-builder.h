@@ -36,7 +36,7 @@ public:
 
   void setCurBlock(std::shared_ptr<ASM_BasicBlock> block);
 
-  void allocSP(unsigned int size);
+  void allocSP(int size);
 
   void reclaimSP();
 
