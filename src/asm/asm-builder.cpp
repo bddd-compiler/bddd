@@ -40,7 +40,6 @@ void ASM_Builder::setParams() {
   // set params in stack
 #ifndef SP_FOR_PARAM
   // use r11 as the frame pointer register
-  std::shared_ptr<Operand> fp = Operand::getRReg(RReg::R11);
   while (i < n) {
     value = m_cur_func->m_ir_func->m_args[i];
     std::shared_ptr<Operand> offs;
@@ -53,13 +52,13 @@ void ASM_Builder::setParams() {
       offs = mov->m_dest;
       m_cur_func->m_params_set_list.push_back(mov);
     }
-    auto ldr = std::make_shared<LDRInst>(getOperand(value), fp, offs);
+    auto ldr = std::make_shared<LDRInst>(getOperand(value), Operand::getRReg(RReg::R11), offs);
     m_cur_func->m_params_set_list.push_back(ldr);
     i++;
   }
   if (n > 4) {
-    m_cur_func->m_push->m_regs.push_back(fp);
-    m_cur_func->m_pop->m_regs.push_back(fp);
+    m_cur_func->m_push->m_regs.push_back(Operand::getRReg(RReg::R11));
+    m_cur_func->m_pop->m_regs.push_back(Operand::getRReg(RReg::R11));
   }
 #else
   while (i < n) {

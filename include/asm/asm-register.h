@@ -2,6 +2,7 @@
 #define BDDD_ASM_REGISTER_H
 
 #include <unordered_set>
+#include <set>
 #include <stack>
 
 #include "asm/asm.h"
@@ -74,7 +75,7 @@ private:
 
     void DecrementDegree(OpPtr m);
 
-    void EnableMoves(std::unordered_set<OpPtr> nodes);
+    void EnableMoves(std::unordered_set<OpPtr>& nodes);
 
     void Coalesce();
 
@@ -82,7 +83,7 @@ private:
 
     bool OK(OpPtr t, OpPtr r);
 
-    bool Conservative(std::unordered_set<OpPtr> nodes);
+    bool Conservative(std::unordered_set<OpPtr>& nodes);
 
     OpPtr GetAlias(OpPtr n);
 

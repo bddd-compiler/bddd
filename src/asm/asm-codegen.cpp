@@ -172,7 +172,6 @@ std::shared_ptr<Operand> GenerateCallInstruction(
     i++;
   }
   // save params to stack
-  std::shared_ptr<Operand> sp = Operand::getRReg(RReg::SP);
   while (i < n) {
     std::shared_ptr<Value> value = inst->m_params[i]->m_value;
     int sp_offs = (i - 4) * 4;
@@ -185,7 +184,8 @@ std::shared_ptr<Operand> GenerateCallInstruction(
                              sp_offs)
                  ->m_dest;
     }
-    builder->appendSTR(builder->getOperand(value), sp, offs);
+    builder->appendSTR(builder->getOperand(value), Operand::getRReg(RReg::SP),
+                       offs);
     i++;
   }
 
@@ -270,6 +270,16 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   int attribute = 4;
   std::shared_ptr<Operand> offs_op;
   bool first = true;
+  if (indices.size() == 1) {
+    if (auto val = std::dynamic_pointer_cast<Constant>(indices[0]->m_value)) {
+      assert(!val->m_is_float);
+      offs = val->m_int_val * 4;
+    } else {
+      offs_op = builder->getOperand(indices[0]->m_value);
+      builder->appendShift(InstOp::LSL, offs_op, offs_op,
+                           std::make_shared<Operand>(4));
+    }
+  }
   for (int i = dimensions.size() - 1; i >= 0; i--) {
     // TODO(Huang): bug not fixed yet:
     // indice can be constant or variable
@@ -301,7 +311,7 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   if (!offs_op) {
     offs_op = const_offs;
   } else {
-    builder->appendAS(InstOp::ADD, offs_op, offs_op, const_offs);
+    if (offs) builder->appendAS(InstOp::ADD, offs_op, offs_op, const_offs);
   }
 
   // store the absolute address in register, then return it
