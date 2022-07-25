@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    filename = "../testSource/buaa/part11/test2.c";
+    filename = "../testSource/buaa/part12/test2.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -65,8 +65,9 @@ int main(int argc, char **argv) {
   builder->m_module->ExportIR(ofs2, 0);
   ofs2.close();
 
-  auto pass_manager = std::make_unique<IRPassManager>(builder);
-  pass_manager->Mem2RegPass();
+  // auto pass_manager = std::make_unique<IRPassManager>(builder);
+  // pass_manager->Mem2RegPass();  // now no allocas for single variable
+  // pass_manager->GVNPass();      // try global value numbering
 
   std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_ir.out");
   auto allocator2 = std::make_shared<IRNameAllocator>();

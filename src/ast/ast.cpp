@@ -114,11 +114,12 @@ void InitBuiltinFunctions() {
 
   // memset(i32*, i32,i32)
   std::vector<std::unique_ptr<FuncFParamAST>> temp8;
-  temp8.push_back(std::make_unique<FuncFParamAST>(VarType::INT, "", nullptr));
+  temp8.push_back(std::make_unique<FuncFParamAST>(VarType::CHAR, "", nullptr));
+  temp8.push_back(std::make_unique<FuncFParamAST>(VarType::CHAR, ""));
   temp8.push_back(std::make_unique<FuncFParamAST>(VarType::INT, ""));
-  temp8.push_back(std::make_unique<FuncFParamAST>(VarType::INT, ""));
+  temp8.push_back(std::make_unique<FuncFParamAST>(VarType::BOOL, ""));
   g_builtin_funcs.push_back(std::make_shared<FuncDefAST>(
-      VarType::VOID, "memset", std::move(temp8), nullptr, true));
+      VarType::VOID, "llvm.memset.p0i8.i32", std::move(temp8), nullptr, true));
 
   // TODO: memset for float array?
 

@@ -1,207 +1,8 @@
-#include "ir/pass/mem2reg.h"
-
 #include <iostream>
 #include <stack>
 #include <unordered_set>
 
-// forward graph
-std::vector<std::vector<size_t>> f_graph;
-// backward graph
-std::vector<std::vector<size_t>> b_graph;
-// auxiliary graph for calculating idom from sdom
-std::vector<std::vector<size_t>> aux_graph;
-
-std::vector<size_t> dfn, ord, fa, idom, sdom, ufs, mn;
-size_t co;
-
-size_t find(size_t u) {
-  if (u == ufs[u]) return u;
-  size_t ret = find(ufs[u]);
-  if (dfn[sdom[mn[ufs[u]]]] < dfn[sdom[mn[u]]]) mn[u] = mn[ufs[u]];
-  return ufs[u] = ret;
-}
-
-void tarjan(size_t u) {
-  dfn[u] = ++co;
-  ord[dfn[u]] = u;
-  for (size_t v : f_graph[u]) {
-    if (!dfn[v]) {
-      fa[v] = u;
-      tarjan(v);
-    }
-  }
-}
-
-std::vector<std::shared_ptr<BasicBlock>> bbs;
-
-void RemoveUnusedBlocks(std::shared_ptr<Function> function) {
-  bbs.clear();
-  bbs.push_back(nullptr);
-  size_t cnt = 0;
-  for (auto &bb : function->m_bb_list) {
-    bb->m_id = ++cnt;
-    bbs.push_back(bb);
-  }
-  size_t n = function->m_bb_list.size();
-  f_graph.clear();
-  f_graph.resize(n + 5);
-  dfn.clear();
-  dfn.resize(n + 5);
-  ord.clear();
-  ord.resize(n + 5);
-  fa.clear();
-  fa.resize(n + 5);
-  co = 0;
-
-  for (auto &bb : function->m_bb_list) {
-    // terminator instruction only have jump, branch, return
-    size_t u = bb->m_id;
-    for (const std::shared_ptr<BasicBlock> &v_block : bb->Successors()) {
-      size_t v = v_block->m_id;
-      f_graph[u].push_back(v);
-    }
-  }
-  tarjan(1);  // start from 1
-
-  for (auto it = function->m_bb_list.begin();
-       it != function->m_bb_list.end();) {
-    auto bb = *it;
-    if (!dfn[bb->m_id]) {
-      // not visited
-      auto del = it;
-      ++it;
-      function->m_bb_list.erase(del);
-    } else {
-      ++it;
-    }
-  }
-}
-
-void ComputeDominanceRelationship(std::shared_ptr<Function> function) {
-  RemoveUnusedBlocks(function);
-
-  // allocate id for each basic block
-  bbs.clear();
-  bbs.push_back(nullptr);
-  size_t cnt = 0;
-  for (auto &bb : function->m_bb_list) {
-    bb->m_id = ++cnt;  // 1, 2, 3, ...
-    bb->m_dominators.clear();
-    bb->m_dominated.clear();
-    bb->m_idom = nullptr;
-    bbs.push_back(bb);
-  }
-  size_t n = function->m_bb_list.size();
-  f_graph.clear();
-  f_graph.resize(n + 5);
-  b_graph.clear();
-  b_graph.resize(n + 5);
-  aux_graph.clear();
-  aux_graph.resize(n + 5);
-  dfn.clear();
-  dfn.resize(n + 5);
-  ord.clear();
-  ord.resize(n + 5);
-  fa.clear();
-  fa.resize(n + 5);
-  idom.clear();
-  idom.resize(n + 5);
-  sdom.clear();
-  sdom.resize(n + 5);
-  ufs.clear();
-  ufs.resize(n + 5);
-  mn.clear();
-  mn.resize(n + 5);
-  co = 0;
-
-  for (auto &bb : function->m_bb_list) {
-    // terminator instruction only have jump, branch, return
-    size_t u = bb->m_id;
-    for (const std::shared_ptr<BasicBlock> &v_block : bb->Successors()) {
-      size_t v = v_block->m_id;
-      f_graph[u].push_back(v);
-      b_graph[v].push_back(u);
-    }
-  }
-
-  tarjan(1);  // start from 1
-  for (int i = 1; i <= n; ++i) {
-    sdom[i] = ufs[i] = mn[i] = i;
-  }
-  for (size_t i = co; i >= 2; --i) {
-    size_t t = ord[i];
-    for (size_t v : b_graph[t]) {
-      if (!dfn[v]) continue;
-      find(v);
-      if (dfn[sdom[mn[v]]] < dfn[sdom[t]]) {
-        sdom[t] = sdom[mn[v]];
-      }
-    }
-    ufs[t] = fa[t];
-    aux_graph[sdom[t]].push_back(t);
-    t = fa[t];
-    for (size_t v : aux_graph[t]) {
-      find(v);
-      if (t == sdom[mn[v]])
-        idom[v] = t;
-      else
-        idom[v] = mn[v];
-    }
-    aux_graph[t].clear();
-  }
-  for (size_t i = 2; i <= co; ++i) {
-    size_t t = ord[i];
-    if (idom[t] ^ sdom[t]) {
-      idom[t] = idom[idom[t]];
-    }
-  }
-
-  for (size_t i = co; i >= 2; --i) {
-    std::shared_ptr<BasicBlock> bb = bbs[ord[i]];
-    bb->m_dominators.push_back(bb);
-    assert(ord[i] != idom[ord[i]]);
-    for (auto x : bbs[ord[i]]->m_dominators) {
-      if (idom[ord[i]] != 0) {
-        bbs[idom[ord[i]]]->m_dominators.push_back(x);
-      }
-    }
-  }
-  bbs[ord[1]]->m_dominators.push_back(bbs[ord[1]]);
-
-  for (size_t i = 1; i <= co; ++i) {
-    for (auto x : bbs[i]->m_dominators) {
-      x->m_dominated.push_back(bbs[i]);
-    }
-  }
-
-  for (size_t i = 1; i <= co; ++i) {
-    if (idom[i]) {
-      bbs[i]->m_idom = bbs[idom[i]];
-    }
-  }
-}
-
-// must be called after ComputeDominanceRelationship
-void ComputeDominanceFrontier(std::shared_ptr<Function> function) {
-  for (auto &a : function->m_bb_list) {
-    for (auto &b : a->Successors()) {
-      auto x = a;
-      while (x->m_id == b->m_id
-             || std::find_if(b->m_dominated.begin(), b->m_dominated.end(),
-                             [=](const std::shared_ptr<BasicBlock> &rhs) {
-                               return rhs.get() == x.get();
-                             })
-                    == b->m_dominated.end()) {
-        if (x->m_id != b->m_id) {
-          x->m_dominance_frontier.insert(b);
-        }
-        // df[x].insert(b);
-        x = x->m_idom;
-        if (x == nullptr) break;
-      }
-    }
-  }
-}
+#include "ir/ir-pass-manager.h"
 
 void updateReachingDefinition(std::shared_ptr<Value> v,
                               std::shared_ptr<Value> instr) {
@@ -291,7 +92,7 @@ void Mem2Reg(std::shared_ptr<Function> function,
     bb->m_visited = false;
   }
   std::stack<std::shared_ptr<BasicBlock>> stack;
-  stack.push(*function->m_bb_list.begin());
+  stack.push(function->m_bb_list.front());
   while (!stack.empty()) {
     std::shared_ptr<BasicBlock> bb = stack.top();
     stack.pop();
@@ -418,4 +219,10 @@ void Mem2Reg(std::shared_ptr<Function> function,
   // for (auto &[trivial_phi, bb] : trivial_phis) {
   //   bb->RemoveInstruction(trivial_phi);
   // }
+}
+
+void IRPassManager::Mem2RegPass() {
+  for (auto func : m_builder->m_module->m_function_list) {
+    Mem2Reg(func, m_builder);
+  }
 }
