@@ -1,4 +1,5 @@
 #include <cassert>
+#include <iostream>
 
 #include "ast/ast.h"
 #include "ast/symbol-table.h"
@@ -69,16 +70,35 @@ EvalValue LValAST::Evaluate(SymbolTable& symbol_table) {
 
   assert(m_decl->m_products.size() == m_decl->m_dimensions.size());
   size_t i;
+  bool flag = true;
   for (i = 0; i < m_indices.size() - 1; i++) {
     auto eval_value = m_indices[i]->Evaluate(symbol_table);
-    assert(eval_value.IsConstInt());
-    offset += eval_value.IntVal() * m_decl->m_products[i + 1];
+    assert(eval_value.IsInt());
+    if (!eval_value.IsConstInt()) {
+      flag = false;
+    } else {
+      offset += eval_value.IntVal() * m_decl->m_products[i + 1];
+    }
   }
   auto eval_value = m_indices[i]->Evaluate(symbol_table);
-  assert(eval_value.IsConstInt());
-  offset += eval_value.IntVal();
-
-  return m_decl->GetFlattenVal(symbol_table, offset);
+  assert(eval_value.IsInt());
+  if (!eval_value.IsConstInt()) {
+    flag = false;
+  } else {
+    offset += eval_value.IntVal();
+  }
+  if (flag)
+    return m_decl->GetFlattenVal(symbol_table, offset);
+  else {
+    switch (m_decl->GetVarType()) {
+      case VarType::INT:
+        return EvalValue(EvalType::VAR_INT);
+      case VarType::FLOAT:
+        return EvalValue(EvalType::VAR_FLOAT);
+      default:
+        assert(false);
+    }
+  }
 }
 void ExprAST::TypeCheck(SymbolTable& symbol_table) {
   auto eval_value = Evaluate(symbol_table);
@@ -487,11 +507,14 @@ EvalValue ExprAST::EvaluateInner(SymbolTable& symbol_table) {
 
       // must be a single value
       if (m_lval->m_decl->IsConst()) {
+        // although decl is const, indices may be variable, which leads to a
+        // non-const result
         switch (m_lval->m_decl->GetVarType()) {
           case VarType::INT:
-            return EvalValue(m_lval->Evaluate(symbol_table).IntVal());
+            // return EvalValue(m_lval->Evaluate(symbol_table).IntVal());
           case VarType::FLOAT:
-            return EvalValue(m_lval->Evaluate(symbol_table).FloatVal());
+            // return EvalValue(m_lval->Evaluate(symbol_table).FloatVal());
+            return m_lval->Evaluate(symbol_table);
           default:
             return EvalValue(EvalType::ERROR);
         }

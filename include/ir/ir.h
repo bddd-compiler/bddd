@@ -107,6 +107,9 @@ public:
       case VarType::VOID:
         m_base_type = BasicType::VOID;
         break;
+      case VarType::BOOL:
+        m_base_type = BasicType::BOOL;
+        break;
       case VarType::UNKNOWN:
         assert(false);  // unreachable
     }
@@ -179,7 +182,8 @@ public:
   }
 
   bool Equals(BasicType base_type, bool is_ptr = false) const {
-    return m_base_type == base_type && m_num_star == is_ptr;
+    return m_base_type == base_type && m_num_star == is_ptr
+           && m_dimensions.empty();
   }
 
   // std::string ToString() {
@@ -247,10 +251,9 @@ public:
   // make differences into other related instructions)
   std::list<std::shared_ptr<Use>> m_use_list;
   ValueType m_type;
-  std::string m_allocated_name;
+  // std::string m_allocated_name;
 
   // new things
-  std::shared_ptr<Value> m_reaching_def;
   std::shared_ptr<BasicBlock> m_bb;  // belong to which basic block
 
   template <typename Derived> std::shared_ptr<Derived> shared_from_base() {
@@ -277,10 +280,11 @@ public:
   std::shared_ptr<Use> AddUse(const std::shared_ptr<Value> &user);
 
   void KillUse(const std::shared_ptr<Value> &user);
+  void KillAllUses();
 
   void ReplaceUseBy(const std::shared_ptr<Value> &new_val);
 
-  virtual void AllocateName(std::shared_ptr<IRNameAllocator> allocator) = 0;
+  // virtual void AllocateName(std::shared_ptr<IRNameAllocator> allocator) = 0;
   virtual void ExportIR(std::ofstream &ofs, int depth) = 0;
 };
 
@@ -288,19 +292,25 @@ class Constant : public Value {
 public:
   int m_int_val;
   float m_float_val;
-  // constants do not belong to any bb
+  // constants may belong to any bb, which is useful in mem2reg
 
   // non-float
-  explicit Constant(int int_val, BasicType basic_type)
+  explicit Constant(int int_val, BasicType basic_type,
+                    std::shared_ptr<BasicBlock> bb)
       : Value(basic_type, true), m_int_val(int_val), m_float_val(0.0) {
     assert(basic_type == BasicType::INT || basic_type == BasicType::BOOL
            || basic_type == BasicType::CHAR);
+    m_bb = std::move(bb);
+    assert(m_bb != nullptr);
   }
 
-  explicit Constant(float float_val)
-      : Value(BasicType::FLOAT, true), m_int_val(0), m_float_val(float_val) {}
+  explicit Constant(float float_val, std::shared_ptr<BasicBlock> bb)
+      : Value(BasicType::FLOAT, true), m_int_val(0), m_float_val(float_val) {
+    m_bb = std::move(bb);
+    assert(m_bb != nullptr);
+  }
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
 
   EvalValue Evaluate() {
@@ -338,7 +348,7 @@ public:
         m_is_float(decl->GetVarType() == VarType::FLOAT),
         m_is_array(decl->IsArray()) {}
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
 };
 
 class IntGlobalVariable : public GlobalVariable {
@@ -419,8 +429,8 @@ public:
         m_rhs_val_use(nullptr) {
     // assert(m_lhs_val_use.m_value->m_type == m_rhs_val_use.m_value->m_type);
     std::shared_ptr<BinaryInstruction> temp(this);  // to allow shared_from_this
-    m_lhs_val_use = lhs_val->AddUse(shared_from_this());
-    m_rhs_val_use = rhs_val->AddUse(shared_from_this());
+    m_lhs_val_use = lhs_val->AddUse(temp);
+    m_rhs_val_use = rhs_val->AddUse(temp);
     switch (op) {
       case IROp::ADD:
       case IROp::SUB:
@@ -460,7 +470,7 @@ public:
 
   void ExportIR(std::ofstream &ofs, int depth) override;
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   bool IsTerminator() override { return false; }
 
   std::vector<std::shared_ptr<Use>> Operands() override {
@@ -476,13 +486,13 @@ public:
                            std::shared_ptr<BasicBlock> bb)
       : Instruction(IROp::F_NEG, std::move(bb)), m_lhs_val_use(nullptr) {
     std::shared_ptr<FNegInstruction> temp(this);  // to allow shared_from_this
-    m_lhs_val_use = lhs_val->AddUse(shared_from_this());
+    m_lhs_val_use = lhs_val->AddUse(temp);
     m_type.Set(BasicType::FLOAT);
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   bool IsTerminator() override { return false; }
 
   std::vector<std::shared_ptr<Use>> Operands() override {
@@ -520,7 +530,7 @@ public:
     }
   }
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
 
   bool IsTerminator() override { return false; }  // seems not terminator
@@ -546,10 +556,10 @@ public:
         m_true_block(std::move(true_block)),
         m_false_block(std::move(false_block)) {
     std::shared_ptr<BranchInstruction> temp(this);
-    m_cond = cond->AddUse(shared_from_this());
+    m_cond = cond->AddUse(temp);
   }
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return true; }
   std::vector<std::shared_ptr<Use>> Operands() override { return {m_cond}; }
@@ -564,7 +574,7 @@ public:
       : Instruction(IROp::JUMP, std::move(bb)),
         m_target_block(std::move(target_block)) {}
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return true; }
   std::vector<std::shared_ptr<Use>> Operands() override { return {}; }
@@ -583,7 +593,7 @@ public:
     // }
   }
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return true; }
   std::vector<std::shared_ptr<Use>> Operands() override {
@@ -615,10 +625,10 @@ public:
       : AccessInstruction(IROp::GET_ELEMENT_PTR, std::move(bb)),
         m_addr(nullptr),
         m_indices() {
-    std::shared_ptr<Value> test(this);
-    m_addr = addr->AddUse(shared_from_this());
+    std::shared_ptr<Value> temp(this);
+    m_addr = addr->AddUse(temp);
     for (auto index : indices) {
-      m_indices.push_back(index->AddUse(shared_from_this()));
+      m_indices.push_back(index->AddUse(temp));
     }
 
     // determine m_type
@@ -632,7 +642,7 @@ public:
     }
   }
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return false; }
   std::vector<std::shared_ptr<Use>> Operands() override {
@@ -653,10 +663,10 @@ public:
     assert(addr->m_type.m_num_star >= 1);
     m_type = addr->m_type.Dereference();
     std::shared_ptr<Value> temp(this);
-    m_addr = addr->AddUse(shared_from_this());
+    m_addr = addr->AddUse(temp);
   }
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return false; }
   std::vector<std::shared_ptr<Use>> Operands() override { return {m_addr}; }
@@ -674,11 +684,11 @@ public:
         m_addr(nullptr),
         m_val(nullptr) {
     std::shared_ptr<Value> temp(this);
-    m_addr = addr->AddUse(shared_from_this());
-    m_val = val->AddUse(shared_from_this());
+    m_addr = addr->AddUse(temp);
+    m_val = val->AddUse(temp);
   }
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return false; }
 
@@ -693,20 +703,20 @@ public:
   bool m_is_const;
 
   // used in mem2reg
-  size_t m_alloca_id;
+  int m_alloca_id;
   std::vector<std::shared_ptr<BasicBlock>> m_defs;
 
   explicit AllocaInstruction(ValueType value_type,
                              std::shared_ptr<BasicBlock> bb,
                              bool is_arg = false, bool is_const = false)
       : Instruction(IROp::ALLOCA, std::move(bb)),
-        m_alloca_id(0),
+        m_alloca_id(-1),
         m_is_arg(is_arg),
         m_is_const(is_const) {
     m_type = std::move(value_type);
   }
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return false; }
   std::vector<std::shared_ptr<Use>> Operands() override { return {}; }
@@ -736,20 +746,31 @@ public:
 
   void AddPhiOperand(std::shared_ptr<BasicBlock> bb,
                      std::shared_ptr<Value> val) {
-    assert(val != nullptr);
     auto it = std::find_if(
         m_contents.begin(), m_contents.end(),
         [=](const auto &x) { return x.first.get() == bb.get(); });
     if (it == m_contents.end()) {
-      m_contents[bb] = val->AddUse(shared_from_this());
+      if (val == nullptr)
+        m_contents[bb] = nullptr;
+      else
+        m_contents[bb] = val->AddUse(shared_from_this());
     } else {
       // na mei shi le
     }
   }
 
-  void Remove(std::shared_ptr<BasicBlock> bb) { m_contents.erase(bb); }
+  bool IsValid();
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  void Remove(std::shared_ptr<Value> val) {
+    for (auto it = m_contents.begin(); it != m_contents.end(); ++it) {
+      if (it->second->m_value == val) {
+        m_contents.erase(it);
+        return;
+      }
+    }
+  }
+
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return false; }
   std::vector<std::shared_ptr<Use>> Operands() override {
@@ -759,26 +780,6 @@ public:
     }
     return std::move(ret);
   }
-};
-
-class ExtInstruction : public Instruction {
-public:
-  std::shared_ptr<Use> m_val;
-  BasicType m_target_type;
-
-  explicit ExtInstruction(IROp op, std::shared_ptr<Value> val,
-                          BasicType target_type, std::shared_ptr<BasicBlock> bb)
-      : Instruction(op, std::move(bb)),
-        m_val(nullptr),
-        m_target_type(target_type) {
-    m_type.Set(target_type);
-    std::shared_ptr<Value> temp(this);
-    m_val = val->AddUse(shared_from_this());
-  }
-
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
-  bool IsTerminator() override { return false; }
-  std::vector<std::shared_ptr<Use>> Operands() override { return {m_val}; }
 };
 
 // fat pointer to thin pointer
@@ -795,52 +796,69 @@ public:
         m_target_type(target_type) {
     m_type.Set(target_type, true);
     std::shared_ptr<Value> temp(this);
-    m_val = val->AddUse(shared_from_this());
+    m_val = val->AddUse(temp);
   }
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
   bool IsTerminator() override { return false; }
   std::vector<std::shared_ptr<Use>> Operands() override { return {m_val}; }
 };
 
 // i1 to i32
-class ZExtInstruction : public ExtInstruction {
+class ZExtInstruction : public Instruction {
 public:
+  std::shared_ptr<Use> m_val;
+
   explicit ZExtInstruction(std::shared_ptr<Value> val,
                            std::shared_ptr<BasicBlock> bb)
-      : ExtInstruction(IROp::ZEXT, std::move(val), BasicType::INT,
-                       std::move(bb)) {
-    assert(m_val->m_value->m_type.IsBasicBool());
+      : Instruction(IROp::ZEXT, std::move(bb)), m_val(nullptr) {
+    m_type.Set(BasicType::INT);
+    std::shared_ptr<ZExtInstruction> temp(this);
+    m_val = val->AddUse(temp);
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
+
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  bool IsTerminator() override { return false; }
+  std::vector<std::shared_ptr<Use>> Operands() override { return {m_val}; }
 };
 
 // i32 to float
-class SIToFPInstruction : public ExtInstruction {
+class SIToFPInstruction : public Instruction {
 public:
+  std::shared_ptr<Use> m_val;
   explicit SIToFPInstruction(std::shared_ptr<Value> val,
                              std::shared_ptr<BasicBlock> bb)
-      : ExtInstruction(IROp::SITOFP, std::move(val), BasicType::FLOAT,
-                       std::move(bb)) {
-    assert(m_val->m_value->m_type.IsBasicInt());
+      : Instruction(IROp::SITOFP, std::move(bb)), m_val(nullptr) {
+    m_type.Set(BasicType::FLOAT);
+    std::shared_ptr<SIToFPInstruction> temp(this);
+    m_val = val->AddUse(temp);
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  bool IsTerminator() override { return false; }
+  std::vector<std::shared_ptr<Use>> Operands() override { return {m_val}; }
 };
 
 // float to i32
-class FPToSIInstruction : public ExtInstruction {
+class FPToSIInstruction : public Instruction {
 public:
+  std::shared_ptr<Use> m_val;
   explicit FPToSIInstruction(std::shared_ptr<Value> val,
                              std::shared_ptr<BasicBlock> bb)
-      : ExtInstruction(IROp::FPTOSI, std::move(val), BasicType::INT,
-                       std::move(bb)) {
-    assert(m_val->m_value->m_type.IsBasicFloat());
+      : Instruction(IROp::FPTOSI, std::move(bb)), m_val(nullptr) {
+    m_type.Set(BasicType::INT);
+    std::shared_ptr<FPToSIInstruction> temp(this);
+    m_val = val->AddUse(temp);
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  bool IsTerminator() override { return false; }
+  std::vector<std::shared_ptr<Use>> Operands() override { return {m_val}; }
 };
 
 class BasicBlock : public Value {
@@ -853,9 +871,9 @@ public:
   // members used in ComputeDominanceRelationship
   size_t m_id;                         // for calculating dominance relationship
   std::shared_ptr<BasicBlock> m_idom;  // immediate dominator
-  std::vector<std::shared_ptr<BasicBlock>>
+  std::unordered_set<std::shared_ptr<BasicBlock>>
       m_dominators;  // 我支配谁（可能是自己）
-  std::vector<std::shared_ptr<BasicBlock>>
+  std::unordered_set<std::shared_ptr<BasicBlock>>
       m_dominated;  // 我被谁支配（可能是自己）
   std::unordered_set<std::shared_ptr<BasicBlock>> m_dominance_frontier;
   int m_dom_depth;  // depth in dominance tree
@@ -891,12 +909,13 @@ public:
     return m_instr_list.back();
   }
 
+  std::vector<std::shared_ptr<BasicBlock>> Predecessors();
   std::vector<std::shared_ptr<BasicBlock>> Successors();
 
   bool Dominate(std::shared_ptr<BasicBlock> bb);
   bool IsDominatedBy(std::shared_ptr<BasicBlock> bb);
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
 
   friend class Module;
@@ -941,7 +960,7 @@ public:
     }
   }
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
 };
 
@@ -998,8 +1017,8 @@ public:
 
   void AppendBasicBlock(std::shared_ptr<BasicBlock> bb);
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
-  void ExportIR(std::ofstream &ofs, int depth);
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  void ExportIR(std::ofstream &ofs, int depth) override;
 
   friend class Module;
 };
@@ -1013,8 +1032,8 @@ public:
   std::list<std::shared_ptr<Function>> m_function_decl_list;
   std::list<std::shared_ptr<GlobalVariable>> m_global_variable_list;
 
-  std::map<int, std::shared_ptr<Constant>> m_const_ints;
-  std::map<float, std::shared_ptr<Constant>> m_const_floats;
+  std::vector<std::pair<int, std::shared_ptr<Constant>>> m_const_ints;
+  std::vector<std::pair<float, std::shared_ptr<Constant>>> m_const_floats;
 
   std::shared_ptr<BasicBlock> GetCurrentBB() {
     return m_current_func->GetCurrentBB();
@@ -1029,7 +1048,7 @@ public:
   void Check();
   void ExportIR(std::ofstream &ofs, int depth);
 
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator);
+  // void AllocateName(std::shared_ptr<IRNameAllocator> allocator);
 };
 
 #endif  // BDDD_IR_H

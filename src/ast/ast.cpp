@@ -18,6 +18,8 @@ bool LValAST::IsSingle() {
 
 bool LValAST::IsArray() { return m_decl->DimensionsSize() > m_indices.size(); }
 
+bool LValAST::HasIndex() { return !m_indices.empty(); }
+
 void DeclAST::AddDimension(int x) {
   m_dimensions.push_back(std::make_unique<ExprAST>(x));
 }

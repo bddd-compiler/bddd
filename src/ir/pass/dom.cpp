@@ -6,15 +6,24 @@ std::vector<std::vector<size_t>> f_graph;
 std::vector<std::vector<size_t>> b_graph;
 // auxiliary graph for calculating idom from sdom
 std::vector<std::vector<size_t>> aux_graph;
+// dominance tree
+std::vector<std::vector<size_t>> dom_tree;
 
 std::vector<size_t> dfn, ord, fa, idom, sdom, ufs, mn;
 size_t co;
 
+std::vector<std::shared_ptr<BasicBlock>> bbs;
+
 void dfs(std::shared_ptr<BasicBlock> bb, int dom_depth) {
+  // std::cerr << "[debug] " << bb->m_id << std::endl;
   bb->m_dom_depth = dom_depth;
-  for (auto &dom : bb->m_dominators) {
-    if (dom == bb) continue;
-    dfs(dom, dom_depth + 1);
+  for (auto i : dom_tree[bb->m_id]) {
+    dfs(bbs[i], dom_depth + 1);
+
+    for (auto x : bbs[i]->m_dominators) {
+      bb->m_dominators.insert(x);
+      x->m_dominated.insert(bb);
+    }
   }
 }
 
@@ -36,8 +45,6 @@ void tarjan(size_t u) {
   }
 }
 
-std::vector<std::shared_ptr<BasicBlock>> bbs;
-
 void RemoveUnusedBlocks(std::shared_ptr<Function> function) {
   bbs.clear();
   bbs.push_back(nullptr);
@@ -49,13 +56,13 @@ void RemoveUnusedBlocks(std::shared_ptr<Function> function) {
   }
   size_t n = function->m_bb_list.size();
   f_graph.clear();
-  f_graph.reserve(n + 5);
+  f_graph.resize(n + 5);
   dfn.clear();
-  dfn.reserve(n + 5);
+  dfn.resize(n + 5);
   ord.clear();
-  ord.reserve(n + 5);
+  ord.resize(n + 5);
   fa.clear();
-  fa.reserve(n + 5);
+  fa.resize(n + 5);
   co = 0;
 
   for (auto &bb : function->m_bb_list) {
@@ -100,25 +107,27 @@ void ComputeDominanceRelationship(std::shared_ptr<Function> function) {
   }
   size_t n = function->m_bb_list.size();
   f_graph.clear();
-  f_graph.reserve(n + 5);
+  f_graph.resize(n + 5);
   b_graph.clear();
-  b_graph.reserve(n + 5);
+  b_graph.resize(n + 5);
   aux_graph.clear();
-  aux_graph.reserve(n + 5);
+  aux_graph.resize(n + 5);
+  dom_tree.clear();
+  dom_tree.resize(n + 5);
   dfn.clear();
-  dfn.reserve(n + 5);
+  dfn.resize(n + 5);
   ord.clear();
-  ord.reserve(n + 5);
+  ord.resize(n + 5);
   fa.clear();
-  fa.reserve(n + 5);
+  fa.resize(n + 5);
   idom.clear();
-  idom.reserve(n + 5);
+  idom.resize(n + 5);
   sdom.clear();
-  sdom.reserve(n + 5);
+  sdom.resize(n + 5);
   ufs.clear();
-  ufs.reserve(n + 5);
+  ufs.resize(n + 5);
   mn.clear();
-  mn.reserve(n + 5);
+  mn.resize(n + 5);
   co = 0;
 
   for (auto &bb : function->m_bb_list) {
@@ -163,30 +172,36 @@ void ComputeDominanceRelationship(std::shared_ptr<Function> function) {
       idom[t] = idom[idom[t]];
     }
   }
-
-  for (size_t i = co; i >= 2; --i) {
-    std::shared_ptr<BasicBlock> bb = bbs[ord[i]];
-    bb->m_dominators.push_back(bb);
-    assert(ord[i] != idom[ord[i]]);
-    for (auto x : bbs[ord[i]]->m_dominators) {
-      if (idom[ord[i]] != 0) {
-        bbs[idom[ord[i]]]->m_dominators.push_back(x);
-      }
-    }
-  }
-  bbs[ord[1]]->m_dominators.push_back(bbs[ord[1]]);
-
-  for (size_t i = 1; i <= co; ++i) {
-    for (auto x : bbs[i]->m_dominators) {
-      x->m_dominated.push_back(bbs[i]);
-    }
+  for (size_t i = 2; i <= co; ++i) {
+    size_t t = ord[i];
+    dom_tree[idom[t]].push_back(t);
+    assert(idom[i] != 0);
+    bbs[i]->m_idom = bbs[idom[i]];
   }
 
-  for (size_t i = 1; i <= co; ++i) {
-    if (idom[i]) {
-      bbs[i]->m_idom = bbs[idom[i]];
-    }
-  }
+  // for (size_t i = co; i >= 2; --i) {
+  //   std::shared_ptr<BasicBlock> bb = bbs[ord[i]];
+  //   bb->m_dominators.insert(bb);
+  //   assert(ord[i] != idom[ord[i]]);
+  //   for (auto x : bbs[ord[i]]->m_dominators) {
+  //     if (idom[ord[i]] != 0) {
+  //       bbs[idom[ord[i]]]->m_dominators.insert(x);
+  //     }
+  //   }
+  // }
+  // bbs[ord[1]]->m_dominators.insert(bbs[ord[1]]);
+  //
+  // for (size_t i = 1; i <= co; ++i) {
+  //   for (auto x : bbs[i]->m_dominators) {
+  //     x->m_dominated.insert(bbs[i]);
+  //   }
+  // }
+
+  // for (size_t i = 1; i <= co; ++i) {
+  //   if (idom[i]) {
+  //     bbs[i]->m_idom = bbs[idom[i]];
+  //   }
+  // }
 
   dfs(function->m_bb_list.front(), 0);
 }

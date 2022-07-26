@@ -205,6 +205,8 @@ std::shared_ptr<Value> ExprAST::CodeGen(std::shared_ptr<IRBuilder> builder) {
           case Op::NEQ:
             op = IROp::I_NE;
             break;
+          default:
+            assert(false);
         }
         return builder->CreateBinaryInstruction(op, lhs_val, rhs_val);
       } else if (lhs_val->m_type.IsBasicFloat()
@@ -235,6 +237,8 @@ std::shared_ptr<Value> ExprAST::CodeGen(std::shared_ptr<IRBuilder> builder) {
           case Op::NEQ:
             op = IROp::F_NE;
             break;
+          default:
+            assert(false);
         }
         return builder->CreateBinaryInstruction(op, lhs_val, rhs_val);
       } else {
@@ -387,10 +391,12 @@ std::shared_ptr<Value> FuncDefAST::CodeGen(std::shared_ptr<IRBuilder> builder) {
 
 std::shared_ptr<Value> AssignStmtAST::CodeGen(
     std::shared_ptr<IRBuilder> builder) {
+  assert(m_lval->IsSingle());
   auto val = m_rhs->CodeGen(builder);
-
   auto addr = m_lval->CodeGenAddr(builder);
-  return builder->CreateStoreInstruction(addr, val);
+  // bug: cannot store when lval is indexed single value from an array
+  builder->CreateStoreInstruction(addr, val);
+  return nullptr;
 }
 
 std::shared_ptr<Value> EvalStmtAST::CodeGen(

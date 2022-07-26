@@ -50,11 +50,21 @@ std::shared_ptr<Use> Value::AddUse(const std::shared_ptr<Value>& user) {
 void Value::KillUse(const std::shared_ptr<Value>& user) {
   for (auto it = m_use_list.begin(); it != m_use_list.end(); ++it) {
     if ((*it)->m_user == user) {
+      if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(user)) {
+        phi->Remove(shared_from_this());
+      }
       m_use_list.erase(it);
       return;
     }
   }
   assert(false);  // not found! what happen?
+}
+void Value::KillAllUses() {
+  for (auto it = m_use_list.begin(); it != m_use_list.end();) {
+    auto user = (*it)->m_user;
+    ++it;
+    KillUse(user);
+  }
 }
 
 // move from val's m_use_list to new_val's m_use_list
@@ -138,6 +148,9 @@ void BasicBlock::RemoveInstruction(const std::shared_ptr<Instruction>& elem) {
   if (it != m_instr_list.end()) {
     m_instr_list.erase(it);
   }
+}
+std::vector<std::shared_ptr<BasicBlock>> BasicBlock::Predecessors() {
+  return m_predecessors;
 }
 std::vector<std::shared_ptr<BasicBlock>> BasicBlock::Successors() {
   if (m_instr_list.empty()) return {};
@@ -240,4 +253,13 @@ std::ostream& operator<<(std::ostream& out, ValueType value_type) {
     out << "*";
   }
   return out;
+}
+
+bool PhiInstruction::IsValid() {
+  for (auto pred : m_bb->Predecessors()) {
+    if (m_contents.find(pred) == m_contents.end()) {
+      return false;
+    }
+  }
+  return true;
 }

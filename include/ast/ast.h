@@ -158,6 +158,7 @@ public:
 
   bool IsSingle();
   bool IsArray();
+  bool HasIndex();
 
   // methods used in typechecking
 

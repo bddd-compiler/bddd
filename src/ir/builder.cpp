@@ -6,31 +6,25 @@ void IRBuilder::AppendBasicBlock(std::shared_ptr<BasicBlock> bb) {
   m_module->AppendBasicBlock(std::move(bb));
 }
 std::shared_ptr<Value> IRBuilder::GetIntConstant(int int_val) {
-  auto it = m_module->m_const_ints.find(int_val);
-  if (it != m_module->m_const_ints.end()) {
-    return it->second;
-  } else {
-    auto constant = std::make_shared<Constant>(int_val, BasicType::INT);
-    m_module->m_const_ints[int_val] = constant;
-    return constant;
-  }
+  auto bb = m_module->GetCurrentBB();
+  auto constant = std::make_shared<Constant>(int_val, BasicType::INT, bb);
+  m_module->m_const_ints.emplace_back(int_val, constant);
+  return constant;
 }
 std::shared_ptr<Value> IRBuilder::GetFloatConstant(float float_val) {
-  auto it = m_module->m_const_floats.find(float_val);
-  if (it != m_module->m_const_floats.end()) {
-    return it->second;
-  } else {
-    auto constant = std::make_shared<Constant>(float_val);
-    m_module->m_const_floats[float_val] = constant;
-    return constant;
-  }
+  auto bb = m_module->GetCurrentBB();
+  auto constant = std::make_shared<Constant>(float_val, bb);
+  m_module->m_const_floats.emplace_back(float_val, constant);
+  return constant;
 }
 std::shared_ptr<Value> IRBuilder::GetBoolConstant(bool bool_val) {
-  auto constant = std::make_shared<Constant>(bool_val, BasicType::BOOL);
+  auto bb = m_module->GetCurrentBB();
+  auto constant = std::make_shared<Constant>(bool_val, BasicType::BOOL, bb);
   return constant;
 }
 std::shared_ptr<Value> IRBuilder::GetCharConstant(char char_val) {
-  auto constant = std::make_shared<Constant>(char_val, BasicType::CHAR);
+  auto bb = m_module->GetCurrentBB();
+  auto constant = std::make_shared<Constant>(char_val, BasicType::CHAR, bb);
   return constant;
 }
 std::shared_ptr<IntGlobalVariable> IRBuilder::CreateIntGlobalVariable(
