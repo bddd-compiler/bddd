@@ -26,80 +26,6 @@ void RegisterAllocator::setCurFunction(std::shared_ptr<ASM_Function> func) {
   m_cur_func = func;
 }
 
-void RegisterAllocator::LivenessAnalysis() {
-  // calculate def and use set of all blocks
-  for (auto& b : m_cur_func->m_blocks) {
-    b->m_def.clear();
-    b->m_use.clear();
-    for (auto& i : b->m_insts) {
-      for (auto& def : i->m_def) {
-        if (b->m_def.find(def) == b->m_def.end()) {
-          b->m_def.insert(def);
-        }
-      }
-      for (auto& use : i->m_use) {
-        if (b->m_use.find(use) == b->m_use.end()) {
-          b->m_use.insert(use);
-        }
-      }
-    }
-    b->m_livein.clear();
-    b->m_liveout.clear();
-  }
-
-  // calculate liveIn and liveOut of all blocks
-  // loop until nothing was added
-  bool end;
-  do {
-    end = true;
-    for (auto iter = m_cur_func->m_blocks.rbegin();
-         iter != m_cur_func->m_blocks.rend(); iter++) {
-      auto b = *iter;
-      // record in'[b] and out'[b]
-      auto temp_in = b->m_livein;
-      auto temp_out = b->m_liveout;
-
-      // in[b] = use[b] union (out[b] - def[b])
-      b->m_livein = b->m_use;
-      for (auto& out : b->m_liveout) {
-        if (b->m_def.find(out) == b->m_def.end()
-            && b->m_livein.find(out) == b->m_livein.end()) {
-          b->m_livein.insert(out);
-        }
-      }
-
-      // out[b] = union(in[s]), s in succ[b]
-      for (auto& successor : b->getSuccessors()) {
-        for (auto& in : successor->m_livein) {
-          if (b->m_liveout.find(in) == b->m_liveout.end()) {
-            b->m_liveout.insert(in);
-          }
-        }
-      }
-
-      // check if loop is end
-      if (b->m_livein != temp_in || b->m_liveout != temp_out) end = false;
-    }
-  } while (!end);
-
-  // print
-  // for (auto& b : m_cur_func->m_blocks) {
-  //   std::cout << b->m_label << ":" << std::endl;
-  //   std::cout << "liveUse: ";
-  //   for (auto& use : b->m_use) std::cout << use->getName() << " ";
-  //   std::cout << std::endl;
-  //   std::cout << "liveDef: ";
-  //   for (auto& def : b->m_def) std::cout << def->getName() << " ";
-  //   std::cout << std::endl;
-  //   std::cout << "liveIn:  ";
-  //   for (auto& in : b->m_livein) std::cout << in->getName() << " ";
-  //   std::cout << std::endl;
-  //   std::cout << "liveOut: ";
-  //   for (auto& out : b->m_liveout) std::cout << out->getName() << " ";
-  //   std::cout << std::endl;
-  // }
-}
-
 void RegisterAllocator::getPrecoloredAndInitial() {
   for (auto& b : m_cur_func->m_blocks) {
     for (auto& i : b->m_insts) {
@@ -109,9 +35,6 @@ void RegisterAllocator::getPrecoloredAndInitial() {
       for (auto& op : i->m_use) {
         if (op->m_op_type == OperandType::VREG) initial.insert(op);
       }
-    }
-    for (auto& [i, o] : Operand::rreg_map) {
-      precolored.insert(o);
     }
   }
 
@@ -125,21 +48,22 @@ void RegisterAllocator::getPrecoloredAndInitial() {
 }
 
 void RegisterAllocator::AllocateCurFunc() {
+  // debug("AllocateCurFunc");
   LivenessAnalysis();
   Build();
   MkWorklist();
   do {
     if (!simplifyWorklist.empty()) {
-      //std::cout << "Simplify" << std::endl;
+      // std::cout << "Simplify" << std::endl;
       Simplify();
     } else if (!worklistMoves.empty()) {
-      //std::cout << "Coalesce" << std::endl;
+      // std::cout << "Coalesce" << std::endl;
       Coalesce();
     } else if (!freezeWorklist.empty()) {
-      //std::cout << "Freeze" << std::endl;
+      // std::cout << "Freeze" << std::endl;
       Freeze();
     } else if (!spillWorklist.empty()) {
-      //std::cout << "SelectSpill" << std::endl;
+      // std::cout << "SelectSpill" << std::endl;
       SelectSpill();
     }
   } while (!simplifyWorklist.empty() || !worklistMoves.empty()
@@ -152,15 +76,16 @@ void RegisterAllocator::AllocateCurFunc() {
 }
 
 void RegisterAllocator::AddEdge(OpPtr u, OpPtr v) {
+  // debug("AddEdge");
   auto e = std::make_pair(u, v);
   if (adjSet.find(e) == adjSet.end() && u != v) {
     adjSet.insert(e);
     adjSet.insert(std::make_pair(v, u));
-    if (precolored.find(u) == precolored.end()) {
+    if (u->m_op_type != OperandType::REG) {
       adjList[u].insert(v);
       degree[u]++;
     }
-    if (precolored.find(v) == precolored.end()) {
+    if (v->m_op_type != OperandType::REG) {
       adjList[v].insert(u);
       degree[v]++;
     }
@@ -168,6 +93,7 @@ void RegisterAllocator::AddEdge(OpPtr u, OpPtr v) {
 }
 
 void RegisterAllocator::Build() {
+  // debug("Build");
   for (auto& b : m_cur_func->m_blocks) {
     std::unordered_set<OpPtr>& live = b->m_liveout;
     for (auto iter = b->m_insts.rbegin(); iter != b->m_insts.rend(); iter++) {
@@ -217,6 +143,7 @@ void RegisterAllocator::Build() {
 }
 
 std::unordered_set<OpPtr> RegisterAllocator::Adjacent(OpPtr n) {
+  // debug("Adjacent");
   if (adjList.find(n) == adjList.end()) {
     return {};
   }
@@ -232,16 +159,11 @@ std::unordered_set<OpPtr> RegisterAllocator::Adjacent(OpPtr n) {
 
 std::unordered_set<std::shared_ptr<MOVInst>> RegisterAllocator::NodeMoves(
     OpPtr n) {
+  // debug("NodeMoves");
   if (moveList.find(n) == moveList.end()) {
     return {};
   }
   std::unordered_set<std::shared_ptr<MOVInst>> temp, ret;
-  //   std::set_union(activeMoves.begin(), activeMoves.end(),
-  //   worklistMoves.begin(),
-  //                  worklistMoves.end(), std::inserter(temp, temp.begin()));
-  //   std::set_intersection(moveList[n].begin(), moveList[n].end(),
-  //   temp.begin(),
-  //                         temp.end(), std::inserter(ret, ret.begin()));
   for (auto& m : moveList[n]) {
     if (activeMoves.find(m) != activeMoves.end()
         || worklistMoves.find(m) != worklistMoves.end()) {
@@ -254,15 +176,16 @@ std::unordered_set<std::shared_ptr<MOVInst>> RegisterAllocator::NodeMoves(
 bool RegisterAllocator::MoveRelated(OpPtr n) { return !NodeMoves(n).empty(); }
 
 void RegisterAllocator::MkWorklist() {
+  // debug("MkWorklist");
   for (auto& n : initial) {
     if (degree[n] >= K) {
-      //std::cout << "spill: " << n->getName() << std::endl;
+      // std::cout << "spill: " << n->getName() << std::endl;
       spillWorklist.insert(n);
     } else if (MoveRelated(n)) {
-      //std::cout << "freeze: " << n->getName() << std::endl;
+      // std::cout << "freeze: " << n->getName() << std::endl;
       freezeWorklist.insert(n);
     } else {
-      //std::cout << "simplify: " << n->getName() << std::endl;
+      // std::cout << "simplify: " << n->getName() << std::endl;
       simplifyWorklist.insert(n);
     }
   }
@@ -270,6 +193,7 @@ void RegisterAllocator::MkWorklist() {
 }
 
 void RegisterAllocator::Simplify() {
+  // debug("Simplify");
   assert(!simplifyWorklist.empty());
   OpPtr n = *simplifyWorklist.begin();
   simplifyWorklist.erase(simplifyWorklist.begin());
@@ -280,6 +204,7 @@ void RegisterAllocator::Simplify() {
 }
 
 void RegisterAllocator::DecrementDegree(OpPtr m) {
+  // debug("DecrementDegree");
   int d = degree[m]--;
   if (d == K) {
     auto adj = Adjacent(m);
@@ -295,6 +220,7 @@ void RegisterAllocator::DecrementDegree(OpPtr m) {
 }
 
 void RegisterAllocator::EnableMoves(std::unordered_set<OpPtr>& nodes) {
+  // debug("EnableMoves");
   for (auto& n : nodes)
     for (auto& m : NodeMoves(n))
       if (activeMoves.find(m) != activeMoves.end()) {
@@ -304,12 +230,13 @@ void RegisterAllocator::EnableMoves(std::unordered_set<OpPtr>& nodes) {
 }
 
 void RegisterAllocator::Coalesce() {
+  // debug("Coalesce");
   assert(!worklistMoves.empty());
   auto m = *worklistMoves.begin();
   auto x = GetAlias(m->m_src);
   auto y = GetAlias(m->m_dest);
   OpPtr u, v;
-  if (precolored.find(x) != precolored.end()) {
+  if (x->m_op_type == OperandType::REG) {
     u = y;
     v = x;
   } else {
@@ -320,14 +247,13 @@ void RegisterAllocator::Coalesce() {
   if (u == v) {
     coalescedMoves.insert(m);
     AddWorkList(u);
-  } else if (precolored.find(v) != precolored.end()
+  } else if (v->m_op_type == OperandType::REG
              || adjSet.find(std::make_pair(u, v)) != adjSet.end()) {
     constrainedMoves.insert(m);
     AddWorkList(u);
     AddWorkList(v);
-  } else if (precolored.find(u) != precolored.end() && AllOK(u, v)
-             || precolored.find(u) == precolored.end()
-                    && ConservativeAdj(u, v)) {
+  } else if (u->m_op_type == OperandType::REG && AllOK(u, v)
+             || u->m_op_type != OperandType::REG && ConservativeAdj(u, v)) {
     coalescedMoves.insert(m);
     Combine(u, v);
     AddWorkList(u);
@@ -337,15 +263,15 @@ void RegisterAllocator::Coalesce() {
 }
 
 void RegisterAllocator::AddWorkList(OpPtr u) {
-  if (precolored.find(u) == precolored.end() && !MoveRelated(u)
-      && degree[u] < K) {
+  // debug("AddWorkList");
+  if (u->m_op_type != OperandType::REG && !MoveRelated(u) && degree[u] < K) {
     freezeWorklist.erase(u);
     simplifyWorklist.insert(u);
   }
 }
 
 bool RegisterAllocator::OK(OpPtr t, OpPtr r) {
-  return degree[t] < K || precolored.find(t) != precolored.end()
+  return degree[t] < K || t->m_op_type == OperandType::REG
          || adjSet.find(std::make_pair(t, r)) != adjSet.end();
 }
 
@@ -362,6 +288,7 @@ OpPtr RegisterAllocator::GetAlias(OpPtr n) {
 }
 
 void RegisterAllocator::Combine(OpPtr u, OpPtr v) {
+  // debug("Combine");
   if (freezeWorklist.find(v) != freezeWorklist.end()) {
     freezeWorklist.erase(v);
   } else {
@@ -384,6 +311,7 @@ void RegisterAllocator::Combine(OpPtr u, OpPtr v) {
 }
 
 void RegisterAllocator::Freeze() {
+  // debug("Freeze");
   assert(!freezeWorklist.empty());
   auto u = *freezeWorklist.begin();
   freezeWorklist.erase(freezeWorklist.begin());
@@ -392,6 +320,7 @@ void RegisterAllocator::Freeze() {
 }
 
 void RegisterAllocator::FreezeMoves(OpPtr u) {
+  // debug("FreezeMoves");
   for (auto& m : NodeMoves(u)) {
     if (activeMoves.find(m) != activeMoves.end()) {
       activeMoves.erase(m);
@@ -408,21 +337,22 @@ void RegisterAllocator::FreezeMoves(OpPtr u) {
 }
 
 void RegisterAllocator::SelectSpill() {
+  // debug("SelectSpill");
   // TODO(Huang): use a better heuristic algorithm
   // Note: avoid choosing nodes that are the tiny live ranges
   // resulting from the fetches of previously spilled registers
 
   // now we just select the first
-  auto m = *spillWorklist.begin();
-  spillWorklist.erase(spillWorklist.begin());
+  
+  spillWorklist.erase(m);
   simplifyWorklist.insert(m);
   FreezeMoves(m);
 }
 
 void RegisterAllocator::AssignColors() {
+  // debug("AssignColors");
   while (!selectStack.empty()) {
     OpPtr n = selectStack.back();
-    std::cout << n->getName() << std::endl;
     selectStack.pop_back();
     std::set<int> okColors;
     for (int i = 0; i < K; i++) {
@@ -431,7 +361,7 @@ void RegisterAllocator::AssignColors() {
     for (auto& w : adjList[n]) {
       OpPtr a = GetAlias(w);
       if (coloredNodes.find(a) != coloredNodes.end()
-          || precolored.find(a) != precolored.end()) {
+          || a->m_op_type == OperandType::REG) {
         okColors.erase(color[GetAlias(w)]);
       }
     }
@@ -449,6 +379,7 @@ void RegisterAllocator::AssignColors() {
 }
 
 void RegisterAllocator::RewriteProgram() {
+  // debug("RewriteProgram");
   // TODO(Huang):
   // Allocate memory locations for each v ∈ spilledNodes,
   // Create a new temporary vi for each definition and each use,
@@ -456,8 +387,91 @@ void RegisterAllocator::RewriteProgram() {
   // definition of a vi, a fetch before each use of a vi.
   // Put all the vi into a set newTemps.
 
-  std::cout << "Haven't allocate memory for spill nodes" << std::endl;
-  assert(false);
+  // std::cout << "Haven't allocate memory for spill nodes" << std::endl;
+  // assert(false);
+  std::unordered_set<OpPtr> newTemps;
+  for (auto& v : spilledNodes) {
+    int sp_offs = m_cur_func->getStackSize();
+    m_cur_func->allocateStack(4);
+    for (auto& b : m_cur_func->m_blocks) {
+      for (auto iter = b->m_insts.begin(); iter != b->m_insts.end(); iter++) {
+        auto& i = *iter;
+        if (i->m_use.find(v) != i->m_use.end()) {
+          // replace use
+
+          OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
+          i->replaceUse(newOp, v);
+          i->m_use.erase(v);
+          i->addUse(newOp);
+          // insert a load instruction before use of newOp
+          OpPtr offs;
+          std::shared_ptr<MOVInst> mov = nullptr;
+          if (0 <= sp_offs && sp_offs < 4096) {
+            offs = std::make_shared<Operand>(sp_offs);
+          } else {
+            offs = std::make_shared<Operand>(OperandType::VREG);
+            mov = std::make_shared<MOVInst>(offs, sp_offs);
+            newTemps.insert(offs);
+          }
+          auto ldr = std::make_shared<LDRInst>(
+              newOp, Operand::getRReg(RReg::SP), offs);
+          if (mov) {
+            b->insertSpillLDR(iter, ldr, mov);
+          } else {
+            b->insertSpillLDR(iter, ldr);
+          }
+          newTemps.insert(newOp);
+        }
+        if (i->m_def.find(v) != i->m_def.end()) {
+          // replace def
+
+          OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
+          i->replaceDef(newOp, v);
+          i->m_def.erase(v);
+          i->addDef(newOp);
+          // insert a store instruction after defination of newOp
+          OpPtr offs;
+          std::shared_ptr<MOVInst> mov = nullptr;
+          if (0 <= sp_offs && sp_offs < 4096) {
+            offs = std::make_shared<Operand>(sp_offs);
+          } else {
+            offs = std::make_shared<Operand>(OperandType::VREG);
+            mov = std::make_shared<MOVInst>(offs, sp_offs);
+            newTemps.insert(offs);
+          }
+          auto str = std::make_shared<STRInst>(
+              newOp, Operand::getRReg(RReg::SP), offs);
+          if (mov) {
+            b->insertSpillSTR(iter, str, mov);
+          } else {
+            b->insertSpillSTR(iter, str);
+          };
+          newTemps.insert(newOp);
+          auto next = std::next(iter);
+          while (next != b->m_insts.end()
+                 && (*next)->m_def.find(v) == (*next)->m_def.end()) {
+            if ((*next)->m_use.find(v) != (*next)->m_use.end()) {
+              (*next)->replaceUse(newOp, v);
+              (*next)->m_use.erase(v);
+              (*next)->addUse(newOp);
+              next++;
+              iter++;
+            } else {
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  spilledNodes.clear();
+  initial.clear();
+  for (auto& n : coloredNodes) initial.insert(n);
+  for (auto& n : coalescedNodes) initial.insert(n);
+  for (auto& n : newTemps) initial.insert(n);
+  coloredNodes.clear();
+  coalescedNodes.clear();
 }
 
 bool RegisterAllocator::AllOK(OpPtr u, OpPtr v) {
@@ -476,4 +490,27 @@ bool RegisterAllocator::ConservativeAdj(OpPtr u, OpPtr v) {
     nodes.insert(op);
   }
   return Conservative(nodes);
+}
+
+void RegisterAllocator::debug(std::string func) {
+  std::cout << func << std::endl;
+  std::cout << "precolored: ";
+  for (auto& n : precolored) std::cout << n->getName() << ", ";
+  std::cout << "\ninitial: ";
+  for (auto& n : initial) std::cout << n->getName() << ", ";
+  std::cout << "\nsimplifyWorklist: ";
+  for (auto& n : simplifyWorklist) std::cout << n->getName() << ", ";
+  std::cout << "\nfreezeWorklist: ";
+  for (auto& n : freezeWorklist) std::cout << n->getName() << ", ";
+  std::cout << "\nspillWorklist: ";
+  for (auto& n : spillWorklist) std::cout << n->getName() << ", ";
+  std::cout << "\nspilledNodes: ";
+  for (auto& n : spilledNodes) std::cout << n->getName() << ", ";
+  std::cout << "\ncoalescedNodes: ";
+  for (auto& n : coalescedNodes) std::cout << n->getName() << ", ";
+  std::cout << "\noloredNodes: ";
+  for (auto& n : coloredNodes) std::cout << n->getName() << ", ";
+  std::cout << "\nselectStack: ";
+  for (auto& n : selectStack) std::cout << n->getName() << ", ";
+  std::cout << std::endl << std::endl;
 }

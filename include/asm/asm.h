@@ -1,6 +1,7 @@
 #ifndef BDDD_ASM_H
 #define BDDD_ASM_H
 
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <list>
@@ -9,7 +10,6 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
-#include <cmath>
 
 #include "ir/ir.h"
 
@@ -137,6 +137,10 @@ public:
   int m_int_val;
   float m_float_val;
 
+  //
+  int lifespan = 0;
+  bool rejected = false;
+
   Operand(OperandType t, bool r = true) : m_op_type(t), m_is_rreg(r) {}
 
   Operand(int val)
@@ -228,6 +232,16 @@ public:
 
   void insert(std::shared_ptr<ASM_Instruction> inst);
 
+  void insertSpillLDR(
+      std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
+      std::shared_ptr<ASM_Instruction> ldr,
+      std::shared_ptr<ASM_Instruction> mov = nullptr);
+
+  void insertSpillSTR(
+      std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
+      std::shared_ptr<ASM_Instruction> str,
+      std::shared_ptr<ASM_Instruction> mov = nullptr);
+
   void insertPhiMOV(std::shared_ptr<ASM_Instruction> mov);
 
   void appendFilledMOV(std::shared_ptr<ASM_Instruction> mov);
@@ -236,7 +250,7 @@ public:
 
   void appendSuccessor(std::shared_ptr<ASM_BasicBlock> succ);
 
-  void appendPredecessor(std::shared_ptr<ASM_BasicBlock> pred); 
+  void appendPredecessor(std::shared_ptr<ASM_BasicBlock> pred);
 
   std::vector<std::shared_ptr<ASM_BasicBlock>> getSuccessors();
 
@@ -277,8 +291,16 @@ public:
   virtual void exportASM(std::ofstream& ofs) = 0;
 
   void addDef(std::shared_ptr<Operand> def);
-  
+
   void addUse(std::shared_ptr<Operand> use);
+
+  virtual void replaceDef(std::shared_ptr<Operand> newOp,
+                          std::shared_ptr<Operand> oldOp)
+      = 0;
+
+  virtual void replaceUse(std::shared_ptr<Operand> newOp,
+                          std::shared_ptr<Operand> oldOp)
+      = 0;
 };
 
 class LDRInst : public ASM_Instruction {
@@ -296,6 +318,12 @@ public:
           std::shared_ptr<Operand> offs);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 class STRInst : public ASM_Instruction {
@@ -309,6 +337,12 @@ public:
           std::shared_ptr<Operand> offs);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 // TODO(Huang): class ADRInst
@@ -325,6 +359,12 @@ public:
   MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 // TODO(Huang): class VMOVInst
@@ -336,6 +376,12 @@ public:
   PInst(InstOp op);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 class BInst : public ASM_Instruction {
@@ -345,6 +391,12 @@ public:
   BInst(std::shared_ptr<ASM_BasicBlock> block);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 // CALL uses BL inst
@@ -359,6 +411,12 @@ public:
   CALLInst(VarType t, std::string l, int n);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 class ShiftInst : public ASM_Instruction {
@@ -371,6 +429,12 @@ public:
             std::shared_ptr<Operand> src, std::shared_ptr<Operand> sval);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 // ADD SUB RSB
@@ -385,6 +449,12 @@ public:
          std::shared_ptr<Operand> operand1, std::shared_ptr<Operand> operand2);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 // MUL MLA MLS
@@ -400,6 +470,12 @@ public:
           std::shared_ptr<Operand> append = nullptr);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 class SDIVInst : public ASM_Instruction {
@@ -412,6 +488,12 @@ public:
            std::shared_ptr<Operand> devisor);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 class BITInst : public ASM_Instruction {
@@ -429,6 +511,12 @@ public:
           std::shared_ptr<Operand> operand1);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 // CMP TST
@@ -442,6 +530,12 @@ public:
          std::shared_ptr<Operand> operand2);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
 
 #endif  // BDDD_ASM_H

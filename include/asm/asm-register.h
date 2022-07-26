@@ -21,17 +21,13 @@ class RegisterAllocator {
 private:
     std::shared_ptr<ASM_Module> m_module;
     std::shared_ptr<ASM_Function> m_cur_func;
-    const int K = 14;
+    const int K = 12;
 
     void setCurFunction(std::shared_ptr<ASM_Function> func);
 
-    void LivenessAnalysis();
-
-    void getPrecoloredAndInitial();
-
     // Data Structures
     // Node Worklists, Node Sets, and Node Stacks
-    std::unordered_set<OpPtr> precolored;
+    std::unordered_set<OpPtr> precolored;       // we didn't use this set
     std::unordered_set<OpPtr> initial;
     std::unordered_set<OpPtr> simplifyWorklist;
     std::unordered_set<OpPtr> freezeWorklist;
@@ -103,11 +99,17 @@ private:
 
     bool ConservativeAdj(OpPtr u, OpPtr v);
 
+    void LivenessAnalysis();
+
+    void getPrecoloredAndInitial();
+
 public:
 
     RegisterAllocator(std::shared_ptr<ASM_Module> module = nullptr);
 
     void Allocate();
+
+    void debug(std::string func);
 
 };
 

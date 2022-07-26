@@ -44,7 +44,7 @@ void ASM_Builder::setParams() {
     value = m_cur_func->m_ir_func->m_args[i];
     std::shared_ptr<Operand> offs;
     int fp_offs = (i - 4) * 4;
-    if (Operand::immCheck(fp_offs)) {
+    if (0 <= fp_offs && fp_offs < 4096) {
       offs = std::make_shared<Operand>(fp_offs);
     } else {
       auto mov = std::make_shared<MOVInst>(
@@ -52,7 +52,8 @@ void ASM_Builder::setParams() {
       offs = mov->m_dest;
       m_cur_func->m_params_set_list.push_back(mov);
     }
-    auto ldr = std::make_shared<LDRInst>(getOperand(value), Operand::getRReg(RReg::R11), offs);
+    auto ldr = std::make_shared<LDRInst>(getOperand(value),
+                                         Operand::getRReg(RReg::R11), offs);
     m_cur_func->m_params_set_list.push_back(ldr);
     i++;
   }
@@ -81,7 +82,7 @@ void ASM_Builder::fixedStackParams() {
     // maybe wrong if push/pop is changed
     int sp_offs = (i - 3 + m_cur_func->m_push->m_regs.size()) * 4;
     std::shared_ptr<Operand> offs;
-    if (Operand::immCheck(sp_offs)) {
+    if (0 <= sp_offs && sp_offs < 4096) {
       offs = std::make_shared<Operand>(sp_offs);
     } else {
       auto mov = std::make_shared<MOVInst>(

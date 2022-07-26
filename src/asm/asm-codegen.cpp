@@ -241,11 +241,12 @@ std::shared_ptr<Operand> GenerateReturnInstruction(
     std::shared_ptr<ReturnInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
   auto ret_val = inst->m_ret->m_value;
-  if (ret_val != nullptr) {
-    std::shared_ptr<Operand> r0 = Operand::getRReg(RReg::R0);
-    builder->appendMOV(r0, builder->getOperand(ret_val, true));
+  if (ret_val) {
+    builder->appendMOV(Operand::getRReg(RReg::R0),
+                       builder->getOperand(ret_val, true));
   }
-  builder->appendB(builder->m_cur_func->m_rblock, CondType::NONE);
+  auto b = builder->appendB(builder->m_cur_func->m_rblock, CondType::NONE);
+  if (ret_val) b->addUse(Operand::getRReg(RReg::R0));
   builder->m_cur_block = nullptr;
   return nullptr;
 }

@@ -41,6 +41,23 @@ void ASM_BasicBlock::insert(std::shared_ptr<ASM_Instruction> inst) {
   m_insts.push_back(inst);
 }
 
+void ASM_BasicBlock::insertSpillLDR(
+    std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
+    std::shared_ptr<ASM_Instruction> ldr,
+    std::shared_ptr<ASM_Instruction> mov) {
+  if (mov) m_insts.insert(iter, mov);
+  m_insts.insert(iter, ldr);
+}
+
+void ASM_BasicBlock::insertSpillSTR(
+    std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
+    std::shared_ptr<ASM_Instruction> str,
+    std::shared_ptr<ASM_Instruction> mov) {
+  auto next = std::next(iter);
+  if (mov) m_insts.insert(next, mov);
+  m_insts.insert(next, str);
+}
+
 void ASM_BasicBlock::insertPhiMOV(std::shared_ptr<ASM_Instruction> mov) {
   assert(m_branch_pos != m_insts.end());
   m_insts.insert(m_branch_pos, mov);
@@ -54,22 +71,6 @@ void ASM_BasicBlock::fillMOV() {
   for (auto& mov : m_mov_filled_list) {
     insertPhiMOV(mov);
   }
-}
-
-void ASM_BasicBlock::appendSuccessor(std::shared_ptr<ASM_BasicBlock> succ) {
-  m_successors.push_back(succ);
-}
-
-void ASM_BasicBlock::appendPredecessor(std::shared_ptr<ASM_BasicBlock> pred) {
-  m_predecessors.push_back(pred);
-}
-
-std::vector<std::shared_ptr<ASM_BasicBlock>> ASM_BasicBlock::getSuccessors() {
-  return m_successors;
-}
-
-std::vector<std::shared_ptr<ASM_BasicBlock>> ASM_BasicBlock::getPredecessors() {
-  return m_predecessors;
 }
 
 // int type immediate check
@@ -311,15 +312,6 @@ std::string ASM_Instruction::getCondName() {
   return "";
 }
 
-void ASM_Instruction::addDef(std::shared_ptr<Operand> def) {
-  m_def.insert(def);
-}
-
-void ASM_Instruction::addUse(std::shared_ptr<Operand> use) {
-  if (use->m_op_type == OperandType::IMM) return;
-  m_use.insert(use);
-}
-
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
   m_op = InstOp::LDR;
   m_cond = CondType::NONE;
@@ -370,7 +362,7 @@ MOVInst::MOVInst(std::shared_ptr<Operand> dest, int imm) {
 MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
   m_op = InstOp::MOV;
   m_cond = CondType::NONE;
-  m_type = RIType::REG;
+  m_type = src->m_op_type == OperandType::IMM ? RIType::IMM : RIType::REG;
   m_dest = dest;
   m_src = src;
 
@@ -396,8 +388,14 @@ CALLInst::CALLInst(VarType type, std::string label, int n) {
   m_label = label;
   m_params = n;
 
-  auto r0 = Operand::getRReg(RReg::R0);
-  addDef(r0);
+  int i = 0;
+  while (i < 4 && i < n) {
+    addUse(Operand::getRReg((RReg)i));
+    i++;
+  }
+  if (type != VarType::VOID) {
+    addDef(Operand::getRReg(RReg::R0));
+  }
 }
 
 ShiftInst::ShiftInst(InstOp op, std::shared_ptr<Operand> dest,
