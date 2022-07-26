@@ -39,8 +39,18 @@ set(IR_SOURCE
   src/ir/export.cpp
   src/ir/builder.cpp
   src/ir/ir-pass-manager.cpp
-  src/ir/pass/mem2reg.cpp
   src/ir/ir-name-allocator.cpp
+  
+)
+
+set(IR_PASSES
+  src/ir/pass/mem2reg.cpp
+  src/ir/pass/function-inlining.cpp
+  src/ir/pass/gvn.cpp
+  src/ir/pass/gcm.cpp
+  src/ir/pass/dead-code-elimination.cpp
+  src/ir/pass/side-effect.cpp
+  src/ir/pass/dom.cpp
 )
 
 set(ASM_SOURCE
@@ -57,6 +67,7 @@ add_executable(bddd
   ${PARSER_SOURCE}
   ${AST_SOURCE}
   ${IR_SOURCE}
+  ${IR_PASSES}
   ${ASM_SOURCE}
 )
 

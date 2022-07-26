@@ -1,20 +1,31 @@
 #include <cassert>
+#include <iostream>
 
 #include "ast/ast.h"
 #include "ast/symbol-table.h"
+#include "ast/type.h"
 #include "exceptions.h"
 
 void InitValAST::TypeCheck(SymbolTable& symbol_table) {
   if (m_expr) {
     m_expr->TypeCheck(symbol_table);  // m_expr->m_is_const is updated here
     SetIsConst(m_expr->IsConst());
+    auto eval_value = m_expr->Evaluate(symbol_table);
+    if (eval_value.IsConstInt()) {
+      SetAllZero(eval_value.IntVal() == 0);
+    } else if (eval_value.IsConstFloat()) {
+      SetAllZero(eval_value.FloatVal() == 0);
+    }
   } else {
-    bool flag = true;
+    bool is_const = true;
+    bool all_zero = true;
     for (auto& val : m_vals) {
       val->TypeCheck(symbol_table);
-      if (!val->IsConst() && flag) flag = false;
+      if (is_const && !val->IsConst()) is_const = false;
+      if (all_zero && !val->AllZero()) all_zero = false;
     }
-    SetIsConst(flag);
+    SetIsConst(is_const);
+    SetAllZero(all_zero);
   }
 }
 void InitValAST::FillVals(int n, int& offset, const std::vector<int>& sizes,
@@ -25,7 +36,7 @@ void InitValAST::FillVals(int n, int& offset, const std::vector<int>& sizes,
   auto size = (n == sizes.size() - 1 ? 1 : sizes[n + 1]);
 
   // assign values
-  // TODO(garen): WARNING!!! nullptr represents zero, danger behaviour
+  // TODO(garen): WARNING!!! nullptr represents zero, dangerous behaviour
   for (auto& val : m_vals) {
     if (val->m_expr) {  // single
       vals[offset++] = val->m_expr;
@@ -48,7 +59,7 @@ void LValAST::TypeCheck(SymbolTable& symbol_table) {
     index->TypeCheck(symbol_table);
   }
 }
-std::variant<int, float> LValAST::Evaluate(SymbolTable& symbol_table) {
+EvalValue LValAST::Evaluate(SymbolTable& symbol_table) {
   assert(!IsArray());
   assert(m_decl != nullptr);
   if (m_indices.empty()) {
@@ -59,339 +70,340 @@ std::variant<int, float> LValAST::Evaluate(SymbolTable& symbol_table) {
 
   assert(m_decl->m_products.size() == m_decl->m_dimensions.size());
   size_t i;
+  bool flag = true;
   for (i = 0; i < m_indices.size() - 1; i++) {
-    auto [type, res] = m_indices[i]->Evaluate(symbol_table);
-    assert(type == ExprAST::EvalType::INT);
-    offset += std::get<int>(res) * m_decl->m_products[i + 1];
+    auto eval_value = m_indices[i]->Evaluate(symbol_table);
+    assert(eval_value.IsInt());
+    if (!eval_value.IsConstInt()) {
+      flag = false;
+    } else {
+      offset += eval_value.IntVal() * m_decl->m_products[i + 1];
+    }
   }
-  auto [type, res] = m_indices[i]->Evaluate(symbol_table);
-  assert(type == ExprAST::EvalType::INT || type == ExprAST::EvalType::VAR_INT);
-  offset += std::get<int>(res);
-
-  return m_decl->GetFlattenVal(symbol_table, offset);
+  auto eval_value = m_indices[i]->Evaluate(symbol_table);
+  assert(eval_value.IsInt());
+  if (!eval_value.IsConstInt()) {
+    flag = false;
+  } else {
+    offset += eval_value.IntVal();
+  }
+  if (flag)
+    return m_decl->GetFlattenVal(symbol_table, offset);
+  else {
+    switch (m_decl->GetVarType()) {
+      case VarType::INT:
+        return EvalValue(EvalType::VAR_INT);
+      case VarType::FLOAT:
+        return EvalValue(EvalType::VAR_FLOAT);
+      default:
+        assert(false);
+    }
+  }
 }
 void ExprAST::TypeCheck(SymbolTable& symbol_table) {
-  auto [var_type, res] = Evaluate(symbol_table);
-  // INT, FLOAT, VAR_INT, VAR_FLOAT, anything except ERROR, are legal results
-  switch (var_type) {
-    case EvalType::INT:
-    case EvalType::FLOAT:
+  auto eval_value = Evaluate(symbol_table);
+  // CONST_INT, CONST_FLOAT, VAR_INT, VAR_FLOAT, anything except ERROR, are
+  // legal results
+  switch (eval_value.m_eval_type) {
+    case EvalType::CONST_INT:
+    case EvalType::CONST_FLOAT:
       SetIsConst(true);
       break;
     case EvalType::VAR_INT:
     case EvalType::VAR_FLOAT:
       SetIsConst(false);
       break;
-    case EvalType::ARR:
-    case EvalType::VOID:
-      // do nothing
-      break;
     case EvalType::ERROR:
       throw MyException("unexpected evaluation");
-      break;
     default:
-      break;
+      break;  // do nothing
   }
 }
 
 // if a is int variable, if (+--!!!a) {} is legal expression
 // there is no distinction between int and bool
 // array may be evaluated, which cannot join in any computation
-std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::Evaluate(
-    SymbolTable& symbol_table) {
+EvalValue ExprAST::Evaluate(SymbolTable& symbol_table) {
   auto ret = EvaluateInner(symbol_table);
   // memorize the answer
-  if (ret.first == EvalType::INT) {
+  if (ret.IsConstInt()) {
     m_op = Op::CONST_INT;
-    m_int_val = std::get<int>(ret.second);
-  } else if (ret.first == EvalType::FLOAT) {
+    m_int_val = ret.IntVal();
+  } else if (ret.IsConstFloat()) {
     m_op = Op::CONST_FLOAT;
-    m_float_val = std::get<float>(ret.second);
+    m_float_val = ret.FloatVal();
   }
   return ret;
 }
 
-std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::EvaluateInner(
-    SymbolTable& symbol_table) {
-  std::pair<EvalType, std::variant<int, float>> lhs_res, rhs_res;
+EvalValue ExprAST::EvaluateInner(SymbolTable& symbol_table) {
+  EvalValue lhs_res, rhs_res;
   switch (m_op) {
     case Op::POSITIVE:
       return m_lhs->Evaluate(symbol_table);
-      break;
     case Op::NEGATIVE:
       lhs_res = m_lhs->Evaluate(symbol_table);
-      if (lhs_res.first == EvalType::INT)
-        return std::make_pair(lhs_res.first, -std::get<int>(lhs_res.second));
-      else if (lhs_res.first == EvalType::FLOAT)
-        return std::make_pair(lhs_res.first, -std::get<float>(lhs_res.second));
-      else if (lhs_res.first == EvalType::VAR_INT)
-        return std::make_pair(EvalType::VAR_INT, 0);
-      else if (lhs_res.first == EvalType::VAR_FLOAT)
-        return std::make_pair(EvalType::VAR_FLOAT, 0);
-      else
-        return std::make_pair(EvalType::ERROR, 0);
-      break;
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          return EvalValue(-lhs_res.IntVal());
+        case EvalType::CONST_FLOAT:
+          return EvalValue(-lhs_res.FloatVal());
+        case EvalType::VAR_INT:
+          return EvalValue(EvalType::VAR_INT);
+        case EvalType::VAR_FLOAT:
+          return EvalValue(EvalType::VAR_FLOAT);
+        default:
+          return EvalValue(EvalType::ERROR);
+      }
     case Op::PLUS:
       lhs_res = m_lhs->Evaluate(symbol_table);
       rhs_res = m_rhs->Evaluate(symbol_table);
-      if (lhs_res.first == EvalType::INT) {
-        if (rhs_res.first == EvalType::INT) {
-          return std::make_pair(
-              EvalType::INT,
-              std::get<int>(lhs_res.second) + std::get<int>(rhs_res.second));
-        } else if (rhs_res.first == EvalType::FLOAT) {
-          return std::make_pair(
-              EvalType::FLOAT, static_cast<float>(std::get<int>(lhs_res.second))
-                                   + std::get<float>(rhs_res.second));
-        } else if (rhs_res.first == EvalType::VAR_INT) {
-          return std::make_pair(EvalType::VAR_INT, 0);
-        } else if (rhs_res.first == EvalType::VAR_FLOAT) {
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        } else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::FLOAT) {
-        if (rhs_res.first == EvalType::INT) {
-          return std::make_pair(
-              EvalType::FLOAT,
-              std::get<float>(lhs_res.second)
-                  + static_cast<float>(std::get<int>(rhs_res.second)));
-        } else if (rhs_res.first == EvalType::FLOAT) {
-          return std::make_pair(EvalType::FLOAT,
-                                std::get<float>(lhs_res.second)
-                                    + std::get<float>(rhs_res.second));
-        } else if (rhs_res.first == EvalType::VAR_INT) {
-          return std::make_pair(EvalType::VAR_INT, 0);
-        } else if (rhs_res.first == EvalType::VAR_FLOAT) {
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        } else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::VAR_INT) {
-        if (rhs_res.first == EvalType::INT
-            || rhs_res.first == EvalType::VAR_INT)
-          return std::make_pair(EvalType::VAR_INT, 0);
-        else if (rhs_res.first == EvalType::FLOAT
-                 || rhs_res.first == EvalType::VAR_FLOAT)
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::VAR_FLOAT) {
-        if (rhs_res.first == EvalType::INT || rhs_res.first == EvalType::FLOAT
-            || rhs_res.first == EvalType::VAR_INT
-            || rhs_res.first == EvalType::VAR_FLOAT)
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        else
-          return std::make_pair(EvalType::ERROR, 0);
-      } else {
-        return std::make_pair(EvalType::ERROR, 0);
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              return EvalValue(lhs_res.IntVal() + rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              return EvalValue(lhs_res.IntVal() + rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::CONST_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              // rhs_res int->float
+              m_rhs->SetFloatVal(rhs_res.IntVal());
+              return EvalValue(lhs_res.FloatVal() + rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              return EvalValue(lhs_res.FloatVal() + rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        default:
+          return EvalValue(EvalType::ERROR);
       }
-      break;
     case Op::MINUS:
       lhs_res = m_lhs->Evaluate(symbol_table);
       rhs_res = m_rhs->Evaluate(symbol_table);
-      if (lhs_res.first == EvalType::INT) {
-        if (rhs_res.first == EvalType::INT) {
-          return std::make_pair(
-              EvalType::INT,
-              std::get<int>(lhs_res.second) - std::get<int>(rhs_res.second));
-        } else if (rhs_res.first == EvalType::FLOAT) {
-          return std::make_pair(
-              EvalType::FLOAT, static_cast<float>(std::get<int>(lhs_res.second))
-                                   - std::get<float>(rhs_res.second));
-        } else if (rhs_res.first == EvalType::VAR_INT) {
-          return std::make_pair(EvalType::VAR_INT, 0);
-        } else if (rhs_res.first == EvalType::VAR_FLOAT) {
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        } else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::FLOAT) {
-        if (rhs_res.first == EvalType::INT) {
-          return std::make_pair(
-              EvalType::FLOAT,
-              std::get<float>(lhs_res.second)
-                  - static_cast<float>(std::get<int>(rhs_res.second)));
-        } else if (rhs_res.first == EvalType::FLOAT) {
-          return std::make_pair(EvalType::FLOAT,
-                                std::get<float>(lhs_res.second)
-                                    - std::get<float>(rhs_res.second));
-        } else if (rhs_res.first == EvalType::VAR_INT
-                   || rhs_res.first == EvalType::VAR_FLOAT) {
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        } else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::VAR_INT) {
-        if (rhs_res.first == EvalType::INT
-            || rhs_res.first == EvalType::VAR_INT)
-          return std::make_pair(EvalType::VAR_INT, 0);
-        else if (rhs_res.first == EvalType::FLOAT
-                 || rhs_res.first == EvalType::VAR_FLOAT)
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::VAR_FLOAT) {
-        if (rhs_res.first == EvalType::INT || rhs_res.first == EvalType::FLOAT
-            || rhs_res.first == EvalType::VAR_INT
-            || rhs_res.first == EvalType::VAR_FLOAT)
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        else
-          return std::make_pair(EvalType::ERROR, 0);
-      } else {
-        return std::make_pair(EvalType::ERROR, 0);
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              return EvalValue(lhs_res.IntVal() - rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              m_lhs->SetFloatVal(lhs_res.IntVal());
+              return EvalValue(lhs_res.IntVal() - rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::CONST_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              m_rhs->SetFloatVal(rhs_res.IntVal());
+              return EvalValue(lhs_res.FloatVal() - rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              return EvalValue(lhs_res.FloatVal() - rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        default:
+          return EvalValue(EvalType::ERROR);
       }
-      break;
     case Op::MULTI:
       lhs_res = m_lhs->Evaluate(symbol_table);
       rhs_res = m_rhs->Evaluate(symbol_table);
-      if (lhs_res.first == EvalType::INT) {
-        if (rhs_res.first == EvalType::INT) {
-          return std::make_pair(
-              EvalType::INT,
-              std::get<int>(lhs_res.second) * std::get<int>(rhs_res.second));
-        } else if (rhs_res.first == EvalType::FLOAT) {
-          return std::make_pair(
-              EvalType::FLOAT, static_cast<float>(std::get<int>(lhs_res.second))
-                                   * std::get<float>(rhs_res.second));
-        } else if (rhs_res.first == EvalType::VAR_INT) {
-          return std::make_pair(EvalType::VAR_INT, 0);
-        } else if (rhs_res.first == EvalType::VAR_FLOAT) {
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        } else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::FLOAT) {
-        if (rhs_res.first == EvalType::INT) {
-          return std::make_pair(
-              EvalType::FLOAT,
-              std::get<float>(lhs_res.second)
-                  * static_cast<float>(std::get<int>(rhs_res.second)));
-        } else if (rhs_res.first == EvalType::FLOAT) {
-          return std::make_pair(EvalType::FLOAT,
-                                std::get<float>(lhs_res.second)
-                                    * std::get<float>(rhs_res.second));
-        } else if (rhs_res.first == EvalType::VAR_INT
-                   || rhs_res.first == EvalType::VAR_FLOAT) {
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        } else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::VAR_INT) {
-        if (rhs_res.first == EvalType::INT
-            || rhs_res.first == EvalType::VAR_INT)
-          return std::make_pair(EvalType::VAR_INT, 0);
-        else if (rhs_res.first == EvalType::FLOAT
-                 || rhs_res.first == EvalType::VAR_FLOAT)
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::VAR_FLOAT) {
-        return std::make_pair(EvalType::VAR_FLOAT, 0);
-      } else {
-        return std::make_pair(EvalType::ERROR, 0);
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              return EvalValue(lhs_res.IntVal() * rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              m_lhs->SetFloatVal(lhs_res.IntVal());
+              return EvalValue(lhs_res.IntVal() * rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::CONST_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              m_rhs->SetFloatVal(rhs_res.IntVal());
+              return EvalValue(lhs_res.FloatVal() * rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              return EvalValue(lhs_res.FloatVal() * rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        default:
+          return EvalValue(EvalType::ERROR);
       }
-      break;
     case Op::DIV:
       lhs_res = m_lhs->Evaluate(symbol_table);
       rhs_res = m_rhs->Evaluate(symbol_table);
-      if (lhs_res.first == EvalType::INT) {
-        if (rhs_res.first == EvalType::INT) {
-          auto dividend = std::get<int>(lhs_res.second);
-          auto divisor = std::get<int>(rhs_res.second);
-          if (divisor == 0) {
-            return std::make_pair(EvalType::ERROR, 0);
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              if (rhs_res.IntVal() == 0) return EvalValue(EvalType::ERROR);
+              return EvalValue(lhs_res.IntVal() / rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              if (rhs_res.FloatVal() == 0) return EvalValue(EvalType::ERROR);
+              m_lhs->SetFloatVal(lhs_res.IntVal());
+              return EvalValue(lhs_res.IntVal() / rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
           }
-          return std::make_pair(EvalType::INT, dividend / divisor);
-        } else if (rhs_res.first == EvalType::FLOAT) {
-          auto dividend = std::get<int>(lhs_res.second);
-          auto divisor = std::get<float>(rhs_res.second);
-          if (divisor == 0) {
-            return std::make_pair(EvalType::ERROR, 0);
+        case EvalType::CONST_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              if (rhs_res.IntVal() == 0) return EvalValue(EvalType::ERROR);
+              m_rhs->SetFloatVal(rhs_res.IntVal());
+              return EvalValue(lhs_res.FloatVal() / rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              if (rhs_res.FloatVal() == 0) return EvalValue(EvalType::ERROR);
+              return EvalValue(lhs_res.FloatVal() / rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
           }
-          return std::make_pair(EvalType::FLOAT,
-                                static_cast<float>(dividend) / divisor);
-        } else if (rhs_res.first == EvalType::VAR_INT) {
-          // divided-by-zero may happen in runtime
-          return std::make_pair(EvalType::VAR_INT, 0);
-        } else if (rhs_res.first == EvalType::VAR_FLOAT) {
-          // divided-by-zero may happen in runtime
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        } else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::FLOAT) {
-        if (rhs_res.first == EvalType::INT) {
-          auto dividend = std::get<float>(lhs_res.second);
-          auto divisor = std::get<int>(rhs_res.second);
-          if (divisor == 0) {
-            return std::make_pair(EvalType::ERROR, 0);
+        case EvalType::VAR_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
           }
-          return std::make_pair(EvalType::FLOAT,
-                                dividend / static_cast<float>(divisor));
-        } else if (rhs_res.first == EvalType::FLOAT) {
-          auto dividend = std::get<float>(lhs_res.second);
-          auto divisor = std::get<float>(rhs_res.second);
-          if (divisor == 0) {
-            return std::make_pair(EvalType::ERROR, 0);
+        case EvalType::VAR_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
           }
-          return std::make_pair(EvalType::FLOAT, dividend / divisor);
-        } else if (rhs_res.first == EvalType::VAR_INT
-                   || rhs_res.first == EvalType::VAR_FLOAT) {
-          // divided-by-zero may happen in runtime
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        } else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::VAR_INT) {
-        if (rhs_res.first == EvalType::INT
-            || rhs_res.first == EvalType::VAR_INT)
-          // divided-by-zero may happen in runtime
-          return std::make_pair(EvalType::VAR_INT, 0);
-        else if (rhs_res.first == EvalType::FLOAT
-                 || rhs_res.first == EvalType::VAR_FLOAT)
-          // divided-by-zero may happen in runtime
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::VAR_FLOAT) {
-        return std::make_pair(EvalType::VAR_FLOAT, 0);
-      } else {
-        return std::make_pair(EvalType::ERROR, 0);
+        default:
+          return EvalValue(EvalType::ERROR);
       }
-      break;
     case Op::MOD:
       lhs_res = m_lhs->Evaluate(symbol_table);
       rhs_res = m_rhs->Evaluate(symbol_table);
-      if (lhs_res.first == EvalType::INT) {
-        if (rhs_res.first == EvalType::INT) {
-          auto dividend = std::get<int>(lhs_res.second);
-          auto divisor = std::get<int>(rhs_res.second);
-          if (divisor == 0) {
-            return std::make_pair(EvalType::ERROR, 0);
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              if (rhs_res.IntVal() == 0) return EvalValue(EvalType::ERROR);
+              return EvalValue(lhs_res.IntVal() % rhs_res.IntVal());
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            default:
+              return EvalValue(EvalType::ERROR);
           }
-          return std::make_pair(EvalType::INT, dividend % divisor);
-        } else if (rhs_res.first == EvalType::VAR_INT) {
-          // divided-by-zero may happen in runtime
-          return std::make_pair(EvalType::VAR_INT, 0);
-        } else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else if (lhs_res.first == EvalType::VAR_INT) {
-        if (rhs_res.first == EvalType::INT
-            || rhs_res.first == EvalType::VAR_INT) {
-          return std::make_pair(EvalType::VAR_INT, 0);
-        } else {
-          return std::make_pair(EvalType::ERROR, 0);
-        }
-      } else {
-        return std::make_pair(EvalType::ERROR, 0);
+        case EvalType::VAR_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        default:
+          return EvalValue(EvalType::ERROR);
       }
-      break;
     case Op::LE:
     case Op::LEQ:
     case Op::GE:
@@ -400,91 +412,86 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::EvaluateInner(
     case Op::NEQ:
       lhs_res = m_lhs->Evaluate(symbol_table);
       rhs_res = m_rhs->Evaluate(symbol_table);
-      if ((lhs_res.first == EvalType::INT || lhs_res.first == EvalType::FLOAT)
-          && (rhs_res.first == EvalType::INT
-              || rhs_res.first == EvalType::FLOAT)) {
+      if (lhs_res.IsConst() && rhs_res.IsConst()) {
         // lhs and rhs are constant, then the result is also constant
         float lhs_num, rhs_num;
-        if (lhs_res.first == EvalType::INT)
-          lhs_num = static_cast<float>(std::get<int>(lhs_res.second));
+        if (lhs_res.IsConstInt())
+          lhs_num = static_cast<float>(lhs_res.IntVal());
         else
-          lhs_num = std::get<float>(lhs_res.second);
-        if (rhs_res.first == EvalType::INT)
-          rhs_num = static_cast<float>(std::get<int>(rhs_res.second));
+          lhs_num = lhs_res.FloatVal();
+        if (rhs_res.IsConstInt())
+          rhs_num = static_cast<float>(rhs_res.IntVal());
         else
-          rhs_num = std::get<float>(rhs_res.second);
+          rhs_num = rhs_res.FloatVal();
 
-        if (m_op == Op::LE)
-          return std::make_pair(EvalType::INT, lhs_num < rhs_num ? 1 : 0);
-        else if (m_op == Op::LEQ)
-          return std::make_pair(EvalType::INT, lhs_num <= rhs_num ? 1 : 0);
-        else if (m_op == Op::GE)
-          return std::make_pair(EvalType::INT, lhs_num > rhs_num ? 1 : 0);
-        else if (m_op == Op::GEQ)
-          return std::make_pair(EvalType::INT, lhs_num >= rhs_num ? 1 : 0);
-        else if (m_op == Op::EQ)
-          return std::make_pair(EvalType::INT, lhs_num == rhs_num ? 1 : 0);
-        else if (m_op == Op::NEQ)
-          return std::make_pair(EvalType::INT, lhs_num != rhs_num ? 1 : 0);
-        else
-          assert(false);  // unreachable
-
-      } else if ((lhs_res.first == EvalType::INT
-                  || lhs_res.first == EvalType::FLOAT
-                  || lhs_res.first == EvalType::VAR_INT
-                  || lhs_res.first == EvalType::VAR_FLOAT)
-                 && ((rhs_res.first == EvalType::INT
-                      || rhs_res.first == EvalType::FLOAT
-                      || rhs_res.first == EvalType::VAR_INT
-                      || rhs_res.first == EvalType::VAR_FLOAT))) {
+        switch (m_op) {
+          case Op::LE:
+            return EvalValue(lhs_num < rhs_num);
+          case Op::LEQ:
+            return EvalValue(lhs_num <= rhs_num);
+          case Op::GE:
+            return EvalValue(lhs_num > rhs_num);
+          case Op::GEQ:
+            return EvalValue(lhs_num >= rhs_num);
+          case Op::EQ:
+            return EvalValue(lhs_num == rhs_num);
+          case Op::NEQ:
+            return EvalValue(lhs_num != rhs_num);
+          default:
+            assert(false);  // impossible
+        }
+      } else if (lhs_res.IsSingle() && rhs_res.IsSingle()) {
         // either one of them is not constant, then may be 1 or 0
-        return std::make_pair(EvalType::VAR_INT, 0);
+        if (!lhs_res.IsInt() || !rhs_res.IsInt()) {
+          if (lhs_res.IsConstInt()) m_lhs->SetFloatVal(lhs_res.IntVal());
+          if (rhs_res.IsConstInt()) m_rhs->SetFloatVal(rhs_res.IntVal());
+        }
+        return EvalValue(EvalType::VAR_INT);
       } else {
-        return std::make_pair(EvalType::ERROR, 0);
+        return EvalValue(EvalType::ERROR);
       }
-      break;
     case Op::AND:
     case Op::OR:
       lhs_res = m_lhs->Evaluate(symbol_table);
       rhs_res = m_rhs->Evaluate(symbol_table);
-      if ((lhs_res.first == EvalType::INT || lhs_res.first == EvalType::VAR_INT
-           || lhs_res.first == EvalType::FLOAT
-           || lhs_res.first == EvalType::VAR_FLOAT)
-          && (rhs_res.first == EvalType::INT
-              || rhs_res.first == EvalType::VAR_INT
-              || rhs_res.first == EvalType::FLOAT
-              || rhs_res.first == EvalType::VAR_FLOAT)) {
-        return std::make_pair(EvalType::VAR_INT, 0);
+      if (lhs_res.IsConst() && rhs_res.IsConst()) {
+        // either 1 or 0
+        float lhs_num, rhs_num;
+        if (lhs_res.IsConstInt())
+          lhs_num = static_cast<float>(lhs_res.IntVal());
+        else
+          lhs_num = lhs_res.FloatVal();
+        if (rhs_res.IsConstInt())
+          rhs_num = static_cast<float>(rhs_res.IntVal());
+        else
+          rhs_num = rhs_res.FloatVal();
+
+        if (m_op == Op::AND)
+          return EvalValue(lhs_num && rhs_num);
+        else
+          return EvalValue(lhs_num || rhs_num);
+      } else if (lhs_res.IsSingle() && rhs_res.IsSingle()) {
+        return EvalValue(EvalType::VAR_INT);
       } else {
-        return std::make_pair(EvalType::ERROR, 0);
+        return EvalValue(EvalType::ERROR);
       }
-      break;
     case Op::NOT:
       lhs_res = m_lhs->Evaluate(symbol_table);
-      if (lhs_res.first == EvalType::INT) {
-        // TODO(garen): naive patch here, just a temp solution
-        if (std::get<int>(lhs_res.second) != 0)
-          return std::make_pair(EvalType::INT, 0);
-        else
-          return std::make_pair(EvalType::INT, 1);
-      } else if (lhs_res.first == EvalType::FLOAT) {
-        if (std::get<float>(lhs_res.second) != 0)
-          return std::make_pair(EvalType::INT, 0);
-        else
-          return std::make_pair(EvalType::INT, 1);
-      } else if (lhs_res.first == EvalType::VAR_INT
-                 || lhs_res.first == EvalType::VAR_FLOAT) {
-        return std::make_pair(EvalType::VAR_INT, 0);
-      } else {
-        return std::make_pair(EvalType::ERROR, 0);
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          return EvalValue(!lhs_res.IntVal());
+        case EvalType::CONST_FLOAT:
+          return EvalValue(!lhs_res.FloatVal());
+        case EvalType::VAR_INT:
+        case EvalType::VAR_FLOAT:
+          return EvalValue(EvalType::VAR_INT);
+        default:
+          return EvalValue(EvalType::ERROR);
       }
-      break;
     case Op::CONST_INT:
-      return std::make_pair(EvalType::INT, m_int_val);
-      break;
+      return EvalValue(m_int_val);
     case Op::CONST_FLOAT:
-      return std::make_pair(EvalType::FLOAT, m_float_val);
-      break;
+      return EvalValue(m_float_val);
     case Op::LVAL:
       m_lval->TypeCheck(symbol_table);
       // if (m_lval->m_decl == nullptr) {
@@ -496,48 +503,46 @@ std::pair<ExprAST::EvalType, std::variant<int, float>> ExprAST::EvaluateInner(
 
       // can we handle lval array?
       // yes, just give a new enum variant ARR
-      if (m_lval->IsArray()) return std::make_pair(EvalType::ARR, 0);
+      if (m_lval->IsArray()) return EvalValue(EvalType::ARR);
 
+      // must be a single value
       if (m_lval->m_decl->IsConst()) {
-        auto var_type = m_lval->m_decl->GetVarType();
-        if (var_type == VarType::INT) {
-          return std::make_pair(EvalType::INT,
-                                std::get<int>(m_lval->Evaluate(symbol_table)));
-        } else if (var_type == VarType::FLOAT) {
-          return std::make_pair(
-              EvalType::FLOAT, std::get<float>(m_lval->Evaluate(symbol_table)));
-        } else {
-          return std::make_pair(EvalType::ERROR, 0);
+        // although decl is const, indices may be variable, which leads to a
+        // non-const result
+        switch (m_lval->m_decl->GetVarType()) {
+          case VarType::INT:
+            // return EvalValue(m_lval->Evaluate(symbol_table).IntVal());
+          case VarType::FLOAT:
+            // return EvalValue(m_lval->Evaluate(symbol_table).FloatVal());
+            return m_lval->Evaluate(symbol_table);
+          default:
+            return EvalValue(EvalType::ERROR);
         }
       } else {
-        auto type = m_lval->m_decl->GetVarType();
-        if (type == VarType::INT)
-          return std::make_pair(EvalType::VAR_INT, 0);
-        else if (type == VarType::FLOAT)
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
-        else
-          return std::make_pair(EvalType::ERROR, 0);
+        switch (m_lval->m_decl->GetVarType()) {
+          case VarType::INT:
+            return EvalValue(EvalType::VAR_INT);
+          case VarType::FLOAT:
+            return EvalValue(EvalType::VAR_FLOAT);
+          default:
+            return EvalValue(EvalType::ERROR);
+        }
       }
-      break;
     case Op::FUNC_CALL:
       m_func_call->TypeCheck(symbol_table);
 
       switch (m_func_call->ReturnType()) {
         case VarType::INT:
-          return std::make_pair(EvalType::VAR_INT, 0);
+          return EvalValue(EvalType::VAR_INT);
         case VarType::FLOAT:
-          return std::make_pair(EvalType::VAR_FLOAT, 0);
+          return EvalValue(EvalType::VAR_FLOAT);
         case VarType::VOID:
-          // TODO(garen): temp solution with serious problems
-          // void function call should return nothing, rather than an integer
-          return std::make_pair(EvalType::VOID, 0);
+          return EvalValue(EvalType::VOID);
         default:
-          return std::make_pair(EvalType::ERROR, 0);
+          return EvalValue(EvalType::ERROR);
       }
-      break;
     default:
       assert(false);  // unreachable
-      break;
   }
 }
 void DeclAST::TypeCheck(SymbolTable& symbol_table) {
@@ -582,6 +587,7 @@ void DeclAST::TypeCheck(SymbolTable& symbol_table) {
   if (m_is_const && m_init_val && !m_init_val->IsConst())
     throw MyException("const declaration with non-const init val");
 
+  assert(m_flatten_vals.empty());
   if (m_dimensions.empty()) {  // single
     if (m_init_val && m_init_val->m_expr) {
       m_flatten_vals.push_back(m_init_val->m_expr);
@@ -595,9 +601,9 @@ void DeclAST::TypeCheck(SymbolTable& symbol_table) {
     m_products.resize(m_dimensions.size());
     for (int i = m_dimensions.size() - 1; i >= 0; --i) {
       m_dimensions[i]->TypeCheck(symbol_table);
-      auto [type, res] = m_dimensions[i]->Evaluate(symbol_table);
-      assert(type == ExprAST::EvalType::INT);
-      tot *= std::get<int>(res);
+      auto eval_value = m_dimensions[i]->Evaluate(symbol_table);
+      assert(eval_value.IsConstInt());
+      tot *= eval_value.IntVal();
       m_products[i] = tot;
     }
     assert(tot > 0);
@@ -615,12 +621,11 @@ void DeclAST::TypeCheck(SymbolTable& symbol_table) {
     throw MyException("declaration defined multiple times");
 }
 
-std::variant<int, float> DeclAST::GetFlattenVal(SymbolTable& symbol_table,
-                                                int offset) {
+EvalValue DeclAST::GetFlattenVal(SymbolTable& symbol_table, int offset) {
   assert(offset < m_flatten_vals.size());
-  auto [type, ret] = m_flatten_vals[offset]->Evaluate(symbol_table);
-  assert(type == ExprAST::EvalType::INT || type == ExprAST::EvalType::FLOAT);
-  return ret;
+  auto eval_value = m_flatten_vals[offset]->Evaluate(symbol_table);
+  assert(eval_value.IsConst());
+  return eval_value;
 }
 
 void FuncCallAST::TypeCheck(SymbolTable& symbol_table) {
@@ -700,6 +705,10 @@ void IfStmtAST::TypeCheck(SymbolTable& symbol_table) {
 void ReturnStmtAST::TypeCheck(SymbolTable& symbol_table) {
   if (!symbol_table.existScope(ScopeType::FUNC))
     throw MyException("return m_stmt appears in non-func scope");
+
+  m_expected_type = symbol_table.GetCurrentFunc()->ReturnType();
+  if (m_expected_type == VarType::VOID && m_ret != nullptr)
+    throw MyException("void function returns non-void value??");
   if (m_ret) m_ret->TypeCheck(symbol_table);
 }
 void WhileStmtAST::TypeCheck(SymbolTable& symbol_table) {

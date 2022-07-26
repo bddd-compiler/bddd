@@ -343,7 +343,7 @@ void RegisterAllocator::SelectSpill() {
   // resulting from the fetches of previously spilled registers
 
   // now we just select the first
-  
+  auto m = *spillWorklist.begin();
   spillWorklist.erase(m);
   simplifyWorklist.insert(m);
   FreezeMoves(m);

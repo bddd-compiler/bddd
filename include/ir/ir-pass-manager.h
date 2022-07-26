@@ -2,7 +2,9 @@
 #define BDDD_IR_PASS_MANAGER_H
 
 #include "ir/builder.h"
-#include "ir/pass/mem2reg.h"
+
+void ComputeDominanceRelationship(std::shared_ptr<Function> function);
+void ComputeDominanceFrontier(std::shared_ptr<Function> function);
 
 class IRPassManager {
 public:
@@ -11,11 +13,17 @@ public:
   explicit IRPassManager(std::shared_ptr<IRBuilder> builder)
       : m_builder(std::move(builder)) {}
 
-  void Mem2RegPass() {
-    for (auto func : m_builder->m_module->m_function_list) {
-      Mem2Reg(func, m_builder);
-    }
-  }
+  void Mem2RegPass();
+
+  void FunctionInliningPass();
+
+  void GVNPass();
+
+  void GCMPass();
+
+  void SideEffectPass();
+
+private:
 };
 
 #endif  // BDDD_IR_PASS_MANAGER_H

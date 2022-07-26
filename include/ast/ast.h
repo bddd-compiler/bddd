@@ -11,6 +11,8 @@
 #include <variant>
 #include <vector>
 
+#include "ast/type.h"
+
 class Value;
 
 class IRBuilder;
@@ -51,9 +53,11 @@ enum class Op {
 };
 
 enum class VarType {
-  INT,
-  FLOAT,
-  VOID,
+  INT,    // i32
+  FLOAT,  // float
+  VOID,   // void
+  CHAR,   // i8
+  BOOL,   // i1
   UNKNOWN,
 };
 
@@ -87,22 +91,29 @@ class ExprAST;
 class InitValAST : public AST {
 private:
   bool m_is_const;  // true => expr is const or all sub-init-vals are const
-  std::shared_ptr<ExprAST> m_expr;
+  bool m_all_zero;  // for global array, we can use "zero initialize"
 
 public:
   [[nodiscard]] bool IsConst() const { return m_is_const; }
   void SetIsConst(bool is_const) { m_is_const = is_const; }
+  [[nodiscard]] bool AllZero() const { return m_all_zero; }
+  void SetAllZero(bool all_zero) { m_all_zero = all_zero; }
 
 public:
-  std::vector<std::unique_ptr<InitValAST>> m_vals;
+  std::shared_ptr<ExprAST> m_expr;                  // if single init-val
+  std::vector<std::unique_ptr<InitValAST>> m_vals;  // if multiple sub init-vals
 
-  explicit InitValAST() : m_expr(nullptr), m_vals(), m_is_const(false) {}
+  explicit InitValAST()
+      : m_expr(nullptr), m_vals(), m_is_const(false), m_all_zero(false) {}
 
   explicit InitValAST(std::unique_ptr<ExprAST> expr)
-      : m_expr(std::move(expr)), m_vals(), m_is_const(false) {}
+      : m_expr(std::move(expr)),
+        m_vals(),
+        m_is_const(false),
+        m_all_zero(false) {}
 
   explicit InitValAST(std::unique_ptr<InitValAST> val)
-      : m_expr(nullptr), m_vals(), m_is_const(false) {
+      : m_expr(nullptr), m_vals(), m_is_const(false), m_all_zero(false) {
     m_vals.push_back(std::move(val));
   }
 
@@ -147,13 +158,14 @@ public:
 
   bool IsSingle();
   bool IsArray();
+  bool HasIndex();
 
   // methods used in typechecking
 
   void TypeCheck(SymbolTable &symbol_table) override;
 
   // called only when is_const is true and not an array
-  std::variant<int, float> Evaluate(SymbolTable &symbol_table);
+  EvalValue Evaluate(SymbolTable &symbol_table);
 
   // methods used in codegen
   std::shared_ptr<Value> CodeGen(std::shared_ptr<IRBuilder> builder) override;
@@ -184,21 +196,8 @@ private:
   std::unique_ptr<LValAST> m_lval;
   bool m_is_const;  // true => can get value from int_val or float_val
 
-public:
-  enum class EvalType {
-    INT,  // BOOL is included, non-zero is true, zero is false
-    FLOAT,
-    // BOOL,
-    VAR_INT,
-    VAR_FLOAT,
-    ARR,  // array cannot join with any computation
-    VOID,
-    ERROR,
-  };
-
 private:
-  std::pair<EvalType, std::variant<int, float>> EvaluateInner(
-      SymbolTable &symbol_table);
+  EvalValue EvaluateInner(SymbolTable &symbol_table);
 
 public:
   [[nodiscard]] bool IsConst() const { return m_is_const; }
@@ -268,19 +267,39 @@ public:
 
   void TypeCheck(SymbolTable &symbol_table) override;
 
-  std::pair<EvalType, std::variant<int, float>> Evaluate(
-      SymbolTable &symbol_table);
+  EvalValue Evaluate(SymbolTable &symbol_table);
 
   std::shared_ptr<Value> CodeGen(std::shared_ptr<IRBuilder> builder) override;
   std::shared_ptr<Value> CodeGenAnd(std::shared_ptr<IRBuilder> builder);
   std::shared_ptr<Value> CodeGenOr(std::shared_ptr<IRBuilder> builder);
+
+  void SetIntVal(int int_val) {
+    m_op = Op::CONST_INT;
+    m_lhs = nullptr;
+    m_rhs = nullptr;
+    m_func_call = nullptr;
+    m_int_val = int_val;
+    m_float_val = 0.0;
+    m_lval = nullptr;
+    m_is_const = true;
+  }
+  void SetFloatVal(float float_val) {
+    m_op = Op::CONST_FLOAT;
+    m_lhs = nullptr;
+    m_rhs = nullptr;
+    m_func_call = nullptr;
+    m_int_val = 0;
+    m_float_val = float_val;
+    m_lval = nullptr;
+    m_is_const = true;
+  }
 };
 
 /**
  * @is_const indicates whether it is a const declaration
  * @is_global used in typechecking
  * @is_param not declaration of variable but an argument of function definition
- * @var_type only can be INT or FLOAT
+ * @var_type only can be CONST_INT or CONST_FLOAT
  */
 class DeclAST : public AST {
 private:
@@ -334,7 +353,7 @@ public:
   void TypeCheck(SymbolTable &symbol_table) override;
 
   // called only when is_const = true and flatten_vals is constructed
-  std::variant<int, float> GetFlattenVal(SymbolTable &symbol_table, int offset);
+  EvalValue GetFlattenVal(SymbolTable &symbol_table, int offset);
 
   std::shared_ptr<Value> CodeGen(std::shared_ptr<IRBuilder> builder) override;
 };
@@ -534,11 +553,12 @@ public:
 
 class ReturnStmtAST : public StmtAST {
 private:
+  VarType m_expected_type;  // initially void, filled in typechecking
   std::unique_ptr<ExprAST> m_ret;
 
 public:
   explicit ReturnStmtAST(std::unique_ptr<ExprAST> ret = nullptr)
-      : m_ret(std::move(ret)) {}
+      : m_expected_type(VarType::VOID), m_ret(std::move(ret)) {}
 
   void Debug(std::ofstream &ofs, int depth) override;
 

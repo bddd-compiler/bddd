@@ -50,11 +50,21 @@ std::shared_ptr<Use> Value::AddUse(const std::shared_ptr<Value>& user) {
 void Value::KillUse(const std::shared_ptr<Value>& user) {
   for (auto it = m_use_list.begin(); it != m_use_list.end(); ++it) {
     if ((*it)->m_user == user) {
+      if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(user)) {
+        phi->Remove(shared_from_this());
+      }
       m_use_list.erase(it);
       return;
     }
   }
   assert(false);  // not found! what happen?
+}
+void Value::KillAllUses() {
+  for (auto it = m_use_list.begin(); it != m_use_list.end();) {
+    auto user = (*it)->m_user;
+    ++it;
+    KillUse(user);
+  }
 }
 
 // move from val's m_use_list to new_val's m_use_list
@@ -145,6 +155,9 @@ void BasicBlock::RemoveInstruction(const std::shared_ptr<Instruction>& elem) {
     m_instr_list.erase(it);
   }
 }
+std::vector<std::shared_ptr<BasicBlock>> BasicBlock::Predecessors() {
+  return m_predecessors;
+}
 std::vector<std::shared_ptr<BasicBlock>> BasicBlock::Successors() {
   if (m_instr_list.empty()) return {};
   auto last_instr = LastInstruction();
@@ -161,6 +174,17 @@ std::vector<std::shared_ptr<BasicBlock>> BasicBlock::Successors() {
       return {};
   }
 }
+bool BasicBlock::Dominate(std::shared_ptr<BasicBlock> bb) {
+  auto it = std::find_if(m_dominators.begin(), m_dominators.end(),
+                         [=](const auto& x) { return x.get() == bb.get(); });
+  return it != m_dominators.end();
+}
+
+bool BasicBlock::IsDominatedBy(std::shared_ptr<BasicBlock> bb) {
+  auto it = std::find_if(m_dominated.begin(), m_dominated.end(),
+                         [=](const auto& x) { return x.get() == bb.get(); });
+  return it != m_dominated.end();
+}
 
 bool Instruction::HasSideEffect() {
   switch (m_op) {
@@ -174,4 +198,74 @@ bool Instruction::HasSideEffect() {
     default:
       return false;
   }
+}
+
+std::ostream& operator<<(std::ostream& out, BasicType base_type) {
+  switch (base_type) {
+    case BasicType::INT:
+      return out << "i32";
+    case BasicType::FLOAT:
+      return out << "float";
+    case BasicType::BOOL:
+      return out << "i1";
+    case BasicType::CHAR:
+      return out << "i8";
+    case BasicType::LABEL:
+      return out << "label";
+    case BasicType::VOID:
+      return out << "void";
+    default:
+      assert(false);  // impossible
+  }
+}
+std::ostream& operator<<(std::ostream& out, ValueType value_type) {
+  auto base_type = value_type.m_base_type;
+  if (base_type == BasicType::VOID)
+    return out << "void";
+  else if (base_type == BasicType::LABEL)
+    return out << "label";
+  else if (base_type == BasicType::BOOL)
+    return out << "i1";
+
+  if (!value_type.m_dimensions.empty()) {
+    for (auto dimension : value_type.m_dimensions) {
+      out << '[' << dimension << " x ";
+    }
+    if (base_type == BasicType::INT)
+      out << "i32";
+    else if (base_type == BasicType::FLOAT)
+      out << "float";
+    else if (base_type == BasicType::CHAR)
+      out << "i8";
+    else
+      assert(false);  // ???
+    out << std::string(value_type.m_dimensions.size(), ']');
+  } else {
+    if (base_type == BasicType::INT)
+      out << "i32";
+    else if (base_type == BasicType::FLOAT)
+      out << "float";
+    else if (base_type == BasicType::CHAR)
+      out << "i8";
+    else
+      assert(false);  // ???
+  }
+  bool first = true;
+  for (int i = 0; i < value_type.m_num_star; ++i) {
+    if (first)
+      first = false;
+    else
+      out << " ";
+    out << "*";
+  }
+  return out;
+}
+
+bool PhiInstruction::IsValid() {
+  for (auto pred : m_bb->Predecessors()) {
+    if (m_contents.find(pred) == m_contents.end()) {
+      return false;
+    }
+  }
+  return true;
 }
