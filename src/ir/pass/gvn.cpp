@@ -55,9 +55,6 @@ std::unordered_map<std::shared_ptr<Value>, size_t> g_idx;
 std::shared_ptr<Value> GetValue(std::shared_ptr<Value> val,
                                 std::shared_ptr<IRBuilder> builder);
 
-/*
- * TODO: support floating point GVN
- */
 size_t GetValueNumber(std::shared_ptr<Value> val,
                       std::shared_ptr<IRBuilder> builder) {
   auto temp = GetValue(std::move(val), std::move(builder));
@@ -136,101 +133,167 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
     return builder->GetConstant(instr->m_op, lhs->Evaluate(), rhs->Evaluate());
   }
 
-  if (instr->m_op == IROp::ADD) {
+  if (instr->m_op == IROp::ADD || instr->m_op == IROp::F_ADD) {
     if (instr->m_lhs_val_use->m_value->m_type.IsConst()) {
       auto c
           = std::dynamic_pointer_cast<Constant>(instr->m_lhs_val_use->m_value);
-      if (c != nullptr && c->Evaluate().Equals(0)) {
-        // 0 + a = a
+      assert(c != nullptr);
+      auto res = c->Evaluate();
+      // 0 + a = a
+      if (instr->m_op == IROp::ADD && res.Equals(0)) {
+        assert(instr->m_rhs_val_use->m_value->m_type.IsBasicInt());
+        return instr->m_rhs_val_use->m_value;
+      } else if (instr->m_op == IROp::F_ADD && res.Equals(0.0f)) {
+        assert(instr->m_rhs_val_use->m_value->m_type.IsBasicFloat());
         return instr->m_rhs_val_use->m_value;
       }
     }
     if (instr->m_rhs_val_use->m_value->m_type.IsConst()) {
       auto c
           = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->m_value);
-      if (c != nullptr && c->Evaluate().Equals(0)) {
-        // a + 0 = a
+      assert(c != nullptr);
+      auto res = c->Evaluate();
+      // a + 0 = a
+      if (instr->m_op == IROp::ADD && res.Equals(0)) {
+        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicInt());
+        return instr->m_lhs_val_use->m_value;
+      } else if (instr->m_op == IROp::F_ADD && res.Equals(0.0f)) {
+        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicFloat());
         return instr->m_lhs_val_use->m_value;
       }
     }
   }
 
-  if (instr->m_op == IROp::SUB) {
+  if (instr->m_op == IROp::SUB || instr->m_op == IROp::F_SUB) {
     if (instr->m_rhs_val_use->m_value->m_type.IsConst()) {
       auto c
           = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->m_value);
-      if (c != nullptr && c->Evaluate().Equals(0)) {
-        // a - 0 = a
+      assert(c != nullptr);
+      auto res = c->Evaluate();
+      // a - 0 = a
+      if (instr->m_op == IROp::SUB && res.Equals(0)) {
+        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicInt());
+        return instr->m_lhs_val_use->m_value;
+      } else if (instr->m_op == IROp::F_SUB && res.Equals(0.0f)) {
+        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicFloat());
         return instr->m_lhs_val_use->m_value;
       }
     }
   }
 
-  if (instr->m_op == IROp::MUL) {
+  if (instr->m_op == IROp::MUL || instr->m_op == IROp::F_MUL) {
     if (instr->m_rhs_val_use->m_value->m_type.IsConst()) {
       auto c
           = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->m_value);
-      if (c != nullptr) {
-        if (c->Evaluate().Equals(0)) {
+      assert(c != nullptr);
+      auto res = c->Evaluate();
+      if (instr->m_op == IROp::MUL) {
+        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicInt());
+        if (res.Equals(0)) {
           // a * 0 = 0
           return builder->GetIntConstant(0);
-        } else if (c->Evaluate().Equals(1)) {
+        } else if (res.Equals(1)) {
           // a * 1 = a
           return instr->m_lhs_val_use->m_value;
-        } else if (c->Evaluate().Equals(-1)) {
-          // a * -1 => 0 - a
+        } else if (res.Equals(-1)) {
+          // a * -1 = 0 - a
           instr->m_op = IROp::SUB;
           instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->m_value);
           instr->m_lhs_val_use->UseValue(builder->GetIntConstant(0));
           return instr;
         }
+      } else {
+        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicFloat());
+        if (res.Equals(0.0f)) {
+          return builder->GetFloatConstant(0.0);
+        } else if (res.Equals(1.0f)) {
+          return instr->m_lhs_val_use->m_value;
+        } else if (res.Equals(-1.0f)) {
+          instr->m_op = IROp::F_SUB;
+          instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->m_value);
+          instr->m_lhs_val_use->UseValue(builder->GetFloatConstant(0.0f));
+          return instr;
+        }
       }
     }
+
     if (instr->m_lhs_val_use->m_value->m_type.IsConst()) {
       auto c
           = std::dynamic_pointer_cast<Constant>(instr->m_lhs_val_use->m_value);
-      if (c != nullptr) {
-        if (c->Evaluate().Equals(0)) {
+      assert(c != nullptr);
+      auto res = c->Evaluate();
+      if (instr->m_op == IROp::MUL) {
+        assert(instr->m_rhs_val_use->m_value->m_type.IsBasicInt());
+        if (res.Equals(0)) {
           // 0 * a = 0
           return builder->GetIntConstant(0);
-        } else if (c->Evaluate().Equals(1)) {
+        } else if (res.Equals(1)) {
           // 1 * a = a
           return instr->m_rhs_val_use->m_value;
-        } else if (c->Evaluate().Equals(-1)) {
+        } else if (res.Equals(-1)) {
           // -1 * a = 0 - a
           instr->m_op = IROp::SUB;
           instr->m_lhs_val_use->UseValue(builder->GetIntConstant(0));
           return instr;
         }
+      } else {
+        assert(instr->m_rhs_val_use->m_value->m_type.IsBasicFloat());
+        if (res.Equals(0.0f)) {
+          return builder->GetFloatConstant(0.0);
+        } else if (res.Equals(1.0f)) {
+          return instr->m_rhs_val_use->m_value;
+        } else if (res.Equals(-1.0f)) {
+          instr->m_op = IROp::F_SUB;
+          instr->m_lhs_val_use->UseValue(builder->GetFloatConstant(0.0f));
+          return instr;
+        }
       }
     }
   }
 
-  if (instr->m_op == IROp::SDIV) {
+  if (instr->m_op == IROp::SDIV || instr->m_op == IROp::F_DIV) {
     if (instr->m_lhs_val_use->m_value->m_type.IsConst()) {
       auto c
           = std::dynamic_pointer_cast<Constant>(instr->m_lhs_val_use->m_value);
-      if (c != nullptr && c->Evaluate().Equals(0)) {
-        // 0 / a = 0
+      assert(c != nullptr);
+      auto res = c->Evaluate();
+      // 0 / a = 0
+      if (instr->m_op == IROp::SDIV && res.Equals(0)) {
         return builder->GetIntConstant(0);
+      } else if (instr->m_op == IROp::F_DIV && res.Equals(0.0f)) {
+        return builder->GetFloatConstant(0.0);
       }
     }
     if (instr->m_rhs_val_use->m_value->m_type.IsConst()) {
       auto c
           = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->m_value);
-      if (c != nullptr) {
-        if (c->Evaluate().Equals(0)) {
+      assert(c != nullptr);
+      auto res = c->Evaluate();
+      if (instr->m_op == IROp::SDIV) {
+        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicInt());
+        if (res.Equals(0)) {
           // a / 0 raise exception
           assert(false);  // ??????????
-        } else if (c->Evaluate().Equals(1)) {
+        } else if (res.Equals(1)) {
           // a / 1 = a
           return instr->m_lhs_val_use->m_value;
-        } else if (c->Evaluate().Equals(-1)) {
+        } else if (res.Equals(-1)) {
           // a / -1 = -a = 0 - a
           instr->m_op = IROp::SUB;
           instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->m_value);
           instr->m_lhs_val_use->UseValue(builder->GetIntConstant(0));
           return instr;
+        }
+      } else {
+        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicFloat());
+        if (res.Equals(0.0f)) {
+          assert(false);
+        } else if (res.Equals(1.0f)) {
+          return instr->m_lhs_val_use->m_value;
+        } else if (res.Equals(-1.0f)) {
+          instr->m_op = IROp::F_SUB;
+          instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->m_value);
+          instr->m_lhs_val_use->UseValue(builder->GetFloatConstant(0.0f));
         }
       }
     }
@@ -267,17 +330,23 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
       case IROp::I_SGE:
       case IROp::I_SLE:
       case IROp::I_EQ:
-        return builder->GetIntConstant(1);
+      case IROp::F_GE:
+      case IROp::F_LE:
+      case IROp::F_EQ:
+        return builder->GetBoolConstant(true);
       case IROp::I_SGT:
       case IROp::I_SLT:
       case IROp::I_NE:
-        return builder->GetIntConstant(0);
+      case IROp::F_GT:
+      case IROp::F_LT:
+      case IROp::F_NE:
+        return builder->GetBoolConstant(false);
       default:
         break;
     }
   }
 
-  if (IsICmp(instr->m_op)) return instr;
+  if (IsICmp(instr->m_op) || IsFCmp(instr->m_op)) return instr;
 
   // find previous computed values from cloud
   int i = 0;
@@ -338,6 +407,22 @@ std::shared_ptr<Value> GetValue(std::shared_ptr<Value> val,
     if (zext_instr->m_val->m_value->m_type.IsConst()) {
       auto c = std::dynamic_pointer_cast<Constant>(zext_instr->m_val->m_value);
       g_vns[idx].second = builder->GetIntConstant(c->Evaluate().IntVal());
+    }
+  } else if (auto sitofp_instr
+             = std::dynamic_pointer_cast<SIToFPInstruction>(val)) {
+    // i32 to float
+    if (sitofp_instr->m_val->m_value->m_type.IsConst()) {
+      auto c
+          = std::dynamic_pointer_cast<Constant>(sitofp_instr->m_val->m_value);
+      g_vns[idx].second = builder->GetFloatConstant(c->Evaluate().IntVal());
+    }
+  } else if (auto fptosi_instr
+             = std::dynamic_pointer_cast<FPToSIInstruction>(val)) {
+    // float to i32
+    if (fptosi_instr->m_val->m_value->m_type.IsConst()) {
+      auto c
+          = std::dynamic_pointer_cast<Constant>(fptosi_instr->m_val->m_value);
+      g_vns[idx].second = builder->GetIntConstant(c->Evaluate().FloatVal());
     }
   }
   return g_vns[idx].second;
