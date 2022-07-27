@@ -108,7 +108,7 @@ public:
   }
 
   EvalValue operator%(const EvalValue &_rhs) const {
-    if (!IsInt() && !_rhs.IsInt()) {
+    if (IsInt() && _rhs.IsInt()) {
       // both int, result is int too
       if (_rhs.IntVal() == 0) throw MyException("mod by zero");
       return EvalValue(IntVal() % _rhs.IntVal());
@@ -136,6 +136,15 @@ public:
             || (m_eval_type == EvalType::CONST_FLOAT
                 && m_int_val == static_cast<int>(float_val));
     return ret;
+  }
+
+  [[nodiscard]] bool IsNotZero() const {
+    if (IsConstInt())
+      return m_int_val != 0;
+    else if (IsConstFloat())
+      return m_float_val != 0;
+    else
+      assert(false);  // ???
   }
 
   [[nodiscard]] bool IsInt() const {

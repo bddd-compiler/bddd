@@ -3,6 +3,7 @@
 //
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "ir/ir-pass-manager.h"
@@ -12,13 +13,15 @@ bool IsCommutative(IROp op) {
   switch (op) {
     case IROp::ADD:
     case IROp::MUL:
+    case IROp::F_ADD:
+    case IROp::F_MUL:
       return true;
     default:
       return false;
   }
 }
 
-bool IsComparison(IROp op) {
+bool IsICmp(IROp op) {
   switch (op) {
     case IROp::I_SGE:
     case IROp::I_SGT:
@@ -32,13 +35,36 @@ bool IsComparison(IROp op) {
   }
 }
 
+bool IsFCmp(IROp op) {
+  switch (op) {
+    case IROp::F_EQ:
+    case IROp::F_NE:
+    case IROp::F_GT:
+    case IROp::F_GE:
+    case IROp::F_LT:
+    case IROp::F_LE:
+      return true;
+    default:
+      return false;
+  }
+}
+
 std::vector<std::pair<std::shared_ptr<Value>, std::shared_ptr<Value>>> g_vns;
 std::unordered_map<std::shared_ptr<Value>, size_t> g_idx;
 
-std::shared_ptr<Value> GetVN(std::shared_ptr<Value> val,
-                             std::shared_ptr<IRBuilder> builder);
+std::shared_ptr<Value> GetValue(std::shared_ptr<Value> val,
+                                std::shared_ptr<IRBuilder> builder);
 
-std::shared_ptr<Value> FindForGEPInstr(
+/*
+ * TODO: support floating point GVN
+ */
+size_t GetValueNumber(std::shared_ptr<Value> val,
+                      std::shared_ptr<IRBuilder> builder) {
+  auto temp = GetValue(std::move(val), std::move(builder));
+  return g_idx[temp];
+}
+
+std::shared_ptr<Value> GetValueForGEPInstr(
     std::shared_ptr<GetElementPtrInstruction> instr,
     std::shared_ptr<IRBuilder> builder) {
   for (auto [old_instr, new_val] : g_vns) {
@@ -50,14 +76,14 @@ std::shared_ptr<Value> FindForGEPInstr(
         bool flag = true;
         auto sz = instr->m_indices.size();
         for (int i = 0; i < sz; ++i) {
-          if (GetVN(old_gep_instr->m_indices[i]->m_value, builder)
-              != GetVN(instr->m_indices[i]->m_value, builder)) {
+          if (GetValueNumber(old_gep_instr->m_indices[i]->m_value, builder)
+              != GetValueNumber(instr->m_indices[i]->m_value, builder)) {
             flag = false;
             break;
           }
         }
         if (flag) {
-          return GetVN(new_val, builder);
+          return GetValue(new_val, builder);
         }
       }
     }
@@ -65,8 +91,9 @@ std::shared_ptr<Value> FindForGEPInstr(
   return instr;
 }
 
-std::shared_ptr<Value> FindForCallInstr(std::shared_ptr<CallInstruction> instr,
-                                        std::shared_ptr<IRBuilder> builder) {
+std::shared_ptr<Value> GetValueForCallInstr(
+    std::shared_ptr<CallInstruction> instr,
+    std::shared_ptr<IRBuilder> builder) {
   if (instr->HasSideEffect()) return instr;  // cannot be replaced
   // TODO(garen): load from address?
 
@@ -80,8 +107,9 @@ std::shared_ptr<Value> FindForCallInstr(std::shared_ptr<CallInstruction> instr,
         bool flag = true;
         auto sz = instr->m_params.size();
         for (int i = 0; i < sz; ++i) {
-          if (GetVN(instr->m_params[i]->m_value, builder)
-              != GetVN(old_call_instr->m_params[i]->m_value, builder)) {
+          if (GetValueNumber(instr->m_params[i]->m_value, builder)
+              != GetValueNumber(old_call_instr->m_params[i]->m_value,
+                                builder)) {
             flag = false;
             break;
           }
@@ -95,14 +123,17 @@ std::shared_ptr<Value> FindForCallInstr(std::shared_ptr<CallInstruction> instr,
   return instr;  // fallback, nothing found
 }
 
-std::shared_ptr<Value> FindForBinaryInstr(
+std::shared_ptr<Value> GetValueForBinaryInstr(
     std::shared_ptr<BinaryInstruction> instr,
     std::shared_ptr<IRBuilder> builder) {
   // if both operands are const, the result is const too
   if (instr->m_lhs_val_use->m_value->m_type.IsConst()
       && instr->m_rhs_val_use->m_value->m_type.IsConst()) {
-    return builder->GetConstant(instr->m_op, instr->m_lhs_val_use->m_value,
-                                instr->m_rhs_val_use->m_value);
+    auto lhs
+        = std::dynamic_pointer_cast<Constant>(instr->m_lhs_val_use->m_value);
+    auto rhs
+        = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->m_value);
+    return builder->GetConstant(instr->m_op, lhs->Evaluate(), rhs->Evaluate());
   }
 
   if (instr->m_op == IROp::ADD) {
@@ -230,8 +261,8 @@ std::shared_ptr<Value> FindForBinaryInstr(
     }
   }
 
-  if (GetVN(instr->m_lhs_val_use->m_value, builder)
-      == GetVN(instr->m_rhs_val_use->m_value, builder)) {
+  if (GetValueNumber(instr->m_lhs_val_use->m_value, builder)
+      == GetValueNumber(instr->m_rhs_val_use->m_value, builder)) {
     switch (instr->m_op) {
       case IROp::I_SGE:
       case IROp::I_SLE:
@@ -242,63 +273,74 @@ std::shared_ptr<Value> FindForBinaryInstr(
       case IROp::I_NE:
         return builder->GetIntConstant(0);
       default:
-        assert(false);  // unreachable
+        break;
     }
   }
 
-  if (IsComparison(instr->m_op)) return instr;
+  if (IsICmp(instr->m_op)) return instr;
 
   // find previous computed values from cloud
+  int i = 0;
   for (auto [old_instr, new_val] : g_vns) {
     if (auto old_binary_instr
         = std::dynamic_pointer_cast<BinaryInstruction>(old_instr)) {
       if (old_binary_instr != instr && old_binary_instr->m_op == instr->m_op) {
         // check if they are the same
-        if (GetVN(old_binary_instr->m_lhs_val_use->m_value, builder)
-                == GetVN(instr->m_lhs_val_use->m_value, builder)
-            && GetVN(old_binary_instr->m_rhs_val_use->m_value, builder)
-                   == GetVN(instr->m_rhs_val_use->m_value, builder)) {
+        auto old_lhs_vn
+            = GetValueNumber(old_binary_instr->m_lhs_val_use->m_value, builder);
+        auto new_lhs_vn
+            = GetValueNumber(instr->m_lhs_val_use->m_value, builder);
+        auto old_rhs_vn
+            = GetValueNumber(old_binary_instr->m_rhs_val_use->m_value, builder);
+        auto new_rhs_vn
+            = GetValueNumber(instr->m_rhs_val_use->m_value, builder);
+        if (old_lhs_vn == new_lhs_vn && old_rhs_vn == new_rhs_vn) {
           // identical, return the result in vn table
           return new_val;
-        } else if (IsCommutative(instr->m_op)
-                   && GetVN(old_binary_instr->m_lhs_val_use->m_value, builder)
-                          == GetVN(instr->m_rhs_val_use->m_value, builder)
-                   && GetVN(old_binary_instr->m_rhs_val_use->m_value, builder)
-                          == GetVN(instr->m_lhs_val_use->m_value, builder)) {
+        } else if (IsCommutative(instr->m_op) && old_lhs_vn == new_rhs_vn
+                   && old_rhs_vn == new_lhs_vn) {
           // commutative law
           return new_val;
         }
       }
     }
+    ++i;
   }
   return instr;
 }
 
-std::shared_ptr<Value> GetVN(std::shared_ptr<Value> val,
-                             std::shared_ptr<IRBuilder> builder) {
-  auto it = std::find_if(g_idx.begin(), g_idx.end(),
-                         [=](const auto &x) { return x.first == val; });
+std::shared_ptr<Value> GetValue(std::shared_ptr<Value> val,
+                                std::shared_ptr<IRBuilder> builder) {
+  auto it = g_idx.find(val);
   if (it != g_idx.end()) {
     auto [old_val, idx] = *it;
     if (g_vns[idx].first != g_vns[idx].second) {
-      return g_vns[idx].second = GetVN(g_vns[idx].second, builder);
+      return g_vns[idx].second = GetValue(g_vns[idx].second, builder);
     } else {
       return g_vns[idx].first;
     }
   }
   g_vns.emplace_back(val, val);
-  g_idx[val] = g_vns.size() - 1;  // last one
+  size_t idx = g_vns.size() - 1;
+  g_idx[val] = idx;
 
   if (auto binary_instr = std::dynamic_pointer_cast<BinaryInstruction>(val)) {
-    g_vns.back().second = FindForBinaryInstr(binary_instr, builder);
+    g_vns[idx].second = GetValueForBinaryInstr(binary_instr, builder);
   } else if (auto call_instr
              = std::dynamic_pointer_cast<CallInstruction>(val)) {
-    g_vns.back().second = FindForCallInstr(call_instr, builder);
+    g_vns[idx].second = GetValueForCallInstr(call_instr, builder);
   } else if (auto gep_instr
              = std::dynamic_pointer_cast<GetElementPtrInstruction>(val)) {
-    g_vns.back().second = FindForGEPInstr(gep_instr, builder);
+    g_vns[idx].second = GetValueForGEPInstr(gep_instr, builder);
+  } else if (auto zext_instr
+             = std::dynamic_pointer_cast<ZExtInstruction>(val)) {
+    // i1 to i32
+    if (zext_instr->m_val->m_value->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(zext_instr->m_val->m_value);
+      g_vns[idx].second = builder->GetIntConstant(c->Evaluate().IntVal());
+    }
   }
-  return g_vns.back().second;
+  return g_vns[idx].second;
 }
 
 void RunGVN(std::shared_ptr<Function> function,
@@ -307,9 +349,15 @@ void RunGVN(std::shared_ptr<Function> function,
     // manually ++it
     for (auto it = bb->m_instr_list.begin(); it != bb->m_instr_list.end();) {
       auto instr = *it;
-      auto instr_vn = GetVN(instr, builder);
-      if (instr_vn != instr) {
-        instr->ReplaceUseBy(instr_vn);
+      auto instr_val = GetValue(instr, builder);
+      // std::cerr << "[debug] idx: " << g_idx[instr_val] << std::endl;
+
+      if (instr_val != instr) {
+        instr->ReplaceUseBy(instr_val);
+        size_t idx = g_idx[instr_val];
+        g_idx.erase(instr_val);
+        std::swap(g_vns[idx], g_vns.back());
+        g_vns.pop_back();
         auto del = it;
         ++it;
         bb->m_instr_list.erase(del);
@@ -321,8 +369,12 @@ void RunGVN(std::shared_ptr<Function> function,
 }
 
 void IRPassManager::GVNPass() {
+  SideEffectPass();
   for (auto &func : m_builder->m_module->m_function_list) {
     if (func->m_bb_list.empty()) continue;
     RunGVN(func, m_builder);
+    // RemoveTrivialPhis(func);
+    ReplaceTrivialBranchByJump(func);
+    RemoveUnvisitedBasicBlocks(func);
   }
 }

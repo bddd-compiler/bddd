@@ -3,8 +3,13 @@
 
 #include "ir/builder.h"
 
+// auxiliary
 void ComputeDominanceRelationship(std::shared_ptr<Function> function);
 void ComputeDominanceFrontier(std::shared_ptr<Function> function);
+void RemoveUnvisitedBasicBlocks(std::shared_ptr<Function> func);
+void RemoveTrivialPhis(std::shared_ptr<Function> func);
+void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func);
+void RemoveTrivialBasicBlock(std::shared_ptr<Function> func);
 
 class IRPassManager {
 public:

@@ -47,7 +47,7 @@ void CollectLoopInfo(std::shared_ptr<BasicBlock> header) {
     CollectLoopInfo(bb);
   }
   // assert(w.empty());
-  for (auto pred : header->m_predecessors) {
+  for (auto pred : header->Predecessors()) {
     if (header->Dominate(pred)) {
       // back edge
       w.push_back(pred);
@@ -73,7 +73,7 @@ void CollectLoopInfo(std::shared_ptr<BasicBlock> header) {
       while (sub_loop->m_fa_loop) sub_loop = sub_loop->m_fa_loop;
       if (sub_loop != loop) {
         sub_loop->m_fa_loop = loop;
-        for (auto &p : sub_loop->Header()->m_predecessors) {
+        for (auto &p : sub_loop->Header()->Predecessors()) {
           auto it2 = std::find_if(
               deepest_loop.begin(), deepest_loop.end(),
               [=](const auto &x) { return x.first.get() == pred.get(); });

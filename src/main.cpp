@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    filename = "../testSource/functional/82_long_func.c";
+    filename = "../testSource/functional/62_percolation.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -56,22 +56,19 @@ int main(int argc, char **argv) {
     std::cerr << "exception during codegen: " << e.Msg() << std::endl;
     return 1;
   }
-  builder->m_module->Check();
-
-  // std::ofstream ofs2(filename.substr(0, filename.rfind('.'))
-  //                    + "_ir_example.out");
-  // auto allocator = std::make_shared<IRNameAllocator>();
-  // builder->m_module->AllocateName(allocator);
-  // builder->m_module->ExportIR(ofs2, 0);
-  // ofs2.close();
+  builder->m_module->RemoveInstrsAfterTerminator();
 
   auto pass_manager = std::make_unique<IRPassManager>(builder);
   pass_manager->Mem2RegPass();  // now no allocas for single variable
-  // pass_manager->GVNPass();      // try global value numbering
+
+  std::ofstream ofs2(filename.substr(0, filename.rfind('.'))
+                     + "_ir_example.out");
+  builder->m_module->ExportIR(ofs2, 0);
+  ofs2.close();
+
+  pass_manager->GVNPass();  // try global value numbering
 
   std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_ir.out");
-  // auto allocator2 = std::make_shared<IRNameAllocator>();
-  // builder->m_module->AllocateName(allocator2);
   builder->m_module->ExportIR(ofs3, 0);
   ofs3.close();
 

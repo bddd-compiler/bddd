@@ -43,6 +43,17 @@ std::shared_ptr<Use> Value::AddUse(const std::shared_ptr<Value>& user) {
   // maybe phi instruction can use itself
   // assert(this_ptr != user);
   auto ret = std::make_shared<Use>(this_ptr, user);
+  // if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(user)) {
+  //   // phi->AddPhiOperand()
+  //   assert(phi->m_contents.size() + 1 == phi->m_bb->m_predecessors.size());
+  //   auto pred = std::find_if(
+  //       phi->m_bb->m_predecessors.begin(), phi->m_bb->m_predecessors.end(),
+  //       [=](const auto& x) {
+  //         return phi->m_contents.find(x) == phi->m_contents.end();
+  //       });
+  //   assert(pred != phi->m_bb->m_predecessors.end());
+  //   phi->m_contents[*pred] = ret;
+  // }
   m_use_list.push_back(ret);
   return ret;
 }
@@ -50,9 +61,9 @@ std::shared_ptr<Use> Value::AddUse(const std::shared_ptr<Value>& user) {
 void Value::KillUse(const std::shared_ptr<Value>& user) {
   for (auto it = m_use_list.begin(); it != m_use_list.end(); ++it) {
     if ((*it)->m_user == user) {
-      if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(user)) {
-        phi->Remove(shared_from_this());
-      }
+      // if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(user)) {
+      //   phi->RemoveByValue(shared_from_this());
+      // }
       m_use_list.erase(it);
       return;
     }
@@ -74,7 +85,7 @@ void Value::ReplaceUseBy(const std::shared_ptr<Value>& new_val) {
     ++it;
     assert(use->m_value == shared_from_this());
     KillUse(use->m_user);
-    // if (use->m_user != this_ptr) use->UseValue(new_val);
+
     use->UseValue(new_val);
     new_val->m_use_list.push_back(use);
   }
@@ -96,7 +107,7 @@ void Module::AppendGlobalVariable(
 void Module::AppendBasicBlock(std::shared_ptr<BasicBlock> bb) {
   m_current_func->AppendBasicBlock(std::move(bb));
 }
-void Module::Check() {
+void Module::RemoveInstrsAfterTerminator() {
   for (auto& function : m_function_list) {
     for (auto& basic_block : function->m_bb_list) {
       assert(!basic_block->m_instr_list.empty());
@@ -149,10 +160,10 @@ void BasicBlock::RemoveInstruction(const std::shared_ptr<Instruction>& elem) {
     m_instr_list.erase(it);
   }
 }
-std::vector<std::shared_ptr<BasicBlock>> BasicBlock::Predecessors() {
+std::unordered_set<std::shared_ptr<BasicBlock>> BasicBlock::Predecessors() {
   return m_predecessors;
 }
-std::vector<std::shared_ptr<BasicBlock>> BasicBlock::Successors() {
+std::unordered_set<std::shared_ptr<BasicBlock>> BasicBlock::Successors() {
   if (m_instr_list.empty()) return {};
   auto last_instr = LastInstruction();
   switch (last_instr->m_op) {
@@ -178,6 +189,67 @@ bool BasicBlock::IsDominatedBy(std::shared_ptr<BasicBlock> bb) {
   auto it = std::find_if(m_dominated.begin(), m_dominated.end(),
                          [=](const auto& x) { return x.get() == bb.get(); });
   return it != m_dominated.end();
+}
+void BasicBlock::RemovePredecessor(std::shared_ptr<BasicBlock> bb) {
+  for (auto& instr : m_instr_list) {
+    if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
+      phi->RemoveByBasicBlock(bb);
+    } else {
+      break;
+    }
+  }
+  m_predecessors.erase(bb);
+}
+void BasicBlock::ReplacePredecessorBy(std::shared_ptr<BasicBlock> old_block,
+                                      std::shared_ptr<BasicBlock> new_block) {
+  // only phi instructions matter the predecessor
+  for (auto instr : m_instr_list) {
+    if (auto phi_instr = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
+      phi_instr->ReplacePhiOperand(old_block, new_block);
+    } else {
+      break;
+    }
+  }
+  auto it = m_predecessors.find(old_block);
+  if (it != m_predecessors.end()) {
+    m_predecessors.erase(it);
+    m_predecessors.insert(new_block);
+  }
+}
+
+void BasicBlock::ReplaceSuccessorBy(std::shared_ptr<BasicBlock> old_block,
+                                    std::shared_ptr<BasicBlock> new_block) {
+  auto last_instr = LastInstruction();
+  if (auto jump_instr
+      = std::dynamic_pointer_cast<JumpInstruction>(last_instr)) {
+    // before: bb -> old_block
+    // after: bb -> new_block
+    assert(jump_instr->m_target_block == old_block);
+    jump_instr->m_target_block = new_block;
+    old_block->m_predecessors.erase(jump_instr->m_bb);
+    new_block->m_predecessors.insert(jump_instr->m_bb);
+  } else if (auto br_instr
+             = std::dynamic_pointer_cast<BranchInstruction>(last_instr)) {
+    assert(br_instr->m_true_block == old_block
+           || br_instr->m_false_block == old_block);
+    if (br_instr->m_true_block == old_block) {
+      br_instr->m_true_block = new_block;
+    }
+    if (br_instr->m_false_block == old_block) {
+      br_instr->m_false_block = new_block;
+    }
+    if (br_instr->m_true_block == br_instr->m_false_block) {
+      // replace branch by jump
+      auto new_jump_instr = std::make_shared<JumpInstruction>(
+          br_instr->m_true_block, br_instr->m_bb);
+      m_instr_list.pop_back();
+      m_instr_list.push_back(new_jump_instr);
+    }
+    old_block->m_predecessors.erase(jump_instr->m_bb);
+    new_block->m_predecessors.insert(jump_instr->m_bb);
+  } else {
+    assert(false);  // cannot be return instruction
+  }
 }
 
 bool Instruction::HasSideEffect() {
