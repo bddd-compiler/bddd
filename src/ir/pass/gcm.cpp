@@ -229,7 +229,7 @@ void ScheduleLate(std::shared_ptr<Instruction> instr) {
         auto it = std::find_if(
             phi->m_contents.begin(), phi->m_contents.end(),
             [=](const auto &p) { return p.second.get() == _y.get(); });
-        if (it != nullptr) {
+        if (it != phi->m_contents.end()) {
           use = it->first;
         }
       }

@@ -1,4 +1,5 @@
 #include "asm/asm-register.h"
+#include "asm/asm-fixed.h"
 
 RegisterAllocator::RegisterAllocator(std::shared_ptr<ASM_Module> module) {
   m_module = module;
@@ -8,14 +9,18 @@ void RegisterAllocator::Allocate() {
   assert(m_module);
   for (auto& func : m_module->m_funcs) {
     setCurFunction(func);
-    getPrecoloredAndInitial();
+    initialColors();
+    getInitial();
     AllocateCurFunc();
     for (auto& node : coloredNodes) {
-      int c = color[node];
+      RReg rreg = color[node];
       if (node->m_op_type == OperandType::VREG) {
         node->m_op_type = OperandType::REG;
         node->m_is_rreg = true;
-        node->m_rreg = (RReg)c;
+        node->m_rreg = rreg;
+      }
+      if (4 <= (int)rreg && (int)rreg <= 11) {
+        storeRegisters(func, Operand::getRReg(rreg));
       }
     }
     initial.clear();
@@ -26,7 +31,15 @@ void RegisterAllocator::setCurFunction(std::shared_ptr<ASM_Function> func) {
   m_cur_func = func;
 }
 
-void RegisterAllocator::getPrecoloredAndInitial() {
+void RegisterAllocator::initialColors() {
+  rreg_avaliable = {RReg::R4, RReg::R5,  RReg::R6,  RReg::R7, RReg::R8,
+                    RReg::R9, RReg::R10, RReg::R12, RReg::LR};
+  if (m_cur_func->m_params_set_list.empty()) {
+    rreg_avaliable.insert(RReg::R11);
+  }
+}
+
+void RegisterAllocator::getInitial() {
   for (auto& b : m_cur_func->m_blocks) {
     for (auto& i : b->m_insts) {
       for (auto& op : i->m_def) {
@@ -47,11 +60,19 @@ void RegisterAllocator::getPrecoloredAndInitial() {
   // std::cout << std::endl;
 }
 
+void RegisterAllocator::updateDepth(std::shared_ptr<ASM_BasicBlock> block,
+                                    OpPtr node) {
+  if (m_depth_map[node] < block->m_loop_depth) {
+    m_depth_map[node] = block->m_loop_depth;
+  }
+}
+
 void RegisterAllocator::AllocateCurFunc() {
   // debug("AllocateCurFunc");
   LivenessAnalysis();
   Build();
   MkWorklist();
+  isSelectSpill = false;
   do {
     if (!simplifyWorklist.empty()) {
       // std::cout << "Simplify" << std::endl;
@@ -96,21 +117,26 @@ void RegisterAllocator::Build() {
   // debug("Build");
   for (auto& b : m_cur_func->m_blocks) {
     std::unordered_set<OpPtr>& live = b->m_liveout;
+    std::map<OpPtr, int> lifespan_map;
+    int cnt = 0;
     for (auto iter = b->m_insts.rbegin(); iter != b->m_insts.rend(); iter++) {
       std::shared_ptr<ASM_Instruction>& inst = *iter;
       if (auto I = std::dynamic_pointer_cast<MOVInst>(inst)) {
+        cnt++;
         if (I->m_type != MOVInst::RIType::IMM) {
           for (auto& use : I->m_use) {
             live.erase(use);
           }
           for (auto& n : I->m_def) {
             moveList[n].insert(I);
+            updateDepth(I->m_block, n);
           }
           for (auto& n : I->m_use) {
             if (n->m_op_type == OperandType::IMM) {
               continue;
             }
             moveList[n].insert(I);
+            updateDepth(I->m_block, n);
           }
           worklistMoves.insert(I);
         }
@@ -121,17 +147,26 @@ void RegisterAllocator::Build() {
       for (auto& d : inst->m_def) {
         for (auto& l : live) {
           AddEdge(l, d);
+          updateDepth(inst->m_block, l);
+          updateDepth(inst->m_block, d);
         }
       }
       // live := use(I) ∪ (live\def(I))
       for (auto& def : inst->m_def) {
         live.erase(def);
+        if (lifespan_map.find(def) != lifespan_map.end()) {
+          def->lifespan = cnt - lifespan_map[def];
+        }
       }
       for (auto& use : inst->m_use) {
         if (use->m_op_type == OperandType::IMM) {
           continue;
         }
-        live.insert(use);
+        use->lifespan = 0;
+        auto ret = live.insert(use);
+        if (ret.second) {
+          lifespan_map[use] = cnt;
+        }
       }
     }
   }
@@ -235,14 +270,11 @@ void RegisterAllocator::Coalesce() {
   auto m = *worklistMoves.begin();
   auto x = GetAlias(m->m_src);
   auto y = GetAlias(m->m_dest);
-  OpPtr u, v;
   if (x->m_op_type == OperandType::REG) {
-    u = y;
-    v = x;
-  } else {
-    u = x;
-    v = y;
+    std::swap(x, y);
   }
+  auto& u = x;
+  auto& v = y;
   worklistMoves.erase(worklistMoves.begin());
   if (u == v) {
     coalescedMoves.insert(m);
@@ -343,7 +375,25 @@ void RegisterAllocator::SelectSpill() {
   // resulting from the fetches of previously spilled registers
 
   // now we just select the first
-  auto m = *spillWorklist.begin();
+  if (!isSelectSpill) {
+    coalescedRecord.insert(coalescedNodes.begin(), coalescedNodes.end());
+    isSelectSpill = true;
+  }
+
+  OpPtr m = *std::max_element(
+      spillWorklist.cbegin(), spillWorklist.cend(), [this](OpPtr a, OpPtr b) {
+        if (a->lifespan && b->lifespan) {
+          // still compare degree if lifespan is equal!
+          if (a->lifespan != b->lifespan) return a->lifespan < b->lifespan;
+        } else if (a->lifespan)
+          return true;
+        else if (b->lifespan)
+          return false;
+        assert(m_depth_map.find(a) != m_depth_map.cend()
+               && m_depth_map.find(b) != m_depth_map.cend());
+        return degree[a] / pow(2, m_depth_map[a])
+               < degree[b] / pow(2, m_depth_map[b]);
+      });
   spillWorklist.erase(m);
   simplifyWorklist.insert(m);
   FreezeMoves(m);
@@ -354,28 +404,31 @@ void RegisterAllocator::AssignColors() {
   while (!selectStack.empty()) {
     OpPtr n = selectStack.back();
     selectStack.pop_back();
-    std::set<int> okColors;
-    for (int i = 0; i < K; i++) {
-      okColors.insert(i);
+    std::set<RReg> okColors;
+    for (auto r : rreg_avaliable) {
+      okColors.insert(r);
     }
     for (auto& w : adjList[n]) {
       OpPtr a = GetAlias(w);
-      if (coloredNodes.find(a) != coloredNodes.end()
-          || a->m_op_type == OperandType::REG) {
+      if (coloredNodes.find(a) != coloredNodes.end()) {
         okColors.erase(color[GetAlias(w)]);
+      } else if (a->m_op_type == OperandType::REG) {
+        okColors.erase(a->m_rreg);
       }
     }
     if (okColors.empty()) {
       spilledNodes.insert(n);
     } else {
       coloredNodes.insert(n);
-      int c = *okColors.begin();
-      color[n] = c;
+      RReg rreg = *okColors.begin();
+      color[n] = rreg;
     }
   }
   for (auto& n : coalescedNodes) {
     color[n] = color[GetAlias(n)];
+    coloredNodes.insert(n);
   }
+  coalescedNodes.clear();
 }
 
 void RegisterAllocator::RewriteProgram() {
@@ -391,6 +444,16 @@ void RegisterAllocator::RewriteProgram() {
   // assert(false);
   std::unordered_set<OpPtr> newTemps;
   for (auto& v : spilledNodes) {
+    if (v->lifespan == 1 && !v->rejected) {
+      // std::cerr << "asm: WARN: refuse to spill variable with lifespan of 1!"
+      //           << std::endl;
+      v->rejected = true;
+      newTemps.insert(v);
+      continue;
+    }
+    // if (v->rejected)
+    //   std::cerr << "asm: WARN: Spilling rejected vreg!!!!?" << std::endl;
+
     int sp_offs = m_cur_func->getStackSize();
     m_cur_func->allocateStack(4);
     for (auto& b : m_cur_func->m_blocks) {
@@ -399,7 +462,7 @@ void RegisterAllocator::RewriteProgram() {
         if (i->m_use.find(v) != i->m_use.end()) {
           // replace use
 
-          OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
+          OpPtr newOp = Operand::getRReg(RReg::LR);
           i->replaceUse(newOp, v);
           i->m_use.erase(v);
           i->addUse(newOp);
@@ -412,6 +475,7 @@ void RegisterAllocator::RewriteProgram() {
             offs = std::make_shared<Operand>(OperandType::VREG);
             mov = std::make_shared<MOVInst>(offs, sp_offs);
             newTemps.insert(offs);
+            updateDepth(b, offs);
           }
           auto ldr = std::make_shared<LDRInst>(
               newOp, Operand::getRReg(RReg::SP), offs);
@@ -420,12 +484,12 @@ void RegisterAllocator::RewriteProgram() {
           } else {
             b->insertSpillLDR(iter, ldr);
           }
-          newTemps.insert(newOp);
+          updateDepth(b, newOp);
         }
         if (i->m_def.find(v) != i->m_def.end()) {
           // replace def
 
-          OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
+          OpPtr newOp = Operand::getRReg(RReg::LR);
           i->replaceDef(newOp, v);
           i->m_def.erase(v);
           i->addDef(newOp);
@@ -438,6 +502,7 @@ void RegisterAllocator::RewriteProgram() {
             offs = std::make_shared<Operand>(OperandType::VREG);
             mov = std::make_shared<MOVInst>(offs, sp_offs);
             newTemps.insert(offs);
+            updateDepth(b, offs);
           }
           auto str = std::make_shared<STRInst>(
               newOp, Operand::getRReg(RReg::SP), offs);
@@ -446,7 +511,9 @@ void RegisterAllocator::RewriteProgram() {
           } else {
             b->insertSpillSTR(iter, str);
           };
-          newTemps.insert(newOp);
+          updateDepth(b, newOp);
+
+          // TODO(Huang): modify ↓
           auto next = std::next(iter);
           while (next != b->m_insts.end()
                  && (*next)->m_def.find(v) == (*next)->m_def.end()) {
@@ -470,8 +537,10 @@ void RegisterAllocator::RewriteProgram() {
   for (auto& n : coloredNodes) initial.insert(n);
   for (auto& n : coalescedNodes) initial.insert(n);
   for (auto& n : newTemps) initial.insert(n);
+  for (auto& n : coalescedRecord) initial.erase(n);
   coloredNodes.clear();
   coalescedNodes.clear();
+  std::swap(coloredNodes, coalescedRecord);
 }
 
 bool RegisterAllocator::AllOK(OpPtr u, OpPtr v) {
@@ -508,7 +577,7 @@ void RegisterAllocator::debug(std::string func) {
   for (auto& n : spilledNodes) std::cout << n->getName() << ", ";
   std::cout << "\ncoalescedNodes: ";
   for (auto& n : coalescedNodes) std::cout << n->getName() << ", ";
-  std::cout << "\noloredNodes: ";
+  std::cout << "\ncoloredNodes: ";
   for (auto& n : coloredNodes) std::cout << n->getName() << ", ";
   std::cout << "\nselectStack: ";
   for (auto& n : selectStack) std::cout << n->getName() << ", ";

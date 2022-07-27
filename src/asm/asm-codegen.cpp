@@ -5,7 +5,7 @@ std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
     std::shared_ptr<Constant> value, bool genimm,
     std::shared_ptr<ASM_BasicBlock> block) {
   std::shared_ptr<Operand> ret;
-  if (value->m_is_float) {
+  if (value->m_type.IsBasicFloat()) {
     // TODO(Huang): float
   } else {
     int imm = value->m_int_val;
@@ -122,7 +122,7 @@ std::shared_ptr<Operand> GenerateCMPInstruction(
     std::shared_ptr<BinaryInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
   auto operand1 = builder->getOperand(inst->m_lhs_val_use->m_value);
-  auto operand2 = builder->getOperand(inst->m_rhs_val_use->m_value);
+  auto operand2 = builder->getOperand(inst->m_rhs_val_use->m_value, true);
   builder->appendCT(InstOp::CMP, operand1, operand2);
   return nullptr;
 }
@@ -141,12 +141,12 @@ std::shared_ptr<Operand> GenerateBinaryInstruction(
       return GenerateDivInstruction(inst, builder);
     case IROp::SREM:
       return GenerateModInstruction(inst, builder);
-    case IROp::SGEQ:
-    case IROp::SGE:
-    case IROp::SLEQ:
-    case IROp::SLE:
-    case IROp::EQ:
-    case IROp::NE:
+    case IROp::I_SGE:
+    case IROp::I_SGT:
+    case IROp::I_SLE:
+    case IROp::I_SLT:
+    case IROp::I_EQ:
+    case IROp::I_NE:
       return GenerateCMPInstruction(inst, builder);
   }
   return nullptr;
@@ -240,8 +240,9 @@ std::shared_ptr<Operand> GenerateJumpInstruction(
 std::shared_ptr<Operand> GenerateReturnInstruction(
     std::shared_ptr<ReturnInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  auto ret_val = inst->m_ret->m_value;
-  if (ret_val) {
+  std::shared_ptr<Value> ret_val;
+  if (inst->m_ret && inst->m_ret->m_value) {
+    ret_val = inst->m_ret->m_value;
     builder->appendMOV(Operand::getRReg(RReg::R0),
                        builder->getOperand(ret_val, true));
   }
@@ -268,64 +269,74 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   auto dimensions = base_addr->m_type.m_dimensions;
   auto indices = inst->m_indices;
   int offs = 0;
-  int attribute = 4;
+  int attribute = 1;
   std::shared_ptr<Operand> offs_op;
   bool first = true;
+
+  // maybe redundant??
   if (indices.size() == 1) {
     if (auto val = std::dynamic_pointer_cast<Constant>(indices[0]->m_value)) {
-      assert(!val->m_is_float);
-      offs = val->m_int_val * 4;
+      assert(val->m_type.IsBasicInt());
+      offs = val->m_int_val;
     } else {
       offs_op = builder->getOperand(indices[0]->m_value);
-      builder->appendShift(InstOp::LSL, offs_op, offs_op,
-                           std::make_shared<Operand>(4));
     }
   }
   for (int i = dimensions.size() - 1; i >= 0; i--) {
-    // TODO(Huang): bug not fixed yet:
-    // indice can be constant or variable
+    if (i + 1 >= indices.size()) {
+      attribute *= dimensions[i];
+      continue;
+    }
     if (auto val
         = std::dynamic_pointer_cast<Constant>(indices[i + 1]->m_value)) {
-      assert(!val->m_is_float);
+      assert(val->m_type.IsBasicInt());
       offs += val->m_int_val * attribute;
     } else {
       if (first) {
         first = false;
         offs_op = std::make_shared<Operand>(OperandType::VREG);
+        auto mov = builder->appendMOV(
+            std::make_shared<Operand>(OperandType::VREG), attribute);
         builder->appendMUL(InstOp::MUL, offs_op,
                            builder->getOperand(indices[i + 1]->m_value),
-                           builder->GenerateConstant(
-                               std::make_shared<Constant>(attribute), false));
+                           mov->m_dest);
       } else {
+        auto mov = builder->appendMOV(
+            std::make_shared<Operand>(OperandType::VREG), attribute);
         builder->appendMUL(InstOp::MLA, offs_op,
                            builder->getOperand(indices[i + 1]->m_value),
-                           builder->GenerateConstant(
-                               std::make_shared<Constant>(attribute), false),
-                           offs_op);
+                           mov->m_dest, offs_op);
       }
     }
     attribute *= dimensions[i];
   }
 
-  auto const_offs
-      = builder->GenerateConstant(std::make_shared<Constant>(offs), true);
-  if (!offs_op) {
-    offs_op = const_offs;
+  // const part offset obtained in ir phase
+  std::shared_ptr<Operand> const_offs_op;
+  if (Operand::immCheck(offs)) {
+    const_offs_op = std::make_shared<Operand>(offs);
   } else {
-    if (offs) builder->appendAS(InstOp::ADD, offs_op, offs_op, const_offs);
+    const_offs_op
+        = builder->appendMOV(std::make_shared<Operand>(OperandType::VREG), offs)
+              ->m_dest;
+  }
+
+  if (!offs_op) {
+    offs_op = const_offs_op;
+  } else {
+    if (offs) builder->appendAS(InstOp::ADD, offs_op, offs_op, const_offs_op);
   }
 
   // store the absolute address in register, then return it
   // actually, it would be better to return an offset form, like [Rn, Rm]
   // so that we can reduce the add instruction
   // TODO(Huang): optimize to offset form
-  auto ret = builder
-                 ->appendAS(InstOp::ADD,
-                            std::make_shared<Operand>(OperandType::VREG),
-                            getAddr(base_addr, builder), offs_op)
-                 ->m_dest;
-  builder->m_value_map.insert(std::make_pair(inst, ret));
-  return ret;
+  auto add = builder->appendAS(InstOp::ADD,
+                               std::make_shared<Operand>(OperandType::VREG),
+                               getAddr(base_addr, builder), offs_op);
+  add->m_shift = std::make_unique<Shift>(Shift::ShiftType::LSL, 4);
+  builder->m_value_map.insert(std::make_pair(inst, add->m_dest));
+  return add->m_dest;
 }
 
 std::shared_ptr<Operand> GenerateLoadInstruction(
@@ -394,6 +405,7 @@ std::shared_ptr<Operand> GeneratePhiInstruction(
   for (auto &[ir_block, value] : inst->m_contents) {
     std::shared_ptr<ASM_BasicBlock> block = builder->getBlock(ir_block);
     assert(block);
+    if (!value) continue;
     auto src = builder->getOperand(value->m_value, true, block);
     block->appendFilledMOV(std::make_shared<MOVInst>(tmp, src));
   }
@@ -448,7 +460,7 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
                       std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<ASM_Function> func = std::make_shared<ASM_Function>(ir_func);
   builder->appendFunction(func);
-  for (auto &b : ir_func->GetBlockList()) {
+  for (auto &b : ir_func->m_bb_list) {
     GenerateBasicblock(b, builder);
   }
 

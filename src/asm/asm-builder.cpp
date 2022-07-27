@@ -58,8 +58,8 @@ void ASM_Builder::setParams() {
     i++;
   }
   if (n > 4) {
-    m_cur_func->m_push->m_regs.push_back(Operand::getRReg(RReg::R11));
-    m_cur_func->m_pop->m_regs.push_back(Operand::getRReg(RReg::R11));
+    m_cur_func->m_push->m_regs.insert(Operand::getRReg(RReg::R11));
+    m_cur_func->m_pop->m_regs.insert(Operand::getRReg(RReg::R11));
   }
 #else
   while (i < n) {
@@ -71,6 +71,7 @@ void ASM_Builder::setParams() {
 #endif
 }
 
+#ifdef SP_FOR_PARAM
 void ASM_Builder::fixedStackParams() {
   // fixed offset of params in stack
   int n = m_cur_func->m_ir_func->m_args.size();
@@ -94,6 +95,7 @@ void ASM_Builder::fixedStackParams() {
     m_cur_func->m_params_set_list.push_back(ldr);
   }
 }
+#endif
 
 void ASM_Builder::appendBlock(std::shared_ptr<ASM_BasicBlock> block) {
   m_cur_func->m_blocks.push_back(block);
@@ -154,7 +156,7 @@ std::shared_ptr<ASM_BasicBlock> ASM_Builder::getBlock(
                  ? m_block_map[ir_block]
                  : nullptr;
   if (!ret) {
-    ret = std::make_shared<ASM_BasicBlock>();
+    ret = std::make_shared<ASM_BasicBlock>(ir_block->m_loop_depth);
     m_block_map.insert(std::make_pair(ir_block, ret));
   }
   return ret;

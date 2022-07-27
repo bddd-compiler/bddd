@@ -10,6 +10,7 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include <set>
 
 #include "ir/ir.h"
 
@@ -211,13 +212,15 @@ public:
   void exportASM(std::ofstream& ofs);
 };
 
-class ASM_BasicBlock {
+class ASM_BasicBlock : public std::enable_shared_from_this<ASM_BasicBlock> {
 public:
   static int block_cnt;
   std::string m_label;
   std::list<std::shared_ptr<ASM_Instruction>> m_insts;
   std::list<std::shared_ptr<ASM_Instruction>>::iterator m_branch_pos;
   std::list<std::shared_ptr<ASM_Instruction>> m_mov_filled_list;
+
+  int m_loop_depth;
 
   std::unordered_set<std::shared_ptr<Operand>> m_def;
   std::unordered_set<std::shared_ptr<Operand>> m_use;
@@ -226,8 +229,9 @@ public:
   std::vector<std::shared_ptr<ASM_BasicBlock>> m_predecessors;
   std::vector<std::shared_ptr<ASM_BasicBlock>> m_successors;
 
-  ASM_BasicBlock()
+  ASM_BasicBlock(int depth = 0)
       : m_label(".L" + std::to_string(block_cnt++)),
+        m_loop_depth(depth),
         m_branch_pos(m_insts.end()) {}
 
   void insert(std::shared_ptr<ASM_Instruction> inst);
@@ -371,7 +375,7 @@ public:
 
 class PInst : public ASM_Instruction {
 public:
-  std::vector<std::shared_ptr<Operand>> m_regs;
+  std::set<std::shared_ptr<Operand>> m_regs;
 
   PInst(InstOp op);
 

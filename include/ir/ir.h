@@ -1019,15 +1019,8 @@ public:
 
   void AppendBasicBlock(std::shared_ptr<BasicBlock> bb);
 
-<<<<<<< HEAD
-  std::list<std::shared_ptr<BasicBlock>> GetBlockList();
-
-  void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
-  void ExportIR(std::ofstream &ofs, int depth);
-=======
   // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
->>>>>>> garen_dev
 
   friend class Module;
 };

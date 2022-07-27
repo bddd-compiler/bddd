@@ -1,118 +1,128 @@
 #ifndef BDDD_ASM_REGISTER_H
 #define BDDD_ASM_REGISTER_H
 
-#include <unordered_set>
 #include <set>
 #include <stack>
+#include <unordered_set>
 
 #include "asm/asm.h"
+#include "asm/asm-fixed.h"
 
 typedef std::shared_ptr<Operand> OpPtr;
 
 class OpPairHash {
 public:
-    size_t operator()(const std::pair<OpPtr, OpPtr>& p) const {
-        return std::hash<OpPtr>()(p.first) ^ std::hash<OpPtr>()(p.second);
-    }
+  size_t operator()(const std::pair<OpPtr, OpPtr>& p) const {
+    return std::hash<OpPtr>()(p.first) ^ std::hash<OpPtr>()(p.second);
+  }
 };
 
 // implement the register allocation algorithm in "Iterated Register Coalescing"
 class RegisterAllocator {
 private:
-    std::shared_ptr<ASM_Module> m_module;
-    std::shared_ptr<ASM_Function> m_cur_func;
-    const int K = 12;
+  std::shared_ptr<ASM_Module> m_module;
+  std::shared_ptr<ASM_Function> m_cur_func;
+  std::set<RReg> rreg_avaliable;
+  int K;
 
-    void setCurFunction(std::shared_ptr<ASM_Function> func);
+  std::unordered_map<OpPtr, int> m_depth_map;
 
-    // Data Structures
-    // Node Worklists, Node Sets, and Node Stacks
-    std::unordered_set<OpPtr> precolored;       // we didn't use this set
-    std::unordered_set<OpPtr> initial;
-    std::unordered_set<OpPtr> simplifyWorklist;
-    std::unordered_set<OpPtr> freezeWorklist;
-    std::unordered_set<OpPtr> spillWorklist;
-    std::unordered_set<OpPtr> spilledNodes;
-    std::unordered_set<OpPtr> coalescedNodes;
-    std::unordered_set<OpPtr> coloredNodes;
-    std::vector<OpPtr> selectStack;
+  void setCurFunction(std::shared_ptr<ASM_Function> func);
 
-    // Move Sets
-    std::unordered_set<std::shared_ptr<MOVInst>> coalescedMoves;
-    std::unordered_set<std::shared_ptr<MOVInst>> constrainedMoves;
-    std::unordered_set<std::shared_ptr<MOVInst>> frozenMoves;
-    std::unordered_set<std::shared_ptr<MOVInst>> worklistMoves;
-    std::unordered_set<std::shared_ptr<MOVInst>> activeMoves;
+  // Data Structures
+  // Node Worklists, Node Sets, and Node Stacks
+  std::unordered_set<OpPtr> precolored;  // we didn't use this set
+  std::unordered_set<OpPtr> initial;
+  std::unordered_set<OpPtr> simplifyWorklist;
+  std::unordered_set<OpPtr> freezeWorklist;
+  std::unordered_set<OpPtr> spillWorklist;
+  std::unordered_set<OpPtr> spilledNodes;
+  std::unordered_set<OpPtr> coalescedNodes;
+  std::unordered_set<OpPtr> coloredNodes;
+  std::vector<OpPtr> selectStack;
 
-    // Others
-    std::unordered_set<std::pair<OpPtr, OpPtr>, OpPairHash> adjSet;
-    std::unordered_map<OpPtr, std::unordered_set<OpPtr>> adjList;
-    std::unordered_map<OpPtr, int> degree;
-    std::unordered_map<OpPtr, std::unordered_set<std::shared_ptr<MOVInst>>> moveList;
-    std::unordered_map<OpPtr, OpPtr> alias;
-    std::unordered_map<OpPtr, int> color;
+  bool isSelectSpill;
+  std::unordered_set<OpPtr> coalescedRecord;  // record all the coalescedNodes
+                                              // before first selectSpill();
 
-    // procedure
-    void AllocateCurFunc();    // Main() in "Iterated Register Coalescing"
+  // Move Sets
+  std::unordered_set<std::shared_ptr<MOVInst>> coalescedMoves;
+  std::unordered_set<std::shared_ptr<MOVInst>> constrainedMoves;
+  std::unordered_set<std::shared_ptr<MOVInst>> frozenMoves;
+  std::unordered_set<std::shared_ptr<MOVInst>> worklistMoves;
+  std::unordered_set<std::shared_ptr<MOVInst>> activeMoves;
 
-    void AddEdge(OpPtr u, OpPtr v);
+  // Others
+  std::unordered_set<std::pair<OpPtr, OpPtr>, OpPairHash> adjSet;
+  std::unordered_map<OpPtr, std::unordered_set<OpPtr>> adjList;
+  std::unordered_map<OpPtr, int> degree;
+  std::unordered_map<OpPtr, std::unordered_set<std::shared_ptr<MOVInst>>>
+      moveList;
+  std::unordered_map<OpPtr, OpPtr> alias;
+  std::unordered_map<OpPtr, RReg> color;
 
-    void Build();
+  // procedure
+  void AllocateCurFunc();  // Main() in "Iterated Register Coalescing"
 
-    std::unordered_set<OpPtr> Adjacent(OpPtr n);
+  void AddEdge(OpPtr u, OpPtr v);
 
-    std::unordered_set<std::shared_ptr<MOVInst>> NodeMoves(OpPtr n);
+  void Build();
 
-    bool MoveRelated(OpPtr n);
+  std::unordered_set<OpPtr> Adjacent(OpPtr n);
 
-    void MkWorklist();
+  std::unordered_set<std::shared_ptr<MOVInst>> NodeMoves(OpPtr n);
 
-    void Simplify();
+  bool MoveRelated(OpPtr n);
 
-    void DecrementDegree(OpPtr m);
+  void MkWorklist();
 
-    void EnableMoves(std::unordered_set<OpPtr>& nodes);
+  void Simplify();
 
-    void Coalesce();
+  void DecrementDegree(OpPtr m);
 
-    void AddWorkList(OpPtr u);
+  void EnableMoves(std::unordered_set<OpPtr>& nodes);
 
-    bool OK(OpPtr t, OpPtr r);
+  void Coalesce();
 
-    bool Conservative(std::unordered_set<OpPtr>& nodes);
+  void AddWorkList(OpPtr u);
 
-    OpPtr GetAlias(OpPtr n);
+  bool OK(OpPtr t, OpPtr r);
 
-    void Combine(OpPtr u, OpPtr v);
+  bool Conservative(std::unordered_set<OpPtr>& nodes);
 
-    void Freeze();
+  OpPtr GetAlias(OpPtr n);
 
-    void FreezeMoves(OpPtr n);
+  void Combine(OpPtr u, OpPtr v);
 
-    void SelectSpill();
+  void Freeze();
 
-    void AssignColors();
+  void FreezeMoves(OpPtr n);
 
-    void RewriteProgram();
+  void SelectSpill();
 
-    bool AllOK(OpPtr u, OpPtr v);
+  void AssignColors();
 
-    bool ConservativeAdj(OpPtr u, OpPtr v);
+  void RewriteProgram();
 
-    void LivenessAnalysis();
+  bool AllOK(OpPtr u, OpPtr v);
 
-    void getPrecoloredAndInitial();
+  bool ConservativeAdj(OpPtr u, OpPtr v);
+
+  void LivenessAnalysis();
+
+  void initialColors();
+
+  void getInitial();
+
+  // taken from tinbaccc
+  void updateDepth(std::shared_ptr<ASM_BasicBlock>, OpPtr node);
 
 public:
+  RegisterAllocator(std::shared_ptr<ASM_Module> module = nullptr);
 
-    RegisterAllocator(std::shared_ptr<ASM_Module> module = nullptr);
+  void Allocate();
 
-    void Allocate();
-
-    void debug(std::string func);
-
+  void debug(std::string func);
 };
-
-
 
 #endif  // BDDD_ASM_REGISTER_H

@@ -80,28 +80,28 @@ void ASM_Module::exportGlobalVar(std::ofstream& ofs) {
 template <class T> void ASM_Module::exportVarBody(std::ofstream& ofs,
                                                   std::shared_ptr<T> init_val) {
   assert(std::static_pointer_cast<GlobalVariable>(init_val));
-  int size = init_val->m_init_vals.size();
+  int size = init_val->m_flatten_vals.size();
   ofs << std::to_string(size * 4) << std::endl;
   ofs << init_val->m_name << ":" << std::endl;
   int i = 0;
   while (i < size) {
-    if (init_val->m_init_vals[i] == 0) {
+    if (init_val->m_flatten_vals[i] == 0) {
       ofs << "\t.space ";
       int left = i;
-      while (i < size && init_val->m_init_vals[i] == 0) {
+      while (i < size && init_val->m_flatten_vals[i] == 0) {
         i++;
       }
       ofs << std::to_string((i - left) * 4) << std::endl;
     } else {
       ofs << (init_val->m_is_float ? "\t.float " : "\t.word ");
       int first = true;
-      while (i < size && init_val->m_init_vals[i] != 0) {
+      while (i < size && init_val->m_flatten_vals[i] != 0) {
         if (!first) {
           ofs << ",";
         } else {
           first = false;
         }
-        ofs << std::to_string(init_val->m_init_vals[i]);
+        ofs << std::to_string(init_val->m_flatten_vals[i]);
         i++;
       }
       ofs << std::endl;
@@ -162,7 +162,7 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
     if (Operand::immCheck(size)) {
       ofs << "\tSUB SP, SP, #" << std::to_string(size) << std::endl;
     } else {
-      ofs << "\tMOV r12, #" << (size & 0xffff) << std::endl;
+      ofs << "\tMOVW r12, #" << (size & 0xffff) << std::endl;
       if (size & 0xffff0000)
         ofs << "\tMOVT r12, #" << ((unsigned int)size >> 16) << std::endl;
       ofs << "\tSUB sp, sp, r12" << std::endl;
@@ -252,13 +252,16 @@ void MOVInst::exportASM(std::ofstream& ofs) {
 void PInst::exportASM(std::ofstream& ofs) {
   exportInstHead(ofs);
   ofs << "{";
-  for (int i = 0; i < m_regs.size(); i++) {
-    ofs << m_regs[i]->getName() << ", ";
+  bool first = true;
+  for (auto& reg : m_regs) {
+    if (first) {
+      first = false;
+    }
+    else {
+      ofs << ", ";
+    }
+    ofs << reg->getName();
   }
-  if (m_op == InstOp::PUSH)
-    ofs << "LR";
-  else
-    ofs << "PC";
   ofs << "}" << std::endl;
 }
 

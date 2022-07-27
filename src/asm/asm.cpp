@@ -2,17 +2,17 @@
 
 CondType GetCondFromIR(IROp op) {
   switch (op) {
-    case IROp::SGEQ:
+    case IROp::I_SGE:
       return CondType::GE;
-    case IROp::SGE:
+    case IROp::I_SGT:
       return CondType::GT;
-    case IROp::SLEQ:
+    case IROp::I_SLE:
       return CondType::LE;
-    case IROp::SLE:
+    case IROp::I_SLT:
       return CondType::LT;
-    case IROp::EQ:
+    case IROp::I_EQ:
       return CondType::EQ;
-    case IROp::NE:
+    case IROp::I_NE:
       return CondType::NE;
   }
   return CondType::NONE;
@@ -28,25 +28,32 @@ unsigned int ASM_Function::getStackSize() { return m_local_alloc; }
 void ASM_Function::allocateStack(unsigned int size) { m_local_alloc += size; }
 
 void ASM_Function::appendPush(std::shared_ptr<Operand> reg) {
-  m_push->m_regs.push_back(reg);
+  if (m_push->m_regs.find(reg) == m_push->m_regs.end())
+    m_push->m_regs.insert(reg);
 }
 
 void ASM_Function::appendPop(std::shared_ptr<Operand> reg) {
-  m_pop->m_regs.push_back(reg);
+  if (m_push->m_regs.find(reg) == m_push->m_regs.end())
+    m_pop->m_regs.insert(reg);
 }
 
 int ASM_BasicBlock::block_cnt = 0;
 
 void ASM_BasicBlock::insert(std::shared_ptr<ASM_Instruction> inst) {
   m_insts.push_back(inst);
+  inst->m_block = shared_from_this();
 }
 
 void ASM_BasicBlock::insertSpillLDR(
     std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
     std::shared_ptr<ASM_Instruction> ldr,
     std::shared_ptr<ASM_Instruction> mov) {
-  if (mov) m_insts.insert(iter, mov);
+  if (mov) {
+    m_insts.insert(iter, mov);
+    mov->m_block = shared_from_this();
+  }
   m_insts.insert(iter, ldr);
+  ldr->m_block = shared_from_this();
 }
 
 void ASM_BasicBlock::insertSpillSTR(
@@ -54,13 +61,18 @@ void ASM_BasicBlock::insertSpillSTR(
     std::shared_ptr<ASM_Instruction> str,
     std::shared_ptr<ASM_Instruction> mov) {
   auto next = std::next(iter);
-  if (mov) m_insts.insert(next, mov);
+  if (mov) {
+    m_insts.insert(next, mov);
+    mov->m_block = shared_from_this();
+  }
   m_insts.insert(next, str);
+  str->m_block = shared_from_this();
 }
 
 void ASM_BasicBlock::insertPhiMOV(std::shared_ptr<ASM_Instruction> mov) {
   assert(m_branch_pos != m_insts.end());
   m_insts.insert(m_branch_pos, mov);
+  mov->m_block = shared_from_this();
 }
 
 void ASM_BasicBlock::appendFilledMOV(std::shared_ptr<ASM_Instruction> mov) {
@@ -373,6 +385,9 @@ MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
 PInst::PInst(InstOp op) {
   m_op = op;
   m_cond = CondType::NONE;
+  if (op == InstOp::PUSH) m_regs.insert(Operand::getRReg(RReg::LR));
+  else if (op == InstOp::POP) m_regs.insert(Operand::getRReg(RReg::PC));
+  else assert(false);
 }
 
 BInst::BInst(std::shared_ptr<ASM_BasicBlock> block) {

@@ -117,9 +117,6 @@ void Function::AppendBasicBlock(std::shared_ptr<BasicBlock> bb) {
   m_bb_list.push_back(std::move(bb));
   m_current_bb = m_bb_list.back();
 }
-std::list<std::shared_ptr<BasicBlock>> Function::GetBlockList() {
-  return m_bb_list;
-}
 void BasicBlock::PushBackInstruction(std::shared_ptr<Instruction> instr) {
   instr->m_bb = shared_from_base<BasicBlock>();
   m_instr_list.push_back(std::move(instr));

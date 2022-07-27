@@ -38,9 +38,7 @@ set(IR_SOURCE
   src/ir/ir.cpp
   src/ir/export.cpp
   src/ir/builder.cpp
-  src/ir/ir-pass-manager.cpp
   src/ir/ir-name-allocator.cpp
-  
 )
 
 set(IR_PASSES
@@ -60,6 +58,7 @@ set(ASM_SOURCE
   src/asm/asm-export.cpp
   src/asm/asm-liveness.cpp
   src/asm/asm-register.cpp
+  src/asm/asm-fixed.cpp
 )
 
 add_executable(bddd
