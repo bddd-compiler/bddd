@@ -9,3 +9,6 @@ cmake-build-debug
 *.exe
 *_test.out
 a.out
+*.in
+*.out
+*.s
