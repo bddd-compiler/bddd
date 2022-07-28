@@ -190,6 +190,7 @@ public:
   std::shared_ptr<ASM_BasicBlock> m_rblock;
   std::unique_ptr<PInst> m_push, m_pop;
   std::list<std::shared_ptr<ASM_Instruction>> m_params_set_list;
+  int m_params;
   unsigned int m_local_alloc;
   std::stack<std::shared_ptr<Operand>> m_sp_alloc_size;
 
@@ -540,6 +541,21 @@ public:
 
   void replaceUse(std::shared_ptr<Operand> newOp,
                   std::shared_ptr<Operand> oldOp) override;
+};
+
+class POOLInst : public ASM_Instruction {
+public:
+  int m_number;
+
+  POOLInst(int number) : m_number(number) {}
+
+  void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override {}
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override {}
 };
 
 #endif  // BDDD_ASM_H

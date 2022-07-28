@@ -4,6 +4,7 @@ ASM_Builder::ASM_Builder(std::shared_ptr<ASM_Module> m) : m_module(m) {}
 
 void ASM_Builder::init() {
   m_value_map.clear();
+  m_addr_map.clear();
   m_block_map.clear();
 }
 
@@ -25,15 +26,16 @@ void ASM_Builder::setCurFunction(std::shared_ptr<ASM_Function> func) {
 void ASM_Builder::setParams() {
   int i = 0;
   int n = m_cur_func->m_ir_func->m_args.size();
+  m_cur_func->m_params = n;
   std::shared_ptr<Value> value;
 
   // set params in r0 ~ r3
-  // TODO(Huang): store r0 if there is a call(BL) in this function
-  std::shared_ptr<Operand> reg;
   while (i < 4 && i < n) {
     value = m_cur_func->m_ir_func->m_args[i];
-    reg = Operand::getRReg((RReg)i);
-    m_value_map.insert(std::make_pair(value, reg));
+    auto ret = std::make_shared<Operand>(OperandType::VREG);
+    auto mov = std::make_shared<MOVInst>(ret, Operand::getRReg((RReg)i));
+    m_cur_func->m_params_set_list.push_back(mov);
+    m_value_map.insert(std::make_pair(value, ret));
     i++;
   }
 
@@ -42,19 +44,22 @@ void ASM_Builder::setParams() {
   // use r11 as the frame pointer register
   while (i < n) {
     value = m_cur_func->m_ir_func->m_args[i];
-    std::shared_ptr<Operand> offs;
     int fp_offs = (i - 4) * 4;
-    if (0 <= fp_offs && fp_offs < 4096) {
-      offs = std::make_shared<Operand>(fp_offs);
-    } else {
-      auto mov = std::make_shared<MOVInst>(
-          std::make_shared<Operand>(OperandType::VREG), fp_offs);
-      offs = mov->m_dest;
-      m_cur_func->m_params_set_list.push_back(mov);
-    }
-    auto ldr = std::make_shared<LDRInst>(getOperand(value),
-                                         Operand::getRReg(RReg::R11), offs);
-    m_cur_func->m_params_set_list.push_back(ldr);
+    m_addr_map.insert({value, {Operand::getRReg(RReg::R11), fp_offs}});
+
+    // std::shared_ptr<Operand> offs;
+    // int fp_offs = (i - 4) * 4;
+    // if (0 <= fp_offs && fp_offs < 4096) {
+    //   offs = std::make_shared<Operand>(fp_offs);
+    // } else {
+    //   auto mov = std::make_shared<MOVInst>(
+    //       std::make_shared<Operand>(OperandType::VREG), fp_offs);
+    //   offs = mov->m_dest;
+    //   m_cur_func->m_params_set_list.push_back(mov);
+    // }
+    // auto ldr = std::make_shared<LDRInst>(getOperand(value),
+    //                                      Operand::getRReg(RReg::R11), offs);
+    // m_cur_func->m_params_set_list.push_back(ldr);
     i++;
   }
   if (n > 4) {
@@ -132,12 +137,23 @@ void ASM_Builder::reclaimSP() {
 std::shared_ptr<Operand> ASM_Builder::getOperand(
     std::shared_ptr<Value> value, bool genimm,
     std::shared_ptr<ASM_BasicBlock> block) {
+  if (m_value_map.find(value) != m_value_map.end()) {
+    return m_value_map[value];
+  }
   if (auto val = std::dynamic_pointer_cast<Constant>(value)) {
     return GenerateConstant(val, genimm, block);
   }
-  auto ret = m_value_map.find(value) != m_value_map.end() ? m_value_map[value]
-                                                          : nullptr;
-  if (ret) {
+  if (m_addr_map.find(value) != m_addr_map.end()) {
+    auto& [op, offs] = m_addr_map[value];
+    auto ret = std::make_shared<Operand>(OperandType::VREG);
+    if (0 <= offs && offs < 4096) {
+      appendLDR(ret, op, std::make_shared<Operand>(offs));
+    } else {
+      auto temp = std::make_shared<Operand>(OperandType::VREG);
+      appendMOV(temp, offs);
+      appendLDR(ret, op, temp);
+    }
+    m_value_map.insert({value, ret});
     return ret;
   }
   return createOperand(value);

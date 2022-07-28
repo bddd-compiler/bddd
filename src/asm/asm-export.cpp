@@ -136,19 +136,14 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
   m_push->exportASM(ofs);
 
 #ifndef SP_FOR_PARAM
-  if (!m_params_set_list.empty()) {
-    int sp_offs = (m_push->m_regs.size() + 1) * 4;
+  if (m_params > 4) {
+    int sp_offs = (m_push->m_regs.size()) * 4;
     if (sp_offs)
       ofs << "\tADD R11, SP, #" << std::to_string(sp_offs) << std::endl;
     else
       ofs << "\tMOV R11, SP" << std::endl;
   }
 #endif
-
-  // load params
-  for (auto& i : m_params_set_list) {
-    i->exportASM(ofs);
-  }
 
   // allocate stack
   int size = m_local_alloc;
@@ -178,7 +173,9 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
     if (Operand::immCheck(size)) {
       ofs << "\tADD SP, SP, #" << std::to_string(size) << std::endl;
     } else {
-      ofs << "\tLDR R12, =" << std::to_string(size) << std::endl;
+      ofs << "\tMOVW r12, #" << (size & 0xffff) << std::endl;
+      if (size & 0xffff0000)
+        ofs << "\tMOVT r12, #" << ((unsigned int)size >> 16) << std::endl;
       ofs << "\tADD sp, sp, r12" << std::endl;
     }
   }
@@ -252,12 +249,17 @@ void MOVInst::exportASM(std::ofstream& ofs) {
 void PInst::exportASM(std::ofstream& ofs) {
   exportInstHead(ofs);
   ofs << "{";
+  std::vector<std::shared_ptr<Operand>> regs(m_regs.begin(), m_regs.end());
+  sort(regs.begin(), regs.end(),
+       [=](std::shared_ptr<Operand> a, std::shared_ptr<Operand> b) {
+         return a->m_rreg < b->m_rreg;
+       });
+
   bool first = true;
-  for (auto& reg : m_regs) {
+  for (auto& reg : regs) {
     if (first) {
       first = false;
-    }
-    else {
+    } else {
       ofs << ", ";
     }
     ofs << reg->getName();

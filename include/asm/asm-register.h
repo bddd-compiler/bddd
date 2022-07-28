@@ -110,6 +110,8 @@ private:
 
   void LivenessAnalysis();
 
+  void init();
+
   void initialColors();
 
   void getInitial();

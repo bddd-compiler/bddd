@@ -277,7 +277,7 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   if (indices.size() == 1) {
     if (auto val = std::dynamic_pointer_cast<Constant>(indices[0]->m_value)) {
       assert(val->m_type.IsBasicInt());
-      offs = val->m_int_val;
+      offs = val->m_int_val * 4;
     } else {
       offs_op = builder->getOperand(indices[0]->m_value);
     }
@@ -290,7 +290,7 @@ std::shared_ptr<Operand> GenerateGepInstruction(
     if (auto val
         = std::dynamic_pointer_cast<Constant>(indices[i + 1]->m_value)) {
       assert(val->m_type.IsBasicInt());
-      offs += val->m_int_val * attribute;
+      offs += val->m_int_val * attribute * 4;
     } else {
       if (first) {
         first = false;
@@ -324,7 +324,11 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   if (!offs_op) {
     offs_op = const_offs_op;
   } else {
-    if (offs) builder->appendAS(InstOp::ADD, offs_op, offs_op, const_offs_op);
+    builder->appendShift(InstOp::LSL, offs_op, offs_op,
+                         std::make_shared<Operand>(2));
+    if (offs) {
+      builder->appendAS(InstOp::ADD, offs_op, offs_op, const_offs_op);
+    }
   }
 
   // store the absolute address in register, then return it
@@ -334,7 +338,6 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   auto add = builder->appendAS(InstOp::ADD,
                                std::make_shared<Operand>(OperandType::VREG),
                                getAddr(base_addr, builder), offs_op);
-  add->m_shift = std::make_unique<Shift>(Shift::ShiftType::LSL, 4);
   builder->m_value_map.insert(std::make_pair(inst, add->m_dest));
   return add->m_dest;
 }
@@ -472,6 +475,14 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
   // insert MOV instruction(from PHI)
   for (auto &b : func->m_blocks) {
     b->fillMOV();
+  }
+
+  // insert mov instruction in the entry block for loading params
+  auto first_block = func->m_blocks.front();
+  auto iter = first_block->m_insts.begin();
+  for (auto &mov : func->m_params_set_list) {
+    first_block->m_insts.insert(iter, mov);
+    mov->m_block = first_block;
   }
 }
 

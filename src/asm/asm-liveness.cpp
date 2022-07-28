@@ -24,12 +24,12 @@ void RegisterAllocator::LivenessAnalysis() {
     b->m_use.clear();
     for (auto& i : b->m_insts) {
       for (auto& def : i->m_def) {
-        if (b->m_def.find(def) == b->m_def.end()) {
+        if (b->m_use.find(def) == b->m_use.end()) {
           b->m_def.insert(def);
         }
       }
       for (auto& use : i->m_use) {
-        if (b->m_use.find(use) == b->m_use.end()) {
+        if (b->m_def.find(use) == b->m_def.end()) {
           b->m_use.insert(use);
         }
       }
@@ -220,26 +220,26 @@ void MULInst::replaceUse(std::shared_ptr<Operand> newOp,
 }
 
 void SDIVInst::replaceDef(std::shared_ptr<Operand> newOp,
-                        std::shared_ptr<Operand> oldOp) {
+                          std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);
   m_dest = newOp;
 }
 
 void SDIVInst::replaceUse(std::shared_ptr<Operand> newOp,
-                        std::shared_ptr<Operand> oldOp) {
+                          std::shared_ptr<Operand> oldOp) {
   assert(m_devidend == oldOp || m_devisor == oldOp);
   if (m_devidend == oldOp) m_devidend = newOp;
   if (m_devisor == oldOp) m_devisor = newOp;
 }
 
 void BITInst::replaceDef(std::shared_ptr<Operand> newOp,
-                        std::shared_ptr<Operand> oldOp) {
+                         std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);
   m_dest = newOp;
 }
 
 void BITInst::replaceUse(std::shared_ptr<Operand> newOp,
-                        std::shared_ptr<Operand> oldOp) {
+                         std::shared_ptr<Operand> oldOp) {
   assert(m_operand1 == oldOp || m_operand2 == oldOp);
   if (m_operand1 == oldOp) m_operand1 = newOp;
   if (m_operand2 == oldOp) m_operand2 = newOp;

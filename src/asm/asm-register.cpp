@@ -1,4 +1,5 @@
 #include "asm/asm-register.h"
+
 #include "asm/asm-fixed.h"
 
 RegisterAllocator::RegisterAllocator(std::shared_ptr<ASM_Module> module) {
@@ -9,6 +10,7 @@ void RegisterAllocator::Allocate() {
   assert(m_module);
   for (auto& func : m_module->m_funcs) {
     setCurFunction(func);
+    init();
     initialColors();
     getInitial();
     AllocateCurFunc();
@@ -31,12 +33,38 @@ void RegisterAllocator::setCurFunction(std::shared_ptr<ASM_Function> func) {
   m_cur_func = func;
 }
 
+void RegisterAllocator::init() {
+  precolored.clear();
+  initial.clear();
+  simplifyWorklist.clear();
+  freezeWorklist.clear();
+  spillWorklist.clear();
+  spilledNodes.clear();
+  coalescedNodes.clear();
+  coloredNodes.clear();
+  selectStack.clear();
+  coalescedRecord.clear();
+  coalescedMoves.clear();
+  constrainedMoves.clear();
+  frozenMoves.clear();
+  worklistMoves.clear();
+  activeMoves.clear();
+  adjSet.clear();
+  adjList.clear();
+  degree.clear();
+  moveList.clear();
+  alias.clear();
+  color.clear();
+  isSelectSpill = false;
+}
+
 void RegisterAllocator::initialColors() {
   rreg_avaliable = {RReg::R4, RReg::R5,  RReg::R6,  RReg::R7, RReg::R8,
                     RReg::R9, RReg::R10, RReg::R12, RReg::LR};
-  if (m_cur_func->m_params_set_list.empty()) {
+  if (m_cur_func->m_params <= 4) {
     rreg_avaliable.insert(RReg::R11);
   }
+  K = rreg_avaliable.size();
 }
 
 void RegisterAllocator::getInitial() {
@@ -62,6 +90,7 @@ void RegisterAllocator::getInitial() {
 
 void RegisterAllocator::updateDepth(std::shared_ptr<ASM_BasicBlock> block,
                                     OpPtr node) {
+  assert(block);
   if (m_depth_map[node] < block->m_loop_depth) {
     m_depth_map[node] = block->m_loop_depth;
   }
@@ -461,8 +490,8 @@ void RegisterAllocator::RewriteProgram() {
         auto& i = *iter;
         if (i->m_use.find(v) != i->m_use.end()) {
           // replace use
-
-          OpPtr newOp = Operand::getRReg(RReg::LR);
+          // OpPtr newOp = Operand::getRReg(RReg::LR);
+          OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
           i->replaceUse(newOp, v);
           i->m_use.erase(v);
           i->addUse(newOp);
@@ -484,12 +513,13 @@ void RegisterAllocator::RewriteProgram() {
           } else {
             b->insertSpillLDR(iter, ldr);
           }
+          newTemps.insert(newOp);
           updateDepth(b, newOp);
         }
         if (i->m_def.find(v) != i->m_def.end()) {
           // replace def
-
-          OpPtr newOp = Operand::getRReg(RReg::LR);
+          // OpPtr newOp = Operand::getRReg(RReg::LR);
+          OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
           i->replaceDef(newOp, v);
           i->m_def.erase(v);
           i->addDef(newOp);
@@ -511,6 +541,7 @@ void RegisterAllocator::RewriteProgram() {
           } else {
             b->insertSpillSTR(iter, str);
           };
+          newTemps.insert(newOp);
           updateDepth(b, newOp);
 
           // TODO(Huang): modify ↓

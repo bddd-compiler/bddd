@@ -33,7 +33,7 @@ void ASM_Function::appendPush(std::shared_ptr<Operand> reg) {
 }
 
 void ASM_Function::appendPop(std::shared_ptr<Operand> reg) {
-  if (m_push->m_regs.find(reg) == m_push->m_regs.end())
+  if (m_pop->m_regs.find(reg) == m_pop->m_regs.end())
     m_pop->m_regs.insert(reg);
 }
 
@@ -506,4 +506,10 @@ CTInst::CTInst(InstOp op, std::shared_ptr<Operand> operand1,
 
   addUse(operand1);
   addUse(operand2);
+}
+
+void POOLInst::exportASM(std::ofstream& ofs) {
+  ofs << "\tB .pool_" << std::to_string(m_number) << std::endl;
+  ofs << "\t.pool" << std::endl;
+  ofs << ".pool_" << std::to_string(m_number) << ":" << std::endl;
 }

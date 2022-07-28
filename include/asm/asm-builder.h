@@ -14,6 +14,10 @@ public:
 
   std::unordered_map<std::shared_ptr<Value>, std::shared_ptr<Operand>>
       m_value_map;
+  std::unordered_map<
+      std::shared_ptr<Value>,
+      std::pair<std::shared_ptr<Operand>, int>>
+      m_addr_map;
   std::unordered_map<std::shared_ptr<BasicBlock>,
                      std::shared_ptr<ASM_BasicBlock>>
       m_block_map;

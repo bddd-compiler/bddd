@@ -25,6 +25,7 @@ int main(int argc, char **argv) {
   }
   Driver driver;
 
+  std::cout << filename << std::endl;
   /**
    * parse the source code into AST
    * ASTs can be accessed via driver.comp_unit
@@ -94,6 +95,7 @@ int main(int argc, char **argv) {
   ofs4.close();
   RegisterAllocator(asm_module).Allocate();
   std::ofstream ofs5(filename.substr(0, filename.rfind('.')) + "_asm.s");
+  generateLiteralPool(asm_module);
   asm_module->exportASM(ofs5);
   ofs5.close();
 
