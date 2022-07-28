@@ -23,7 +23,6 @@ bool HasSideEffect(std::shared_ptr<Instruction> instr) {
   switch (instr->m_op) {
     case IROp::LOAD: {
       auto load_instr = std::dynamic_pointer_cast<LoadInstruction>(instr);
-      assert(load_instr != nullptr);
       if (auto global_var = std::dynamic_pointer_cast<GlobalVariable>(
               load_instr->m_addr->m_value)) {
         return true;  // load to a global variable
@@ -38,7 +37,6 @@ bool HasSideEffect(std::shared_ptr<Instruction> instr) {
     }
     case IROp::STORE: {
       auto store_instr = std::dynamic_pointer_cast<StoreInstruction>(instr);
-      assert(store_instr != nullptr);
       if (auto gep_instr = std::dynamic_pointer_cast<GetElementPtrInstruction>(
               store_instr->m_addr->m_value)) {
         if (auto alloca_instr = std::dynamic_pointer_cast<AllocaInstruction>(
@@ -52,7 +50,6 @@ bool HasSideEffect(std::shared_ptr<Instruction> instr) {
     case IROp::GET_ELEMENT_PTR: {
       auto gep_instr
           = std::dynamic_pointer_cast<GetElementPtrInstruction>(instr);
-      assert(gep_instr != nullptr);
 
       if (auto global_var = std::dynamic_pointer_cast<GlobalVariable>(
               gep_instr->m_addr->m_value)) {
@@ -66,6 +63,10 @@ bool HasSideEffect(std::shared_ptr<Instruction> instr) {
       }
       return false;
     }
+    case IROp::CALL: {
+      auto call_instr = std::dynamic_pointer_cast<CallInstruction>(instr);
+      return call_instr->m_function->m_side_effect;
+    }
     default:
       return false;
   }
@@ -73,6 +74,9 @@ bool HasSideEffect(std::shared_ptr<Instruction> instr) {
 
 void ComputeSideEffect(std::unique_ptr<Module> &module) {
   called_graph.clear();
+  for (auto &func : module->m_function_decl_list) {
+    func->m_side_effect = true;  // I/O functions have side effect
+  }
   for (auto &func : module->m_function_list) {
     func->m_visited = false;
     func->m_side_effect = false;  // 无罪推定是吧
@@ -80,6 +84,7 @@ void ComputeSideEffect(std::unique_ptr<Module> &module) {
   for (auto &func : module->m_function_list) {
     for (auto &bb : func->m_bb_list) {
       for (auto &instr : bb->m_instr_list) {
+        // check side effect by instructions
         if (HasSideEffect(instr)) {
           func->m_side_effect = true;
         }
@@ -93,7 +98,7 @@ void ComputeSideEffect(std::unique_ptr<Module> &module) {
   }
 
   for (auto &func : module->m_function_list) {
-    dfs(func);
+    dfs(func);  // check side effect from call graph
   }
 }
 

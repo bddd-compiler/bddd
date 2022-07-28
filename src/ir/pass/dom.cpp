@@ -45,53 +45,53 @@ void tarjan(size_t u) {
   }
 }
 
-void RemoveUnusedBlocks(std::shared_ptr<Function> function) {
-  bbs.clear();
-  bbs.push_back(nullptr);
-  size_t cnt = 0;
-  for (auto &bb : function->m_bb_list) {
-    bb->m_id = ++cnt;
-    bb->m_predecessors.clear();
-    bbs.push_back(bb);
-  }
-  size_t n = function->m_bb_list.size();
-  f_graph.clear();
-  f_graph.resize(n + 5);
-  dfn.clear();
-  dfn.resize(n + 5);
-  ord.clear();
-  ord.resize(n + 5);
-  fa.clear();
-  fa.resize(n + 5);
-  co = 0;
-
-  for (auto &bb : function->m_bb_list) {
-    // terminator instruction only have jump, branch, return
-    size_t u = bb->m_id;
-    for (const std::shared_ptr<BasicBlock> &v_block : bb->Successors()) {
-      size_t v = v_block->m_id;
-      f_graph[u].push_back(v);
-      v_block->m_predecessors.push_back(bb);
-    }
-  }
-  tarjan(1);  // start from 1
-
-  for (auto it = function->m_bb_list.begin();
-       it != function->m_bb_list.end();) {
-    auto bb = *it;
-    if (!dfn[bb->m_id]) {
-      // not visited
-      auto del = it;
-      ++it;
-      function->m_bb_list.erase(del);
-    } else {
-      ++it;
-    }
-  }
-}
+// void RemoveUnusedBlocks(std::shared_ptr<Function> function) {
+//   bbs.clear();
+//   bbs.push_back(nullptr);
+//   size_t cnt = 0;
+//   for (auto &bb : function->m_bb_list) {
+//     bb->m_id = ++cnt;
+//     bb->m_predecessors.clear();
+//     bbs.push_back(bb);
+//   }
+//   size_t n = function->m_bb_list.size();
+//   f_graph.clear();
+//   f_graph.resize(n + 5);
+//   dfn.clear();
+//   dfn.resize(n + 5);
+//   ord.clear();
+//   ord.resize(n + 5);
+//   fa.clear();
+//   fa.resize(n + 5);
+//   co = 0;
+//
+//   for (auto &bb : function->m_bb_list) {
+//     // terminator instruction only have jump, branch, return
+//     size_t u = bb->m_id;
+//     for (const std::shared_ptr<BasicBlock> &v_block : bb->Successors()) {
+//       size_t v = v_block->m_id;
+//       f_graph[u].push_back(v);
+//       v_block->m_predecessors.insert(bb);
+//     }
+//   }
+//   tarjan(1);  // start from 1
+//
+//   for (auto it = function->m_bb_list.begin();
+//        it != function->m_bb_list.end();) {
+//     auto bb = *it;
+//     if (!dfn[bb->m_id]) {
+//       // not visited
+//       auto del = it;
+//       ++it;
+//       function->m_bb_list.erase(del);
+//     } else {
+//       ++it;
+//     }
+//   }
+// }
 
 void ComputeDominanceRelationship(std::shared_ptr<Function> function) {
-  RemoveUnusedBlocks(function);
+  RemoveUnvisitedBasicBlocks(function);
 
   // allocate id for each basic block
   bbs.clear();
@@ -137,7 +137,7 @@ void ComputeDominanceRelationship(std::shared_ptr<Function> function) {
       size_t v = v_block->m_id;
       f_graph[u].push_back(v);
       b_graph[v].push_back(u);
-      v_block->m_predecessors.push_back(bb);
+      v_block->m_predecessors.insert(bb);
     }
   }
 

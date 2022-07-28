@@ -6,27 +6,248 @@ void IRBuilder::AppendBasicBlock(std::shared_ptr<BasicBlock> bb) {
   m_module->AppendBasicBlock(std::move(bb));
 }
 std::shared_ptr<Value> IRBuilder::GetIntConstant(int int_val) {
-  auto bb = m_module->GetCurrentBB();
-  auto constant = std::make_shared<Constant>(int_val, BasicType::INT, bb);
-  m_module->m_const_ints.emplace_back(int_val, constant);
-  return constant;
+  auto it = m_module->m_const_ints.find(int_val);
+  if (it != m_module->m_const_ints.end()) {
+    return it->second;
+  } else {
+    auto c = std::make_shared<Constant>(int_val, BasicType::INT);
+    m_module->m_const_ints[int_val] = c;
+    return c;
+  }
 }
 std::shared_ptr<Value> IRBuilder::GetFloatConstant(float float_val) {
-  auto bb = m_module->GetCurrentBB();
-  auto constant = std::make_shared<Constant>(float_val, bb);
-  m_module->m_const_floats.emplace_back(float_val, constant);
-  return constant;
+  auto it = m_module->m_const_floats.find(float_val);
+  if (it != m_module->m_const_floats.end()) {
+    return it->second;
+  } else {
+    auto c = std::make_shared<Constant>(float_val);
+    m_module->m_const_floats[float_val] = c;
+    return c;
+  }
 }
 std::shared_ptr<Value> IRBuilder::GetBoolConstant(bool bool_val) {
-  auto bb = m_module->GetCurrentBB();
-  auto constant = std::make_shared<Constant>(bool_val, BasicType::BOOL, bb);
-  return constant;
+  auto it = m_module->m_const_bools.find(bool_val);
+  if (it != m_module->m_const_bools.end()) {
+    return it->second;
+  } else {
+    auto c = std::make_shared<Constant>(bool_val, BasicType::BOOL);
+    m_module->m_const_floats[bool_val] = c;
+    return c;
+  }
 }
 std::shared_ptr<Value> IRBuilder::GetCharConstant(char char_val) {
-  auto bb = m_module->GetCurrentBB();
-  auto constant = std::make_shared<Constant>(char_val, BasicType::CHAR, bb);
-  return constant;
+  auto it = m_module->m_const_chars.find(char_val);
+  if (it != m_module->m_const_chars.end()) {
+    return it->second;
+  } else {
+    auto c = std::make_shared<Constant>(char_val, BasicType::CHAR);
+    m_module->m_const_floats[char_val] = c;
+    return c;
+  }
 }
+// std::shared_ptr<Value> IRBuilder::GetIntConstant(
+//     int int_val, std::unique_ptr<Module>& module) {
+//   auto it = module->m_const_ints.find(int_val);
+//   if (it != module->m_const_ints.end()) {
+//     return it->second;
+//   } else {
+//     auto c = std::make_shared<Constant>(int_val, BasicType::INT);
+//     module->m_const_ints[int_val] = c;
+//     return c;
+//   }
+// }
+// std::shared_ptr<Value> IRBuilder::GetFloatConstant(
+//     float float_val, std::unique_ptr<Module>& module) {
+//   auto it = module->m_const_floats.find(float_val);
+//   if (it != module->m_const_floats.end()) {
+//     return it->second;
+//   } else {
+//     auto c = std::make_shared<Constant>(float_val);
+//     module->m_const_floats[float_val] = c;
+//     return c;
+//   }
+// }
+// std::shared_ptr<Value> IRBuilder::GetBoolConstant(
+//     bool bool_val, std::unique_ptr<Module>& module) {
+//   auto it = module->m_const_bools.find(bool_val);
+//   if (it != module->m_const_bools.end()) {
+//     return it->second;
+//   } else {
+//     auto c = std::make_shared<Constant>(bool_val, BasicType::BOOL);
+//     module->m_const_floats[bool_val] = c;
+//     return c;
+//   }
+// }
+// std::shared_ptr<Value> IRBuilder::GetCharConstant(
+//     char char_val, std::unique_ptr<Module>& module) {
+//   auto it = module->m_const_chars.find(char_val);
+//   if (it != module->m_const_chars.end()) {
+//     return it->second;
+//   } else {
+//     auto c = std::make_shared<Constant>(char_val, BasicType::CHAR);
+//     module->m_const_floats[char_val] = c;
+//     return c;
+//   }
+// }
+
+// only support binary operators
+// lhs and rhs can be allowed to be int or float
+std::shared_ptr<Value> IRBuilder::GetConstant(IROp op, EvalValue lhs,
+                                              EvalValue rhs) {
+  switch (op) {
+    case IROp::ADD:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetIntConstant((lhs + rhs).IntVal());
+    case IROp::F_ADD:
+      assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+      return GetFloatConstant((lhs + rhs).FloatVal());
+    case IROp::SUB:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetIntConstant((lhs - rhs).IntVal());
+    case IROp::F_SUB:
+      assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+      return GetFloatConstant((lhs - rhs).FloatVal());
+    case IROp::MUL:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetIntConstant((lhs * rhs).IntVal());
+    case IROp::F_MUL:
+      assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+      return GetFloatConstant((lhs * rhs).FloatVal());
+    case IROp::SDIV:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetIntConstant((lhs / rhs).IntVal());
+    case IROp::F_DIV:
+      assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+      return GetFloatConstant((lhs / rhs).FloatVal());
+    case IROp::SREM:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetIntConstant((lhs % rhs).IntVal());
+    case IROp::F_NEG:
+      assert(lhs.IsConstFloat());
+      return GetFloatConstant(-lhs.FloatVal());
+      break;
+    case IROp::I_SGE:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetBoolConstant(lhs.IntVal() >= rhs.IntVal());
+    case IROp::I_SGT:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetBoolConstant(lhs.IntVal() > rhs.IntVal());
+    case IROp::I_SLE:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetBoolConstant(lhs.IntVal() <= rhs.IntVal());
+    case IROp::I_SLT:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetBoolConstant(lhs.IntVal() < rhs.IntVal());
+    case IROp::I_EQ:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetBoolConstant(lhs.IntVal() == rhs.IntVal());
+    case IROp::I_NE:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetBoolConstant(lhs.IntVal() != rhs.IntVal());
+    case IROp::F_EQ:
+      assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+      return GetBoolConstant(lhs.FloatVal() == rhs.FloatVal());
+    case IROp::F_NE:
+      assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+      return GetBoolConstant(lhs.FloatVal() != rhs.FloatVal());
+    case IROp::F_GT:
+      assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+      return GetBoolConstant(lhs.FloatVal() > rhs.FloatVal());
+    case IROp::F_GE:
+      assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+      return GetBoolConstant(lhs.FloatVal() >= rhs.FloatVal());
+    case IROp::F_LT:
+      assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+      return GetBoolConstant(lhs.FloatVal() < rhs.FloatVal());
+    case IROp::F_LE:
+      assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+      return GetBoolConstant(lhs.FloatVal() <= rhs.FloatVal());
+    case IROp::XOR:
+      assert(lhs.IsConstInt() && rhs.IsConstInt());
+      return GetBoolConstant(lhs.IntVal() ^ rhs.IntVal());  // temp sol
+    default:
+      assert(false);  // uncovered
+  }
+}
+// // only support binary operators
+// // lhs and rhs can be allowed to be int or float
+// std::shared_ptr<Value> IRBuilder::GetConstant(IROp op, EvalValue lhs,
+//                                               EvalValue rhs,
+//                                               std::unique_ptr<Module>&
+//                                               module) {
+//   switch (op) {
+//     case IROp::ADD:
+//       assert(lhs.IsConstInt() && rhs.IsConstInt());
+//       return GetIntConstant((lhs + rhs).IntVal(), module);
+//     case IROp::F_ADD:
+//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+//       return GetFloatConstant((lhs + rhs).FloatVal(), module);
+//     case IROp::SUB:
+//       assert(lhs.IsConstInt() && rhs.IsConstInt());
+//       return GetIntConstant((lhs - rhs).IntVal(), module);
+//     case IROp::F_SUB:
+//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+//       return GetFloatConstant((lhs - rhs).FloatVal(), module);
+//     case IROp::MUL:
+//       assert(lhs.IsConstInt() && rhs.IsConstInt());
+//       return GetIntConstant((lhs * rhs).IntVal(), module);
+//     case IROp::F_MUL:
+//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+//       return GetFloatConstant((lhs * rhs).FloatVal(), module);
+//     case IROp::SDIV:
+//       assert(lhs.IsConstInt() && rhs.IsConstInt());
+//       return GetIntConstant((lhs / rhs).IntVal(), module);
+//     case IROp::F_DIV:
+//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+//       return GetFloatConstant((lhs / rhs).FloatVal(), module);
+//     case IROp::SREM:
+//       assert(lhs.IsConstInt() && rhs.IsConstInt());
+//       return GetIntConstant((lhs % rhs).IntVal(), module);
+//     case IROp::F_NEG:
+//       assert(lhs.IsConstFloat());
+//       return GetFloatConstant(-lhs.FloatVal(), module);
+//       break;
+//     case IROp::I_SGE:
+//       assert(lhs.IsConstInt() && rhs.IsConstInt());
+//       return GetBoolConstant(lhs.IntVal() >= rhs.IntVal(), module);
+//     case IROp::I_SGT:
+//       assert(lhs.IsConstInt() && rhs.IsConstInt());
+//       return GetBoolConstant(lhs.IntVal() > rhs.IntVal(), module);
+//     case IROp::I_SLE:
+//       assert(lhs.IsConstInt() && rhs.IsConstInt());
+//       return GetBoolConstant(lhs.IntVal() <= rhs.IntVal(), module);
+//     case IROp::I_SLT:
+//       assert(lhs.IsConstInt() && rhs.IsConstInt());
+//       return GetBoolConstant(lhs.IntVal() < rhs.IntVal(), module);
+//     case IROp::I_EQ:
+//       assert(lhs.IsConstInt() && rhs.IsConstInt());
+//       return GetBoolConstant(lhs.IntVal() == rhs.IntVal(), module);
+//     case IROp::I_NE:
+//       assert(lhs.IsConstInt() && rhs.IsConstInt());
+//       return GetBoolConstant(lhs.IntVal() != rhs.IntVal(), module);
+//     case IROp::F_EQ:
+//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+//       return GetBoolConstant(lhs.FloatVal() == rhs.FloatVal(), module);
+//     case IROp::F_NE:
+//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+//       return GetBoolConstant(lhs.FloatVal() != rhs.FloatVal(), module);
+//     case IROp::F_GT:
+//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+//       return GetBoolConstant(lhs.FloatVal() > rhs.FloatVal(), module);
+//     case IROp::F_GE:
+//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+//       return GetBoolConstant(lhs.FloatVal() >= rhs.FloatVal(), module);
+//     case IROp::F_LT:
+//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+//       return GetBoolConstant(lhs.FloatVal() < rhs.FloatVal(), module);
+//     case IROp::F_LE:
+//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
+//       return GetBoolConstant(lhs.FloatVal() <= rhs.FloatVal(), module);
+//     default:
+//       assert(false);  // uncovered
+//   }
+// }
+
 std::shared_ptr<IntGlobalVariable> IRBuilder::CreateIntGlobalVariable(
     std::shared_ptr<DeclAST> decl) {
   std::vector<int> flatten_vals;
@@ -402,19 +623,6 @@ std::shared_ptr<PhiInstruction> IRBuilder::CreatePhiInstruction(
   return instr;
 }
 
-std::shared_ptr<Value> IRBuilder::GetConstant(IROp op,
-                                              std::shared_ptr<Value> lhs,
-                                              std::shared_ptr<Value> rhs) {
-  auto lhs_constant = std::dynamic_pointer_cast<Constant>(lhs);
-  auto rhs_constant = std::dynamic_pointer_cast<Constant>(rhs);
-  if (lhs_constant == nullptr || rhs_constant == nullptr) assert(false);  // ???
-
-  auto result = lhs_constant->Evaluate() + rhs_constant->Evaluate();
-  if (result.IsFloat())
-    return GetFloatConstant(result.FloatVal());
-  else
-    return GetIntConstant(result.IntVal());
-}
 void IRBuilder::CreateMemsetInstruction(std::shared_ptr<Value> first_elem,
                                         int size) {
   auto first = CreateBitCastInstruction(first_elem, BasicType::CHAR);

@@ -49,6 +49,9 @@ set(IR_PASSES
   src/ir/pass/dead-code-elimination.cpp
   src/ir/pass/side-effect.cpp
   src/ir/pass/dom.cpp
+  src/ir/pass/rpo.cpp 
+  src/ir/pass/basic.cpp 
+  src/ir/pass/tail-recursion.cpp
 )
 
 set(ASM_SOURCE

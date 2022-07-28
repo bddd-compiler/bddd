@@ -86,10 +86,9 @@ public:
   std::shared_ptr<Value> GetBoolConstant(bool bool_val);
   std::shared_ptr<Value> GetCharConstant(char char_val);
 
-  std::shared_ptr<Value> GetConstant(IROp op, std::shared_ptr<Value> lhs,
-                                     std::shared_ptr<Value> rhs);
+  std::shared_ptr<Value> GetConstant(IROp op, EvalValue lhs, EvalValue rhs);
 
-  // create an empty phi instruction and insert at the prehead of bb
+  // create an empty phi instruction and insert at the preheader of bb
   std::shared_ptr<PhiInstruction> CreatePhiInstruction(
       ValueType type, std::shared_ptr<BasicBlock> bb);
 };

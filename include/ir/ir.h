@@ -39,7 +39,7 @@ enum class IROp {
   F_LT,
   F_LE,
 
-  XOR,
+  XOR,  // currently just used in i1 (boolean)
 
   CALL,
   BRANCH,
@@ -295,19 +295,16 @@ public:
   // constants may belong to any bb, which is useful in mem2reg
 
   // non-float
-  explicit Constant(int int_val, BasicType basic_type,
-                    std::shared_ptr<BasicBlock> bb)
+  explicit Constant(int int_val, BasicType basic_type)
       : Value(basic_type, true), m_int_val(int_val), m_float_val(0.0) {
     assert(basic_type == BasicType::INT || basic_type == BasicType::BOOL
            || basic_type == BasicType::CHAR);
-    m_bb = std::move(bb);
-    assert(m_bb != nullptr);
+    assert(m_bb == nullptr);
   }
 
-  explicit Constant(float float_val, std::shared_ptr<BasicBlock> bb)
+  explicit Constant(float float_val)
       : Value(BasicType::FLOAT, true), m_int_val(0), m_float_val(float_val) {
-    m_bb = std::move(bb);
-    assert(m_bb != nullptr);
+    assert(m_bb == nullptr);
   }
 
   // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
@@ -316,8 +313,8 @@ public:
   EvalValue Evaluate() {
     switch (m_type.m_base_type) {
       case BasicType::INT:
+      case BasicType::BOOL:
       case BasicType::CHAR:
-        return EvalValue(m_int_val);
         return EvalValue(m_int_val);
       case BasicType::FLOAT:
         return EvalValue(m_float_val);
@@ -722,7 +719,6 @@ public:
   std::vector<std::shared_ptr<Use>> Operands() override { return {}; }
 };
 
-// TODO(garen): initialization from IRBuilder
 class PhiInstruction : public Instruction {
 public:
   std::unordered_map<std::shared_ptr<BasicBlock>, std::shared_ptr<Use>>
@@ -759,11 +755,28 @@ public:
     }
   }
 
+  void ReplacePhiOperand(std::shared_ptr<BasicBlock> old_block,
+                         std::shared_ptr<BasicBlock> new_block) {
+    auto it = m_contents.find(old_block);
+    if (it != m_contents.end()) {
+      AddPhiOperand(new_block, it->second->m_value);
+      m_contents.erase(it);
+    }
+  }
+
   bool IsValid();
 
-  void Remove(std::shared_ptr<Value> val) {
+  void RemoveByValue(std::shared_ptr<Value> val) {
     for (auto it = m_contents.begin(); it != m_contents.end(); ++it) {
       if (it->second->m_value == val) {
+        m_contents.erase(it);
+        return;
+      }
+    }
+  }
+  void RemoveByBasicBlock(std::shared_ptr<BasicBlock> bb) {
+    for (auto it = m_contents.begin(); it != m_contents.end(); ++it) {
+      if (it->first == bb) {
         m_contents.erase(it);
         return;
       }
@@ -876,15 +889,12 @@ public:
   std::unordered_set<std::shared_ptr<BasicBlock>>
       m_dominated;  // 我被谁支配（可能是自己）
   std::unordered_set<std::shared_ptr<BasicBlock>> m_dominance_frontier;
-  int m_dom_depth;  // depth in dominance tree
-
-  // members used in ComputeLoopInfo
+  int m_dom_depth;   // depth in dominance tree
+  int m_dfs_depth;   // computed in rpo dfs
   int m_loop_depth;  // depth in loop (see ComputeLoopInfo)
 
   bool m_visited;  // first used in mem2reg
-  std::vector<std::shared_ptr<BasicBlock>> m_predecessors;
-
-  // m_bb = nullptr (otherwise self-loop)
+  std::unordered_set<std::shared_ptr<BasicBlock>> m_predecessors;
 
   // methods
 
@@ -893,6 +903,8 @@ public:
         m_name(std::move(name)),
         m_id(0),
         m_dom_depth(-1),
+        m_dfs_depth(-1),
+        m_loop_depth(-1),
         m_visited(false) {}
 
   void PushBackInstruction(std::shared_ptr<Instruction> instr);
@@ -909,8 +921,15 @@ public:
     return m_instr_list.back();
   }
 
-  std::vector<std::shared_ptr<BasicBlock>> Predecessors();
-  std::vector<std::shared_ptr<BasicBlock>> Successors();
+  std::unordered_set<std::shared_ptr<BasicBlock>> Predecessors();
+  std::unordered_set<std::shared_ptr<BasicBlock>> Successors();
+
+  void RemovePredecessor(std::shared_ptr<BasicBlock> bb);
+
+  void ReplacePredecessorBy(std::shared_ptr<BasicBlock> old_block,
+                            std::shared_ptr<BasicBlock> new_block);
+  void ReplaceSuccessorBy(std::shared_ptr<BasicBlock> old_block,
+                          std::shared_ptr<BasicBlock> new_block);
 
   bool Dominate(std::shared_ptr<BasicBlock> bb);
   bool IsDominatedBy(std::shared_ptr<BasicBlock> bb);
@@ -979,6 +998,8 @@ public:
   std::vector<std::shared_ptr<FunctionArg>> m_args;
   std::list<std::shared_ptr<BasicBlock>> m_bb_list;
 
+  std::list<std::shared_ptr<BasicBlock>> m_rpo_bb_list;
+
   bool m_visited;      // first used in ComputeSideEffect
   bool m_side_effect;  // whether the function has side effect
 
@@ -1034,8 +1055,10 @@ public:
   std::list<std::shared_ptr<Function>> m_function_decl_list;
   std::list<std::shared_ptr<GlobalVariable>> m_global_variable_list;
 
-  std::vector<std::pair<int, std::shared_ptr<Constant>>> m_const_ints;
-  std::vector<std::pair<float, std::shared_ptr<Constant>>> m_const_floats;
+  std::unordered_map<int, std::shared_ptr<Constant>> m_const_ints;
+  std::unordered_map<float, std::shared_ptr<Constant>> m_const_floats;
+  std::unordered_map<bool, std::shared_ptr<Constant>> m_const_bools;
+  std::unordered_map<char, std::shared_ptr<Constant>> m_const_chars;
 
   std::shared_ptr<BasicBlock> GetCurrentBB() {
     return m_current_func->GetCurrentBB();
@@ -1047,7 +1070,7 @@ public:
   void AppendGlobalVariable(std::shared_ptr<GlobalVariable> global_variable);
   void AppendBasicBlock(std::shared_ptr<BasicBlock> bb);
 
-  void Check();
+  void RemoveInstrsAfterTerminator();
   void ExportIR(std::ofstream &ofs, int depth);
 
   // void AllocateName(std::shared_ptr<IRNameAllocator> allocator);

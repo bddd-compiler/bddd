@@ -6,6 +6,10 @@
 
 void Mem2Reg(std::shared_ptr<Function> function,
              std::shared_ptr<IRBuilder> builder) {
+  // prerequisites
+  ComputeDominanceRelationship(function);
+  ComputeDominanceFrontier(function);
+
   size_t alloca_cnt = 0;
   std::vector<std::shared_ptr<AllocaInstruction>> allocas;
   for (auto &bb : function->m_bb_list) {
@@ -42,9 +46,6 @@ void Mem2Reg(std::shared_ptr<Function> function,
   }
 
   // part1: insert phi functions
-  ComputeDominanceRelationship(function);
-  ComputeDominanceFrontier(function);
-
   std::unordered_map<std::shared_ptr<PhiInstruction>,
                      std::shared_ptr<AllocaInstruction>>
       phis;
@@ -158,6 +159,19 @@ void Mem2Reg(std::shared_ptr<Function> function,
         } else {
           break;
         }
+      }
+    }
+  }
+
+  // simple checking
+  for (auto bb : function->m_bb_list) {
+    auto predecessors = bb->Predecessors();
+    for (auto instr : bb->m_instr_list) {
+      if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
+        if (!phi->IsValid())
+          throw MyException("existing uncovered predecessor block");
+      } else {
+        break;
       }
     }
   }
