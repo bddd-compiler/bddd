@@ -42,7 +42,8 @@ void RemoveUnvisitedBasicBlocks(std::shared_ptr<Function> func) {
         // FORGET removing ALL USES from the use_list of their VALUES???????
 
         for (auto &instr : bb->m_instr_list) {
-          instr->RemoveAllUses();
+          instr->KillAllUses();
+          instr->KillAllMyUses();
         }
       } else {
         ++it;
@@ -82,9 +83,9 @@ void RemoveTrivialPhis(std::shared_ptr<Function> func) {
             continue;  // undef
           }
           if (val == nullptr) {
-            if (use->m_value != phi) val = use->m_value;
+            if (use->getValue() != phi) val = use->getValue();
           } else {
-            if (use->m_value != phi && use->m_value != val) {
+            if (use->getValue() != phi && use->getValue() != val) {
               // not correct
               flag = false;
               break;
@@ -126,9 +127,9 @@ void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
       auto last_instr = bb->LastInstruction();
       if (auto br_instr
           = std::dynamic_pointer_cast<BranchInstruction>(last_instr)) {
-        if (br_instr->m_cond->m_value->m_type.IsConst()) {
-          auto c
-              = std::dynamic_pointer_cast<Constant>(br_instr->m_cond->m_value);
+        if (br_instr->m_cond->getValue()->m_type.IsConst()) {
+          auto c = std::dynamic_pointer_cast<Constant>(
+              br_instr->m_cond->getValue());
           std::shared_ptr<BasicBlock> target_block = nullptr;
           if (c->Evaluate().IsNotZero()) {
             // go to true_block

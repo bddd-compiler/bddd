@@ -17,62 +17,39 @@
 //   }
 // }
 //
-void Use::UseValue(std::shared_ptr<Value> value) {
+void Use::UseValue(const std::shared_ptr<Value>& value) {
   assert(value != nullptr);
-
-  // 别别别，我杀我自己是吧
-  // if (m_value) {
-  //   m_value->KillUse(m_user);
-  //   m_value = nullptr;
-  // }
-  // m_value = value;
-  // m_value->AddUse(m_user);
-
-  m_value = std::move(value);
+  m_value = value;
 }
 
-void Use::RemoveFromUseList() {
-  auto it = std::find_if(m_value->m_use_list.begin(), m_value->m_use_list.end(),
-                         [=](const auto& ptr) { return *ptr == *this; });
-  assert(it != m_value->m_use_list.end());
-  m_value->m_use_list.erase(it);
-}
-
-std::shared_ptr<Use> Value::AddUse(const std::shared_ptr<Value>& user) {
+Use* Value::AddUse(const std::shared_ptr<Value>& user) {
   auto this_ptr = shared_from_this();
   // maybe phi instruction can use itself
   // assert(this_ptr != user);
-  auto ret = std::make_shared<Use>(this_ptr, user);
-  // if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(user)) {
-  //   // phi->AddPhiOperand()
-  //   assert(phi->m_contents.size() + 1 == phi->m_bb->m_predecessors.size());
-  //   auto pred = std::find_if(
-  //       phi->m_bb->m_predecessors.begin(), phi->m_bb->m_predecessors.end(),
-  //       [=](const auto& x) {
-  //         return phi->m_contents.find(x) == phi->m_contents.end();
-  //       });
-  //   assert(pred != phi->m_bb->m_predecessors.end());
-  //   phi->m_contents[*pred] = ret;
-  // }
-  m_use_list.push_back(ret);
-  return ret;
+  m_use_list.push_back(std::make_unique<Use>(this_ptr, user));
+  return m_use_list.back().get();
 }
 
-void Value::KillUse(const std::shared_ptr<Value>& user) {
-  for (auto it = m_use_list.begin(); it != m_use_list.end(); ++it) {
-    if ((*it)->m_user == user) {
-      // if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(user)) {
-      //   phi->RemoveByValue(shared_from_this());
-      // }
-      m_use_list.erase(it);
-      return;
-    }
+std::unique_ptr<Use> Value::KillUse(const std::shared_ptr<Value>& user,
+                                    bool mov) {
+  auto it = std::find_if(
+      m_use_list.begin(), m_use_list.end(),
+      [&user](const auto& use) { return use->getUser() == user; });
+  assert(it != m_use_list.end());
+  // ATTENTION: no need to inform the user to remove the use
+  // std::cerr << "[debug] killed" << std::endl;
+  if (!mov) {
+    m_use_list.erase(it);
+    return nullptr;
+  } else {
+    auto ptr = std::move(*it);
+    m_use_list.erase(it);
+    return std::move(ptr);
   }
-  assert(false);  // not found! what happen?
 }
 void Value::KillAllUses() {
   for (auto it = m_use_list.begin(); it != m_use_list.end();) {
-    auto user = (*it)->m_user;
+    auto user = (*it)->m_user.lock();
     ++it;
     KillUse(user);
   }
@@ -81,13 +58,19 @@ void Value::KillAllUses() {
 // move from val's m_use_list to new_val's m_use_list
 void Value::ReplaceUseBy(const std::shared_ptr<Value>& new_val) {
   for (auto it = m_use_list.begin(); it != m_use_list.end();) {
-    auto use = *it;
+    auto use = (*it).get();
     ++it;
-    assert(use->m_value == shared_from_this());
-    KillUse(use->m_user);
-
-    use->UseValue(new_val);
-    new_val->m_use_list.push_back(use);
+    assert(use->getValue() == shared_from_this());
+    auto user = use->getUser();
+    // SOMETHING NONTRIVIAL HERE: we just
+    // 1. move the value's ownership out here
+    auto use_ptr = KillUse(user, true);
+    assert(use_ptr.get() == use);
+    // 2. change its value to the new_val
+    use_ptr->m_value = new_val;
+    // 3. add to new_val's m_use_list
+    new_val->m_use_list.push_back(std::move(use_ptr));
+    // in this way, it is no need for this replacement action to inform users
   }
 }
 
@@ -154,11 +137,18 @@ void BasicBlock::InsertBackInstruction(const std::shared_ptr<Instruction>& elem,
   m_instr_list.insert(it, std::move(instr));
 }
 void BasicBlock::RemoveInstruction(const std::shared_ptr<Instruction>& elem) {
-  auto it = std::find_if(m_instr_list.begin(), m_instr_list.end(),
-                         [=](auto x) { return x.get() == elem.get(); });
-  if (it != m_instr_list.end()) {
-    m_instr_list.erase(it);
-  }
+  auto it = std::find(m_instr_list.begin(), m_instr_list.end(), elem);
+  assert(it != m_instr_list.end());
+  (*it)->KillAllMyUses();
+  (*it)->KillAllUses();
+  m_instr_list.erase(it);
+}
+void BasicBlock::RemoveInstruction(
+    std::list<std::shared_ptr<Instruction>>::iterator it) {
+  assert(it != m_instr_list.end());
+  (*it)->KillAllMyUses();
+  (*it)->KillAllUses();
+  m_instr_list.erase(it);
 }
 std::unordered_set<std::shared_ptr<BasicBlock>> BasicBlock::Predecessors() {
   return m_predecessors;

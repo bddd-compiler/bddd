@@ -5,7 +5,7 @@ void dfs(std::shared_ptr<Instruction> instr) {
   instr->m_visited = true;
   for (auto &operand : instr->Operands()) {
     if (auto operand_instr
-        = std::dynamic_pointer_cast<Instruction>(operand->m_value)) {
+        = std::dynamic_pointer_cast<Instruction>(operand->getValue())) {
       dfs(operand_instr);
     }
   }
@@ -33,7 +33,7 @@ void DeadCodeElimination(std::shared_ptr<Function> function) {
         auto del = it;
         ++it;
         for (auto &op : instr->Operands()) {
-          op->m_value->KillUse(instr);
+          op->getValue()->KillUse(instr);
           op = nullptr;
         }
         bb->RemoveInstruction(del);

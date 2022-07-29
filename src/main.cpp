@@ -14,8 +14,8 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    // filename = "../testSource/buaa/part11/test1.c";
-    filename = "../testSource/functional/27_while_test2.c";
+    // filename = "../testSource/buaa/part12/test1.c";
+    filename = "../testSource/functional/86_long_code2.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -62,18 +62,18 @@ int main(int argc, char **argv) {
   auto pass_manager = std::make_unique<IRPassManager>(builder);
   pass_manager->Mem2RegPass();  // now no allocas for single variable
 
-  pass_manager->GVNPass();  // global value numbering
-
-  std::ofstream ofs2(filename.substr(0, filename.rfind('.'))
-                     + "_ir_example.out");
-  builder->m_module->ExportIR(ofs2, 0);
-  ofs2.close();
-
-  // but IR after GVN may not be executable since the position is incorrect
-  // (some virtual registers do not dominate all of its uses)
-  // we should hoist these VRs to a proper place, so use GCM
-
-  pass_manager->GCMPass();
+  // pass_manager->GVNPass();  // global value numbering
+  //
+  // std::ofstream ofs2(filename.substr(0, filename.rfind('.'))
+  //                    + "_ir_example.out");
+  // builder->m_module->ExportIR(ofs2, 0);
+  // ofs2.close();
+  //
+  // // but IR after GVN may not be executable since the position is incorrect
+  // // (some virtual registers do not dominate all of its uses)
+  // // we should hoist these VRs to a proper place, so use GCM
+  //
+  // pass_manager->GCMPass();
 
   std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_ir.out");
   builder->m_module->ExportIR(ofs3, 0);

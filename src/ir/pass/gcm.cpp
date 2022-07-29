@@ -34,8 +34,8 @@ void ScheduleEarly(std::shared_ptr<Instruction> instr,
       || std::dynamic_pointer_cast<GetElementPtrInstruction>(instr)
       || std::dynamic_pointer_cast<LoadInstruction>(instr)) {
     MoveInstruction(instr, root);
-    for (auto &op : instr->Operands()) {
-      if (auto input = std::dynamic_pointer_cast<Instruction>(op->m_value)) {
+    for (auto op : instr->Operands()) {
+      if (auto input = std::dynamic_pointer_cast<Instruction>(op->getValue())) {
         ScheduleEarly(input, root);
         if (instr->m_bb->m_dom_depth < input->m_bb->m_dom_depth) {
           MoveInstruction(instr, input->m_bb);
@@ -72,15 +72,15 @@ void ScheduleLate(std::shared_ptr<Instruction> instr) {
       || std::dynamic_pointer_cast<GetElementPtrInstruction>(instr)
       || std::dynamic_pointer_cast<LoadInstruction>(instr)) {
     std::shared_ptr<BasicBlock> lca = nullptr;
-    for (auto &y_use : instr->UseList()) {
+    for (auto &y_use : instr->m_use_list) {
       if (auto y = std::dynamic_pointer_cast<Instruction>(
               std::shared_ptr(y_use->m_user))) {
         ScheduleLate(y);
         auto use = y->m_bb;
         if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(y)) {
-          auto it
-              = std::find_if(phi->m_contents.begin(), phi->m_contents.end(),
-                             [=](const auto &p) { return p.second == y_use; });
+          auto it = std::find_if(
+              phi->m_contents.begin(), phi->m_contents.end(),
+              [&y_use](const auto &p) { return p.second == y_use.get(); });
           assert(it != phi->m_contents.end());
           use = it->first;
         }
@@ -106,7 +106,7 @@ void ScheduleLate(std::shared_ptr<Instruction> instr) {
          ++it) {
       auto instr2 = *it;
       if (instr2->m_op != IROp::PHI) {
-        for (auto &use : instr->UseList()) {
+        for (auto &use : instr->m_use_list) {
           if (std::shared_ptr(use->m_user) == instr2) {
             // no need to remove all uses
             best->m_instr_list.remove(instr);

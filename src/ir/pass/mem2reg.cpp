@@ -36,7 +36,7 @@ void Mem2Reg(std::shared_ptr<Function> function,
       if (auto store_instr
           = std::dynamic_pointer_cast<StoreInstruction>(instr)) {
         if (auto alloca_instr = std::dynamic_pointer_cast<AllocaInstruction>(
-                store_instr->m_addr->m_value)) {
+                store_instr->m_addr->getValue())) {
           if (alloca_instr->m_alloca_id >= 0) {
             alloca_instr->m_defs.push_back(bb);
           }
@@ -100,7 +100,12 @@ void Mem2Reg(std::shared_ptr<Function> function,
           // alloca, just remove it
           auto del = it;
           ++it;
-          bb->RemoveInstruction(del);
+
+          // bb->RemoveInstruction(del);
+          // WARNING: cannot call RemoveInstruction since it really deletes the
+          // alloca instruction but mem2reg need allocas to store the reaching
+          // definitions
+          bb->m_instr_list.erase(del);
         } else {
           ++it;
         }
@@ -108,7 +113,7 @@ void Mem2Reg(std::shared_ptr<Function> function,
                  = std::dynamic_pointer_cast<LoadInstruction>(instr)) {
         // load, replace it by its reaching def
         auto alloca = std::dynamic_pointer_cast<AllocaInstruction>(
-            load_instr->m_addr->m_value);
+            load_instr->m_addr->getValue());
         if (alloca != nullptr && alloca->m_alloca_id >= 0) {
           load_instr->ReplaceUseBy(reaching_defs[alloca->m_alloca_id]);
           auto del = it;
@@ -121,9 +126,9 @@ void Mem2Reg(std::shared_ptr<Function> function,
                  = std::dynamic_pointer_cast<StoreInstruction>(instr)) {
         // store, update reaching def
         auto alloca = std::dynamic_pointer_cast<AllocaInstruction>(
-            store_instr->m_addr->m_value);
+            store_instr->m_addr->getValue());
         if (alloca != nullptr && alloca->m_alloca_id >= 0) {
-          reaching_defs[alloca->m_alloca_id] = store_instr->m_val->m_value;
+          reaching_defs[alloca->m_alloca_id] = store_instr->m_val->getValue();
           auto del = it;
           ++it;
           bb->RemoveInstruction(del);
@@ -143,12 +148,12 @@ void Mem2Reg(std::shared_ptr<Function> function,
       }
     }
 
-    for (auto suc : bb->Successors()) {
+    for (auto &suc : bb->Successors()) {
       assert(suc != nullptr);
       if (!suc->m_visited) {
         stack.push(std::make_pair(suc, reaching_defs));
       }
-      for (auto instr : suc->m_instr_list) {
+      for (auto &instr : suc->m_instr_list) {
         if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
           auto phi_it = phis.find(phi);
           if (phi_it != phis.end()) {
@@ -163,9 +168,9 @@ void Mem2Reg(std::shared_ptr<Function> function,
   }
 
   // simple checking
-  for (auto bb : function->m_bb_list) {
+  for (auto &bb : function->m_bb_list) {
     auto predecessors = bb->Predecessors();
-    for (auto instr : bb->m_instr_list) {
+    for (auto &instr : bb->m_instr_list) {
       if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
         if (!phi->IsValid())
           throw MyException("existing uncovered predecessor block");
@@ -177,7 +182,7 @@ void Mem2Reg(std::shared_ptr<Function> function,
 }
 
 void IRPassManager::Mem2RegPass() {
-  for (auto func : m_builder->m_module->m_function_list) {
+  for (auto &func : m_builder->m_module->m_function_list) {
     Mem2Reg(func, m_builder);
   }
 }
