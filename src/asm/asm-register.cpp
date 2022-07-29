@@ -403,7 +403,6 @@ void RegisterAllocator::SelectSpill() {
   // Note: avoid choosing nodes that are the tiny live ranges
   // resulting from the fetches of previously spilled registers
 
-  // now we just select the first
   if (!isSelectSpill) {
     coalescedRecord.insert(coalescedNodes.begin(), coalescedNodes.end());
     isSelectSpill = true;
@@ -462,26 +461,19 @@ void RegisterAllocator::AssignColors() {
 
 void RegisterAllocator::RewriteProgram() {
   // debug("RewriteProgram");
-  // TODO(Huang):
   // Allocate memory locations for each v ∈ spilledNodes,
   // Create a new temporary vi for each definition and each use,
   // In the program (instructions), insert a store after each
   // definition of a vi, a fetch before each use of a vi.
   // Put all the vi into a set newTemps.
 
-  // std::cout << "Haven't allocate memory for spill nodes" << std::endl;
-  // assert(false);
   std::unordered_set<OpPtr> newTemps;
   for (auto& v : spilledNodes) {
     if (v->lifespan == 1 && !v->rejected) {
-      // std::cerr << "asm: WARN: refuse to spill variable with lifespan of 1!"
-      //           << std::endl;
       v->rejected = true;
       newTemps.insert(v);
       continue;
     }
-    // if (v->rejected)
-    //   std::cerr << "asm: WARN: Spilling rejected vreg!!!!?" << std::endl;
 
     int sp_offs = m_cur_func->getStackSize();
     m_cur_func->allocateStack(4);
@@ -490,7 +482,6 @@ void RegisterAllocator::RewriteProgram() {
         auto& i = *iter;
         if (i->m_use.find(v) != i->m_use.end()) {
           // replace use
-          // OpPtr newOp = Operand::getRReg(RReg::LR);
           OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
           i->replaceUse(newOp, v);
           i->m_use.erase(v);
@@ -518,7 +509,6 @@ void RegisterAllocator::RewriteProgram() {
         }
         if (i->m_def.find(v) != i->m_def.end()) {
           // replace def
-          // OpPtr newOp = Operand::getRReg(RReg::LR);
           OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
           i->replaceDef(newOp, v);
           i->m_def.erase(v);
@@ -543,21 +533,6 @@ void RegisterAllocator::RewriteProgram() {
           };
           newTemps.insert(newOp);
           updateDepth(b, newOp);
-
-          // TODO(Huang): modify ↓
-          auto next = std::next(iter);
-          while (next != b->m_insts.end()
-                 && (*next)->m_def.find(v) == (*next)->m_def.end()) {
-            if ((*next)->m_use.find(v) != (*next)->m_use.end()) {
-              (*next)->replaceUse(newOp, v);
-              (*next)->m_use.erase(v);
-              (*next)->addUse(newOp);
-              next++;
-              iter++;
-            } else {
-              break;
-            }
-          }
         }
       }
     }

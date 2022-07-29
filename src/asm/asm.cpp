@@ -85,10 +85,15 @@ void ASM_BasicBlock::fillMOV() {
   }
 }
 
-// int type immediate check
-// arm instruction use a 12-bit immediate
-// 4 bits rotation, 8 bits value
-// check whether the imm is valid
+#include "asm/asm.h"
+
+// for MOV, ADD, SUB, RSB
+/*
+  int type immediate check
+  arm instruction use a 12-bit immediate
+  4 bits rotation, 8 bits value
+  check whether the imm is valid
+*/
 bool Operand::immCheck(int imm) {
   if ((imm & ~0xff) == 0 || (imm & ~0xc000003f) == 0 || (imm & ~0xf000000f) == 0
       || (imm & ~0xfc000003) == 0) {
@@ -104,6 +109,7 @@ bool Operand::immCheck(int imm) {
   return false;
 }
 
+// for VMOV
 /*
   float type immediate check
   arm floating-poing process instruction use a a 8-bit imm to represent IEEE-754

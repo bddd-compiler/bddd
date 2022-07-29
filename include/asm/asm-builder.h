@@ -14,9 +14,8 @@ public:
 
   std::unordered_map<std::shared_ptr<Value>, std::shared_ptr<Operand>>
       m_value_map;
-  std::unordered_map<
-      std::shared_ptr<Value>,
-      std::pair<std::shared_ptr<Operand>, int>>
+  std::unordered_map<std::shared_ptr<Value>,
+                     std::pair<std::shared_ptr<Operand>, int>>
       m_addr_map;
   std::unordered_map<std::shared_ptr<BasicBlock>,
                      std::shared_ptr<ASM_BasicBlock>>
@@ -46,8 +45,7 @@ public:
 
   std::shared_ptr<Operand> getOperand(std::shared_ptr<Value> value,
                                       bool genimm = false,
-                                      std::shared_ptr<ASM_BasicBlock> block
-                                      = nullptr);
+                                      bool checkimm = true);
 
   std::shared_ptr<Operand> createOperand(std::shared_ptr<Value> value);
 
@@ -121,7 +119,7 @@ public:
 
   std::shared_ptr<Operand> GenerateConstant(
       std::shared_ptr<Constant> value, bool genimm,
-      std::shared_ptr<ASM_BasicBlock> block = nullptr);
+      bool checkimm);
 };
 
 void GenerateModule(std::shared_ptr<Module> ir_module,

@@ -62,6 +62,7 @@ set(ASM_SOURCE
   src/asm/asm-liveness.cpp
   src/asm/asm-register.cpp
   src/asm/asm-fixed.cpp
+  src/asm/asm-optimization.cpp
 )
 
 add_executable(bddd

@@ -11,6 +11,7 @@
 #include <unordered_set>
 #include <vector>
 #include <set>
+#include <bitset>
 
 #include "ir/ir.h"
 
@@ -557,5 +558,13 @@ public:
   void replaceUse(std::shared_ptr<Operand> newOp,
                   std::shared_ptr<Operand> oldOp) override {}
 };
+
+// float-related instruction
+class VMOVInst : public ASM_Instruction {
+public:
+  
+};
+
+
 
 #endif  // BDDD_ASM_H

@@ -134,14 +134,14 @@ void ASM_Builder::reclaimSP() {
   m_cur_func->m_sp_alloc_size.pop();
 }
 
-std::shared_ptr<Operand> ASM_Builder::getOperand(
-    std::shared_ptr<Value> value, bool genimm,
-    std::shared_ptr<ASM_BasicBlock> block) {
+std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value,
+                                                 bool genimm,
+                                                 bool checkimm) {
   if (m_value_map.find(value) != m_value_map.end()) {
     return m_value_map[value];
   }
   if (auto val = std::dynamic_pointer_cast<Constant>(value)) {
-    return GenerateConstant(val, genimm, block);
+    return GenerateConstant(val, genimm, checkimm);
   }
   if (m_addr_map.find(value) != m_addr_map.end()) {
     auto& [op, offs] = m_addr_map[value];
