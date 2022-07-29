@@ -21,34 +21,6 @@ bool IsCommutative(IROp op) {
   }
 }
 
-bool IsICmp(IROp op) {
-  switch (op) {
-    case IROp::I_SGE:
-    case IROp::I_SGT:
-    case IROp::I_SLE:
-    case IROp::I_SLT:
-    case IROp::I_EQ:
-    case IROp::I_NE:
-      return true;
-    default:
-      return false;
-  }
-}
-
-bool IsFCmp(IROp op) {
-  switch (op) {
-    case IROp::F_EQ:
-    case IROp::F_NE:
-    case IROp::F_GT:
-    case IROp::F_GE:
-    case IROp::F_LT:
-    case IROp::F_LE:
-      return true;
-    default:
-      return false;
-  }
-}
-
 std::vector<std::pair<std::shared_ptr<Value>, std::shared_ptr<Value>>> g_vns;
 std::unordered_map<std::shared_ptr<Value>, size_t> g_idx;
 
@@ -346,7 +318,7 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
     }
   }
 
-  if (IsICmp(instr->m_op) || IsFCmp(instr->m_op)) return instr;
+  if (instr->IsICmp() || instr->IsFCmp()) return instr;
 
   // find previous computed values from cloud
   int i = 0;
@@ -445,7 +417,7 @@ void RunGVN(std::shared_ptr<Function> function,
         g_vns.pop_back();
         auto del = it;
         ++it;
-        bb->m_instr_list.erase(del);
+        bb->RemoveInstruction(del);
       } else {
         ++it;
       }

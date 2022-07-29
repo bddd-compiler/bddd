@@ -48,8 +48,8 @@ void TailRecursionOptimization(std::unique_ptr<Module>& module) {
                   param_phis[i]->AddPhiOperand(new_entry, func->m_args[i]);
                 }
               }
-              bb->m_instr_list.remove(call_instr);
-              bb->m_instr_list.remove(ret_instr);
+              bb->RemoveInstruction(call_instr);
+              bb->RemoveInstruction(ret_instr);
               auto new_jump_instr
                   = std::make_shared<JumpInstruction>(old_entry, bb);
               bb->PushBackInstruction(new_jump_instr);

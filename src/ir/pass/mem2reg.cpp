@@ -100,7 +100,7 @@ void Mem2Reg(std::shared_ptr<Function> function,
           // alloca, just remove it
           auto del = it;
           ++it;
-          bb->m_instr_list.erase(del);
+          bb->RemoveInstruction(del);
         } else {
           ++it;
         }
@@ -113,8 +113,7 @@ void Mem2Reg(std::shared_ptr<Function> function,
           load_instr->ReplaceUseBy(reaching_defs[alloca->m_alloca_id]);
           auto del = it;
           ++it;
-          bb->m_instr_list.erase(del);
-          // load_instr->m_addr.reset();
+          bb->RemoveInstruction(del);
         } else {
           ++it;
         }
@@ -127,7 +126,7 @@ void Mem2Reg(std::shared_ptr<Function> function,
           reaching_defs[alloca->m_alloca_id] = store_instr->m_val->m_value;
           auto del = it;
           ++it;
-          bb->m_instr_list.erase(del);
+          bb->RemoveInstruction(del);
           // store_instr->m_addr.reset();
         } else {
           ++it;

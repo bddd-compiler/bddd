@@ -10,6 +10,8 @@ void RemoveUnvisitedBasicBlocks(std::shared_ptr<Function> func);
 void RemoveTrivialPhis(std::shared_ptr<Function> func);
 void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func);
 void RemoveTrivialBasicBlock(std::shared_ptr<Function> func);
+void ComputeLoopRelationship(std::shared_ptr<Function> func);
+void DeadCodeElimination(std::shared_ptr<Function> function);
 
 class IRPassManager {
 public:
