@@ -24,11 +24,11 @@ bool HasSideEffect(std::shared_ptr<Instruction> instr) {
     case IROp::LOAD: {
       auto load_instr = std::dynamic_pointer_cast<LoadInstruction>(instr);
       if (auto global_var = std::dynamic_pointer_cast<GlobalVariable>(
-              load_instr->m_addr->m_value)) {
+              load_instr->m_addr->getValue())) {
         return true;  // load to a global variable
       }
       if (auto alloca_var = std::dynamic_pointer_cast<AllocaInstruction>(
-              load_instr->m_addr->m_value)) {
+              load_instr->m_addr->getValue())) {
         if (alloca_var->m_is_arg) {
           return true;  // is an array from outer function
         }
@@ -38,9 +38,9 @@ bool HasSideEffect(std::shared_ptr<Instruction> instr) {
     case IROp::STORE: {
       auto store_instr = std::dynamic_pointer_cast<StoreInstruction>(instr);
       if (auto gep_instr = std::dynamic_pointer_cast<GetElementPtrInstruction>(
-              store_instr->m_addr->m_value)) {
+              store_instr->m_addr->getValue())) {
         if (auto alloca_instr = std::dynamic_pointer_cast<AllocaInstruction>(
-                gep_instr->m_addr->m_value)) {
+                gep_instr->m_addr->getValue())) {
           // example: a[0] = 3, where a is the local array in stack
           return false;  // no side effect when writing local variable
         }
@@ -52,11 +52,11 @@ bool HasSideEffect(std::shared_ptr<Instruction> instr) {
           = std::dynamic_pointer_cast<GetElementPtrInstruction>(instr);
 
       if (auto global_var = std::dynamic_pointer_cast<GlobalVariable>(
-              gep_instr->m_addr->m_value)) {
+              gep_instr->m_addr->getValue())) {
         return true;  // load to a global variable
       }
       if (auto alloca_var = std::dynamic_pointer_cast<AllocaInstruction>(
-              gep_instr->m_addr->m_value)) {
+              gep_instr->m_addr->getValue())) {
         if (alloca_var->m_is_arg) {
           return true;  // is an array from outer function
         }

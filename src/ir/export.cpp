@@ -296,16 +296,17 @@ void BinaryInstruction::ExportIR(std::ofstream& ofs, int depth) {
 
   ofs << std::string(depth * 2, ' ');
   ofs << g_reg_allocator.GetValueName(shared_from_this()) << " = ";
-  ofs << BinaryOpToString(m_op) << " " << m_lhs_val_use->m_value->m_type << " ";
-  ofs << g_reg_allocator.GetValueName(m_lhs_val_use->m_value) << ", "
-      << g_reg_allocator.GetValueName(m_rhs_val_use->m_value) << std::endl;
+  ofs << BinaryOpToString(m_op) << " " << m_lhs_val_use->getValue()->m_type
+      << " ";
+  ofs << g_reg_allocator.GetValueName(m_lhs_val_use->getValue()) << ", "
+      << g_reg_allocator.GetValueName(m_rhs_val_use->getValue()) << std::endl;
 }
 void FNegInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
   ofs << g_reg_allocator.GetValueName(shared_from_this()) << " = ";
   ofs << "fneg"
-      << " " << m_lhs_val_use->m_value->m_type << " "
-      << g_reg_allocator.GetValueName(m_lhs_val_use->m_value) << std::endl;
+      << " " << m_lhs_val_use->getValue()->m_type << " "
+      << g_reg_allocator.GetValueName(m_lhs_val_use->getValue()) << std::endl;
 }
 void CallInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
@@ -321,15 +322,15 @@ void CallInstruction::ExportIR(std::ofstream& ofs, int depth) {
     else
       ofs << ", ";
 
-    ofs << param->m_value->m_type << " "
-        << g_reg_allocator.GetValueName(param->m_value);
+    ofs << param->getValue()->m_type << " "
+        << g_reg_allocator.GetValueName(param->getValue());
   }
   ofs << ")" << std::endl;
 }
 void BranchInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ') << "br ";
-  ofs << m_cond->m_value->m_type << " "
-      << g_reg_allocator.GetValueName(m_cond->m_value) << ", ";
+  ofs << m_cond->getValue()->m_type << " "
+      << g_reg_allocator.GetValueName(m_cond->getValue()) << ", ";
   ofs << m_true_block->m_type << " "
       << g_label_allocator.GetLabelName(m_true_block) << ", ";
   ofs << m_false_block->m_type << " "
@@ -342,52 +343,52 @@ void JumpInstruction::ExportIR(std::ofstream& ofs, int depth) {
 }
 void ReturnInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
-  if (m_ret == nullptr || m_ret->m_value == nullptr) {
+  if (m_ret == nullptr) {
     ofs << "ret void" << std::endl;
   } else if (IsConstant()) {
-    ofs << "ret " << m_ret->m_value->m_type << " ";
-    m_ret->m_value->ExportIR(ofs, depth);
+    ofs << "ret " << m_ret->getValue()->m_type << " ";
+    m_ret->getValue()->ExportIR(ofs, depth);
     ofs << std::endl;
   } else {
     // ret_val->ExportIR(ofs, depth);
-    ofs << "ret " << m_ret->m_value->m_type << " "
-        << g_reg_allocator.GetValueName(m_ret->m_value) << std::endl;
+    ofs << "ret " << m_ret->getValue()->m_type << " "
+        << g_reg_allocator.GetValueName(m_ret->getValue()) << std::endl;
   }
 }
 void GetElementPtrInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
   ofs << g_reg_allocator.GetValueName(shared_from_this()) << " = ";
-  ofs << "getelementptr " << m_addr->m_value->m_type.Dereference() << ", ";
-  ofs << m_addr->m_value->m_type << " "
-      << g_reg_allocator.GetValueName(m_addr->m_value) << ", ";
+  ofs << "getelementptr " << m_addr->getValue()->m_type.Dereference() << ", ";
+  ofs << m_addr->getValue()->m_type << " "
+      << g_reg_allocator.GetValueName(m_addr->getValue()) << ", ";
   bool first = true;
   for (const auto& index : m_indices) {
     if (first)
       first = false;
     else
       ofs << ", ";
-    ofs << index->m_value->m_type << " "
-        << g_reg_allocator.GetValueName(index->m_value);
+    ofs << index->getValue()->m_type << " "
+        << g_reg_allocator.GetValueName(index->getValue());
   }
   ofs << std::endl;
 }
 void LoadInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
   ofs << g_reg_allocator.GetValueName(shared_from_this()) << " = ";
-  ofs << "load " << m_type << ", " << m_addr->m_value->m_type << " "
-      << g_reg_allocator.GetValueName(m_addr->m_value);
+  ofs << "load " << m_type << ", " << m_addr->getValue()->m_type << " "
+      << g_reg_allocator.GetValueName(m_addr->getValue());
   ofs << std::endl;
 }
 void StoreInstruction::ExportIR(std::ofstream& ofs, int depth) {
-  assert(m_val->m_value != nullptr);
-  assert(m_addr->m_value != nullptr);
+  assert(m_val->getValue() != nullptr);
+  assert(m_addr->getValue() != nullptr);
 
   ofs << std::string(depth * 2, ' ');
-  ofs << "store " << m_val->m_value->m_type << " "
-      << g_reg_allocator.GetValueName(m_val->m_value);
+  ofs << "store " << m_val->getValue()->m_type << " "
+      << g_reg_allocator.GetValueName(m_val->getValue());
   // m_val.m_value->ExportIR(ofs, depth);
-  ofs << ", " << m_addr->m_value->GetType() << " "
-      << g_reg_allocator.GetValueName(m_addr->m_value);
+  ofs << ", " << m_addr->getValue()->GetType() << " "
+      << g_reg_allocator.GetValueName(m_addr->getValue());
   ofs << std::endl;
 }
 void AllocaInstruction::ExportIR(std::ofstream& ofs, int depth) {
@@ -413,7 +414,7 @@ void PhiInstruction::ExportIR(std::ofstream& ofs, int depth) {
     if (incoming_val == nullptr) {
       ofs << "undef";
     } else {
-      ofs << g_reg_allocator.GetValueName(incoming_val->m_value);
+      ofs << g_reg_allocator.GetValueName(incoming_val->getValue());
     }
     ofs << ", " << g_label_allocator.GetLabelName(bb) << " ]";
   }
@@ -445,28 +446,30 @@ void Constant::ExportIR(std::ofstream& ofs, int depth) {
 void BitCastInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
   ofs << g_reg_allocator.GetValueName(shared_from_this()) << " = bitcast ";
-  ofs << m_val->m_value->m_type << " "
-      << g_reg_allocator.GetValueName(m_val->m_value) << " to " << m_target_type
-      << "*" << std::endl;
+  ofs << m_val->getValue()->m_type << " "
+      << g_reg_allocator.GetValueName(m_val->getValue()) << " to "
+      << m_target_type << "*" << std::endl;
 }
 void ZExtInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
   ofs << g_reg_allocator.GetValueName(shared_from_this()) << " = zext ";
-  ofs << m_val->m_value->m_type << " "
-      << g_reg_allocator.GetValueName(m_val->m_value) << " to i32" << std::endl;
+  ofs << m_val->getValue()->m_type << " "
+      << g_reg_allocator.GetValueName(m_val->getValue()) << " to i32"
+      << std::endl;
 }
 void SIToFPInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
   ofs << g_reg_allocator.GetValueName(shared_from_this()) << " = sitofp ";
-  ofs << m_val->m_value->m_type << " "
-      << g_reg_allocator.GetValueName(m_val->m_value) << " to float"
+  ofs << m_val->getValue()->m_type << " "
+      << g_reg_allocator.GetValueName(m_val->getValue()) << " to float"
       << std::endl;
 }
 void FPToSIInstruction::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::string(depth * 2, ' ');
   ofs << g_reg_allocator.GetValueName(shared_from_this()) << " = fptosi ";
-  ofs << m_val->m_value->m_type << " "
-      << g_reg_allocator.GetValueName(m_val->m_value) << " to i32" << std::endl;
+  ofs << m_val->getValue()->m_type << " "
+      << g_reg_allocator.GetValueName(m_val->getValue()) << " to i32"
+      << std::endl;
 }
 // not complete
 void FunctionArg::ExportIR(std::ofstream& ofs, int depth) {

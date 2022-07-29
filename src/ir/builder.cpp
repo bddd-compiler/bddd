@@ -31,7 +31,7 @@ std::shared_ptr<Value> IRBuilder::GetBoolConstant(bool bool_val) {
     return it->second;
   } else {
     auto c = std::make_shared<Constant>(bool_val, BasicType::BOOL);
-    m_module->m_const_floats[bool_val] = c;
+    m_module->m_const_bools[bool_val] = c;
     return c;
   }
 }
@@ -41,7 +41,7 @@ std::shared_ptr<Value> IRBuilder::GetCharConstant(char char_val) {
     return it->second;
   } else {
     auto c = std::make_shared<Constant>(char_val, BasicType::CHAR);
-    m_module->m_const_floats[char_val] = c;
+    m_module->m_const_chars[char_val] = c;
     return c;
   }
 }
@@ -322,7 +322,8 @@ std::shared_ptr<BasicBlock> IRBuilder::CreateBasicBlock(
 std::shared_ptr<Instruction> IRBuilder::CreateFNegInstruction(
     const std::shared_ptr<Value>& lhs) {
   auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<FNegInstruction>(lhs, bb);
+  auto instr = std::make_shared<FNegInstruction>(bb);
+  instr->m_lhs_val_use = lhs->AddUse(instr);
   bb->PushBackInstruction(instr);
   return instr;
 }
@@ -330,32 +331,34 @@ std::shared_ptr<Instruction> IRBuilder::CreateBinaryInstruction(
     IROp op, const std::shared_ptr<Value>& lhs,
     const std::shared_ptr<Value>& rhs) {
   auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<BinaryInstruction>(op, lhs, rhs, bb);
+  auto instr = std::make_shared<BinaryInstruction>(op, bb);
+  instr->m_lhs_val_use = lhs->AddUse(instr);
+  instr->m_rhs_val_use = rhs->AddUse(instr);
 
-  auto lhs_type = instr->m_lhs_val_use->m_value->m_type,
-       rhs_type = instr->m_rhs_val_use->m_value->m_type;
+  auto lhs_type = instr->m_lhs_val_use->getValue()->m_type,
+       rhs_type = instr->m_rhs_val_use->getValue()->m_type;
   if (lhs_type.IsBasicBool() && rhs_type.IsBasicInt()) {
     // zext for lhs
-    auto new_lhs = CreateZExtInstruction(instr->m_lhs_val_use->m_value);
-    instr->m_lhs_val_use->m_value->KillUse(instr->m_lhs_val_use->m_user);
+    auto new_lhs = CreateZExtInstruction(instr->m_lhs_val_use->getValue());
+    instr->m_lhs_val_use->getValue()->KillUse(instr->m_lhs_val_use->getUser());
     instr->m_lhs_val_use = new_lhs->AddUse(instr);
   } else if (lhs_type.IsBasicInt() && rhs_type.IsBasicBool()) {
     // zext for rhs
-    auto new_rhs = CreateZExtInstruction(instr->m_rhs_val_use->m_value);
-    instr->m_rhs_val_use->m_value->KillUse(instr->m_rhs_val_use->m_user);
+    auto new_rhs = CreateZExtInstruction(instr->m_rhs_val_use->getValue());
+    instr->m_rhs_val_use->getValue()->KillUse(instr->m_rhs_val_use->getUser());
     instr->m_rhs_val_use = new_rhs->AddUse(instr);
   } else if (lhs_type.IsBasicInt() && rhs_type.IsBasicFloat()) {
     // sitofp for lhs
-    auto new_lhs = CreateSIToFPInstruction(instr->m_lhs_val_use->m_value);
-    instr->m_lhs_val_use->m_value->KillUse(instr->m_lhs_val_use->m_user);
+    auto new_lhs = CreateSIToFPInstruction(instr->m_lhs_val_use->getValue());
+    instr->m_lhs_val_use->getValue()->KillUse(instr->m_lhs_val_use->getUser());
     instr->m_lhs_val_use = new_lhs->AddUse(instr);
   } else if (lhs_type.IsBasicFloat() && rhs_type.IsBasicInt()) {
     // sitofp for rhs
-    auto new_rhs = CreateSIToFPInstruction(instr->m_rhs_val_use->m_value);
-    instr->m_rhs_val_use->m_value->KillUse(instr->m_rhs_val_use->m_user);
+    auto new_rhs = CreateSIToFPInstruction(instr->m_rhs_val_use->getValue());
+    instr->m_rhs_val_use->getValue()->KillUse(instr->m_rhs_val_use->getUser());
     instr->m_rhs_val_use = new_rhs->AddUse(instr);
-  } else if (instr->m_lhs_val_use->m_value->m_type
-             != instr->m_rhs_val_use->m_value->m_type) {
+  } else if (instr->m_lhs_val_use->getValue()->m_type
+             != instr->m_rhs_val_use->getValue()->m_type) {
     assert(false);  // not considered yet
   }
   bb->PushBackInstruction(instr);
@@ -386,12 +389,12 @@ std::shared_ptr<CallInstruction> IRBuilder::CreateCallInstruction(
   auto bb = m_module->GetCurrentBB();
   auto instr = std::make_shared<CallInstruction>(return_type,
                                                  std::move(func_name), bb);
-  std::vector<std::shared_ptr<Use>> params_uses;
+  std::vector<Use*> params_uses;
   for (auto& val : params_values) {
     auto use = val->AddUse(instr);
     params_uses.push_back(use);
   }
-  instr->m_function = std::move(function);
+  instr->m_function = function;
   // for (auto& param_use : params_uses) {
   //   param_use->InitUser(instr);
   // }
@@ -476,17 +479,16 @@ std::shared_ptr<Instruction> IRBuilder::CreateBranchInstruction(
       auto new_cond_val
           = CreateBinaryInstruction(IROp::I_NE, cond_val, GetIntConstant(0));
       auto instr = std::make_shared<BranchInstruction>(
-          std::move(new_cond_val), std::move(true_block),
-          std::move(false_block), bb);
-      // instr->m_cond->InitUser(instr);
+          std::move(true_block), std::move(false_block), bb);
+      instr->m_cond = new_cond_val->AddUse(instr);
       bb->PushBackInstruction(instr);
       return instr;
     } else if (cond_val->m_type.IsBasicFloat()) {
       auto new_cond_val = CreateBinaryInstruction(IROp::F_NE, cond_val,
                                                   GetFloatConstant(0.0));
       auto instr = std::make_shared<BranchInstruction>(
-          std::move(new_cond_val), std::move(true_block),
-          std::move(false_block), bb);
+          std::move(true_block), std::move(false_block), bb);
+      instr->m_cond = new_cond_val->AddUse(instr);
       bb->PushBackInstruction(instr);
       return instr;
     } else {
@@ -494,12 +496,13 @@ std::shared_ptr<Instruction> IRBuilder::CreateBranchInstruction(
     }
   } else {
     auto instr = std::make_shared<BranchInstruction>(
-        std::move(cond_val), std::move(true_block), std::move(false_block), bb);
-    // instr->m_cond->InitUser(instr);
+        std::move(true_block), std::move(false_block), bb);
+    instr->m_cond = cond_val->AddUse(instr);
     bb->PushBackInstruction(instr);
     return instr;
   }
 }
+// SPECIAL
 std::shared_ptr<Instruction> IRBuilder::CreateStoreInstruction(
     std::shared_ptr<Value> addr, std::shared_ptr<Value> val) {
   // maybe store int to float
@@ -519,26 +522,39 @@ std::shared_ptr<Instruction> IRBuilder::CreateStoreInstruction(
     }
   }
   auto bb = m_module->GetCurrentBB();
-  auto instr
-      = std::make_shared<StoreInstruction>(std::move(addr), std::move(val), bb);
-  // instr->m_addr->InitUser(instr);
-  // instr->m_val->InitUser(instr);
+  auto instr = std::make_shared<StoreInstruction>(bb);
+  instr->m_addr = addr->AddUse(instr);
+  instr->m_val = val->AddUse(instr);
   bb->PushBackInstruction(instr);
   return instr;
 }
+// SPECIAL
 std::shared_ptr<Instruction> IRBuilder::CreateGetElementPtrInstruction(
     std::shared_ptr<Value> addr, std::vector<std::shared_ptr<Value>> indices) {
   auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<GetElementPtrInstruction>(
-      std::move(addr), std::move(indices), bb);
+  auto instr = std::make_shared<GetElementPtrInstruction>(bb);
+  instr->m_addr = addr->AddUse(instr);
+  for (auto& index : indices) {
+    instr->m_indices.push_back(index->AddUse(instr));
+  }
+
+  instr->m_type.Set(addr->m_type.m_base_type, true);
+  instr->m_type.m_dimensions.clear();
+  // TODO(garen): maybe wrong here
+  for (size_t i = instr->m_indices.size() - 1;
+       i < addr->m_type.m_dimensions.size(); ++i) {
+    instr->m_type.m_dimensions.push_back(addr->m_type.m_dimensions[i]);
+  }
   bb->PushBackInstruction(instr);
   return instr;
 }
+// SPECIAL
 std::shared_ptr<Instruction> IRBuilder::CreateLoadInstruction(
     std::shared_ptr<Value> addr) {
   auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<LoadInstruction>(addr, bb);
-  // instr->m_addr->InitUser(instr);
+  auto instr = std::make_shared<LoadInstruction>(bb);
+  instr->m_addr = addr->AddUse(instr);
+  instr->m_type = addr->m_type.Dereference();
   m_module->GetCurrentBB()->PushBackInstruction(instr);
   return instr;
 }
@@ -584,8 +600,8 @@ std::shared_ptr<Instruction> IRBuilder::CreateAllocaInstruction(
 std::shared_ptr<Value> IRBuilder::CreateBitCastInstruction(
     std::shared_ptr<Value> from, BasicType target_type) {
   auto bb = m_module->GetCurrentBB();
-  auto instr
-      = std::make_shared<BitCastInstruction>(std::move(from), target_type, bb);
+  auto instr = std::make_shared<BitCastInstruction>(target_type, bb);
+  instr->m_val = from->AddUse(instr);
   bb->PushBackInstruction(instr);
   return instr;
 }
@@ -593,8 +609,8 @@ std::shared_ptr<Value> IRBuilder::CreateBitCastInstruction(
 std::shared_ptr<Value> IRBuilder::CreateZExtInstruction(
     std::shared_ptr<Value> from) {
   auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<ZExtInstruction>(std::move(from), bb);
-  // instr->m_val->InitUser(instr);
+  auto instr = std::make_shared<ZExtInstruction>(bb);
+  instr->m_val = from->AddUse(instr);
   bb->PushBackInstruction(instr);
   return instr;
 }
@@ -602,14 +618,16 @@ std::shared_ptr<Value> IRBuilder::CreateZExtInstruction(
 std::shared_ptr<Value> IRBuilder::CreateSIToFPInstruction(
     std::shared_ptr<Value> from) {
   auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<SIToFPInstruction>(std::move(from), bb);
+  auto instr = std::make_shared<SIToFPInstruction>(bb);
+  instr->m_val = from->AddUse(instr);
   bb->PushBackInstruction(instr);
   return instr;
 }
 std::shared_ptr<Value> IRBuilder::CreateFPToSIInstruction(
     std::shared_ptr<Value> from) {
   auto bb = m_module->GetCurrentBB();
-  auto instr = std::make_shared<FPToSIInstruction>(std::move(from), bb);
+  auto instr = std::make_shared<FPToSIInstruction>(bb);
+  instr->m_val = from->AddUse(instr);
   bb->PushBackInstruction(instr);
   return instr;
 }

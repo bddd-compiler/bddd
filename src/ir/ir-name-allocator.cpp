@@ -54,10 +54,10 @@ std::string IRNameAllocator::GetValueName(const std::shared_ptr<Value>& val) {
 std::string IRNameAllocator::GetLabelName(const std::shared_ptr<Value>& val) {
   auto it = m_name_of_values.find(val);
   if (it != m_name_of_values.end()) {
-    return "%L" + std::to_string(it->second);
+    return "%L" + std::to_string(it->second + 1);
   } else {
     m_name_of_values[val] = m_cnt++;
-    return "%L" + std::to_string(m_name_of_values[val]);
+    return "%L" + std::to_string(m_name_of_values[val] + 1);
   }
 }
 

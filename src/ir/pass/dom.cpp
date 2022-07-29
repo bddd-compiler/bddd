@@ -17,10 +17,12 @@ std::vector<std::shared_ptr<BasicBlock>> bbs;
 void dfs(std::shared_ptr<BasicBlock> bb, int dom_depth) {
   // std::cerr << "[debug] " << bb->m_id << std::endl;
   bb->m_dom_depth = dom_depth;
+  bb->m_dominators.insert(bb);
+  bb->m_dominated.insert(bb);
   for (auto i : dom_tree[bb->m_id]) {
     dfs(bbs[i], dom_depth + 1);
 
-    for (auto x : bbs[i]->m_dominators) {
+    for (auto &x : bbs[i]->m_dominators) {
       bb->m_dominators.insert(x);
       x->m_dominated.insert(bb);
     }
@@ -44,51 +46,6 @@ void tarjan(size_t u) {
     }
   }
 }
-
-// void RemoveUnusedBlocks(std::shared_ptr<Function> function) {
-//   bbs.clear();
-//   bbs.push_back(nullptr);
-//   size_t cnt = 0;
-//   for (auto &bb : function->m_bb_list) {
-//     bb->m_id = ++cnt;
-//     bb->m_predecessors.clear();
-//     bbs.push_back(bb);
-//   }
-//   size_t n = function->m_bb_list.size();
-//   f_graph.clear();
-//   f_graph.resize(n + 5);
-//   dfn.clear();
-//   dfn.resize(n + 5);
-//   ord.clear();
-//   ord.resize(n + 5);
-//   fa.clear();
-//   fa.resize(n + 5);
-//   co = 0;
-//
-//   for (auto &bb : function->m_bb_list) {
-//     // terminator instruction only have jump, branch, return
-//     size_t u = bb->m_id;
-//     for (const std::shared_ptr<BasicBlock> &v_block : bb->Successors()) {
-//       size_t v = v_block->m_id;
-//       f_graph[u].push_back(v);
-//       v_block->m_predecessors.insert(bb);
-//     }
-//   }
-//   tarjan(1);  // start from 1
-//
-//   for (auto it = function->m_bb_list.begin();
-//        it != function->m_bb_list.end();) {
-//     auto bb = *it;
-//     if (!dfn[bb->m_id]) {
-//       // not visited
-//       auto del = it;
-//       ++it;
-//       function->m_bb_list.erase(del);
-//     } else {
-//       ++it;
-//     }
-//   }
-// }
 
 void ComputeDominanceRelationship(std::shared_ptr<Function> function) {
   RemoveUnvisitedBasicBlocks(function);
@@ -178,30 +135,6 @@ void ComputeDominanceRelationship(std::shared_ptr<Function> function) {
     assert(idom[i] != 0);
     bbs[i]->m_idom = bbs[idom[i]];
   }
-
-  // for (size_t i = co; i >= 2; --i) {
-  //   std::shared_ptr<BasicBlock> bb = bbs[ord[i]];
-  //   bb->m_dominators.insert(bb);
-  //   assert(ord[i] != idom[ord[i]]);
-  //   for (auto x : bbs[ord[i]]->m_dominators) {
-  //     if (idom[ord[i]] != 0) {
-  //       bbs[idom[ord[i]]]->m_dominators.insert(x);
-  //     }
-  //   }
-  // }
-  // bbs[ord[1]]->m_dominators.insert(bbs[ord[1]]);
-  //
-  // for (size_t i = 1; i <= co; ++i) {
-  //   for (auto x : bbs[i]->m_dominators) {
-  //     x->m_dominated.insert(bbs[i]);
-  //   }
-  // }
-
-  // for (size_t i = 1; i <= co; ++i) {
-  //   if (idom[i]) {
-  //     bbs[i]->m_idom = bbs[idom[i]];
-  //   }
-  // }
 
   dfs(function->m_bb_list.front(), 0);
 }

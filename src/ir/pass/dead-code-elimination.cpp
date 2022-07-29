@@ -5,13 +5,13 @@ void dfs(std::shared_ptr<Instruction> instr) {
   instr->m_visited = true;
   for (auto &operand : instr->Operands()) {
     if (auto operand_instr
-        = std::dynamic_pointer_cast<Instruction>(operand->m_value)) {
+        = std::dynamic_pointer_cast<Instruction>(operand->getValue())) {
       dfs(operand_instr);
     }
   }
 }
 
-void RunDeadCodeElimination(std::shared_ptr<Function> function) {
+void DeadCodeElimination(std::shared_ptr<Function> function) {
   for (auto &bb : function->m_bb_list) {
     for (auto &instr : bb->m_instr_list) {
       bb->m_visited = false;
@@ -32,7 +32,26 @@ void RunDeadCodeElimination(std::shared_ptr<Function> function) {
       if (!instr->m_visited) {
         auto del = it;
         ++it;
-        bb->m_instr_list.erase(del);
+        for (auto &op : instr->Operands()) {
+          op->getValue()->KillUse(instr);
+          op = nullptr;
+        }
+        bb->RemoveInstruction(del);
+        std::cerr << "dce" << std::endl;
+      } else {
+        ++it;
+      }
+    }
+  }
+  for (auto &bb : function->m_bb_list) {
+    for (auto it = bb->m_instr_list.begin(); it != bb->m_instr_list.end();) {
+      // manually ++it
+      auto instr = *it;
+      if (!instr->m_visited) {
+        auto del = it;
+        ++it;
+        bb->RemoveInstruction(del);
+        std::cerr << "dce" << std::endl;
       } else {
         ++it;
       }

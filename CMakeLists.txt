@@ -52,6 +52,7 @@ set(IR_PASSES
   src/ir/pass/rpo.cpp 
   src/ir/pass/basic.cpp 
   src/ir/pass/tail-recursion.cpp
+  src/ir/pass/loop.cpp
 )
 
 set(ASM_SOURCE

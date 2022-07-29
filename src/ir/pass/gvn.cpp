@@ -21,20 +21,6 @@ bool IsCommutative(IROp op) {
   }
 }
 
-bool IsICmp(IROp op) {
-  switch (op) {
-    case IROp::I_SGE:
-    case IROp::I_SGT:
-    case IROp::I_SLE:
-    case IROp::I_SLT:
-    case IROp::I_EQ:
-    case IROp::I_NE:
-      return true;
-    default:
-      return false;
-  }
-}
-
 bool IsFCmp(IROp op) {
   switch (op) {
     case IROp::F_EQ:
@@ -73,8 +59,8 @@ std::shared_ptr<Value> GetValueForGEPInstr(
         bool flag = true;
         auto sz = instr->m_indices.size();
         for (int i = 0; i < sz; ++i) {
-          if (GetValueNumber(old_gep_instr->m_indices[i]->m_value, builder)
-              != GetValueNumber(instr->m_indices[i]->m_value, builder)) {
+          if (GetValueNumber(old_gep_instr->m_indices[i]->getValue(), builder)
+              != GetValueNumber(instr->m_indices[i]->getValue(), builder)) {
             flag = false;
             break;
           }
@@ -104,8 +90,8 @@ std::shared_ptr<Value> GetValueForCallInstr(
         bool flag = true;
         auto sz = instr->m_params.size();
         for (int i = 0; i < sz; ++i) {
-          if (GetValueNumber(instr->m_params[i]->m_value, builder)
-              != GetValueNumber(old_call_instr->m_params[i]->m_value,
+          if (GetValueNumber(instr->m_params[i]->getValue(), builder)
+              != GetValueNumber(old_call_instr->m_params[i]->getValue(),
                                 builder)) {
             flag = false;
             break;
@@ -124,112 +110,112 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
     std::shared_ptr<BinaryInstruction> instr,
     std::shared_ptr<IRBuilder> builder) {
   // if both operands are const, the result is const too
-  if (instr->m_lhs_val_use->m_value->m_type.IsConst()
-      && instr->m_rhs_val_use->m_value->m_type.IsConst()) {
+  if (instr->m_lhs_val_use->getValue()->m_type.IsConst()
+      && instr->m_rhs_val_use->getValue()->m_type.IsConst()) {
     auto lhs
-        = std::dynamic_pointer_cast<Constant>(instr->m_lhs_val_use->m_value);
+        = std::dynamic_pointer_cast<Constant>(instr->m_lhs_val_use->getValue());
     auto rhs
-        = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->m_value);
+        = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->getValue());
     return builder->GetConstant(instr->m_op, lhs->Evaluate(), rhs->Evaluate());
   }
 
   if (instr->m_op == IROp::ADD || instr->m_op == IROp::F_ADD) {
-    if (instr->m_lhs_val_use->m_value->m_type.IsConst()) {
-      auto c
-          = std::dynamic_pointer_cast<Constant>(instr->m_lhs_val_use->m_value);
+    if (instr->m_lhs_val_use->getValue()->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(
+          instr->m_lhs_val_use->getValue());
       assert(c != nullptr);
       auto res = c->Evaluate();
       // 0 + a = a
       if (instr->m_op == IROp::ADD && res.Equals(0)) {
-        assert(instr->m_rhs_val_use->m_value->m_type.IsBasicInt());
-        return instr->m_rhs_val_use->m_value;
+        assert(instr->m_rhs_val_use->getValue()->m_type.IsBasicInt());
+        return instr->m_rhs_val_use->getValue();
       } else if (instr->m_op == IROp::F_ADD && res.Equals(0.0f)) {
-        assert(instr->m_rhs_val_use->m_value->m_type.IsBasicFloat());
-        return instr->m_rhs_val_use->m_value;
+        assert(instr->m_rhs_val_use->getValue()->m_type.IsBasicFloat());
+        return instr->m_rhs_val_use->getValue();
       }
     }
-    if (instr->m_rhs_val_use->m_value->m_type.IsConst()) {
-      auto c
-          = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->m_value);
+    if (instr->m_rhs_val_use->getValue()->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(
+          instr->m_rhs_val_use->getValue());
       assert(c != nullptr);
       auto res = c->Evaluate();
       // a + 0 = a
       if (instr->m_op == IROp::ADD && res.Equals(0)) {
-        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicInt());
-        return instr->m_lhs_val_use->m_value;
+        assert(instr->m_lhs_val_use->getValue()->m_type.IsBasicInt());
+        return instr->m_lhs_val_use->getValue();
       } else if (instr->m_op == IROp::F_ADD && res.Equals(0.0f)) {
-        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicFloat());
-        return instr->m_lhs_val_use->m_value;
+        assert(instr->m_lhs_val_use->getValue()->m_type.IsBasicFloat());
+        return instr->m_lhs_val_use->getValue();
       }
     }
   }
 
   if (instr->m_op == IROp::SUB || instr->m_op == IROp::F_SUB) {
-    if (instr->m_rhs_val_use->m_value->m_type.IsConst()) {
-      auto c
-          = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->m_value);
+    if (instr->m_rhs_val_use->getValue()->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(
+          instr->m_rhs_val_use->getValue());
       assert(c != nullptr);
       auto res = c->Evaluate();
       // a - 0 = a
       if (instr->m_op == IROp::SUB && res.Equals(0)) {
-        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicInt());
-        return instr->m_lhs_val_use->m_value;
+        assert(instr->m_lhs_val_use->getValue()->m_type.IsBasicInt());
+        return instr->m_lhs_val_use->getValue();
       } else if (instr->m_op == IROp::F_SUB && res.Equals(0.0f)) {
-        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicFloat());
-        return instr->m_lhs_val_use->m_value;
+        assert(instr->m_lhs_val_use->getValue()->m_type.IsBasicFloat());
+        return instr->m_lhs_val_use->getValue();
       }
     }
   }
 
   if (instr->m_op == IROp::MUL || instr->m_op == IROp::F_MUL) {
-    if (instr->m_rhs_val_use->m_value->m_type.IsConst()) {
-      auto c
-          = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->m_value);
+    if (instr->m_rhs_val_use->getValue()->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(
+          instr->m_rhs_val_use->getValue());
       assert(c != nullptr);
       auto res = c->Evaluate();
       if (instr->m_op == IROp::MUL) {
-        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicInt());
+        assert(instr->m_lhs_val_use->getValue()->m_type.IsBasicInt());
         if (res.Equals(0)) {
           // a * 0 = 0
           return builder->GetIntConstant(0);
         } else if (res.Equals(1)) {
           // a * 1 = a
-          return instr->m_lhs_val_use->m_value;
+          return instr->m_lhs_val_use->getValue();
         } else if (res.Equals(-1)) {
           // a * -1 = 0 - a
           instr->m_op = IROp::SUB;
-          instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->m_value);
+          instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->getValue());
           instr->m_lhs_val_use->UseValue(builder->GetIntConstant(0));
           return instr;
         }
       } else {
-        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicFloat());
+        assert(instr->m_lhs_val_use->getValue()->m_type.IsBasicFloat());
         if (res.Equals(0.0f)) {
           return builder->GetFloatConstant(0.0);
         } else if (res.Equals(1.0f)) {
-          return instr->m_lhs_val_use->m_value;
+          return instr->m_lhs_val_use->getValue();
         } else if (res.Equals(-1.0f)) {
           instr->m_op = IROp::F_SUB;
-          instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->m_value);
+          instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->getValue());
           instr->m_lhs_val_use->UseValue(builder->GetFloatConstant(0.0f));
           return instr;
         }
       }
     }
 
-    if (instr->m_lhs_val_use->m_value->m_type.IsConst()) {
-      auto c
-          = std::dynamic_pointer_cast<Constant>(instr->m_lhs_val_use->m_value);
+    if (instr->m_lhs_val_use->getValue()->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(
+          instr->m_lhs_val_use->getValue());
       assert(c != nullptr);
       auto res = c->Evaluate();
       if (instr->m_op == IROp::MUL) {
-        assert(instr->m_rhs_val_use->m_value->m_type.IsBasicInt());
+        assert(instr->m_rhs_val_use->getValue()->m_type.IsBasicInt());
         if (res.Equals(0)) {
           // 0 * a = 0
           return builder->GetIntConstant(0);
         } else if (res.Equals(1)) {
           // 1 * a = a
-          return instr->m_rhs_val_use->m_value;
+          return instr->m_rhs_val_use->getValue();
         } else if (res.Equals(-1)) {
           // -1 * a = 0 - a
           instr->m_op = IROp::SUB;
@@ -237,11 +223,11 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
           return instr;
         }
       } else {
-        assert(instr->m_rhs_val_use->m_value->m_type.IsBasicFloat());
+        assert(instr->m_rhs_val_use->getValue()->m_type.IsBasicFloat());
         if (res.Equals(0.0f)) {
           return builder->GetFloatConstant(0.0);
         } else if (res.Equals(1.0f)) {
-          return instr->m_rhs_val_use->m_value;
+          return instr->m_rhs_val_use->getValue();
         } else if (res.Equals(-1.0f)) {
           instr->m_op = IROp::F_SUB;
           instr->m_lhs_val_use->UseValue(builder->GetFloatConstant(0.0f));
@@ -252,9 +238,9 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
   }
 
   if (instr->m_op == IROp::SDIV || instr->m_op == IROp::F_DIV) {
-    if (instr->m_lhs_val_use->m_value->m_type.IsConst()) {
-      auto c
-          = std::dynamic_pointer_cast<Constant>(instr->m_lhs_val_use->m_value);
+    if (instr->m_lhs_val_use->getValue()->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(
+          instr->m_lhs_val_use->getValue());
       assert(c != nullptr);
       auto res = c->Evaluate();
       // 0 / a = 0
@@ -264,35 +250,35 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
         return builder->GetFloatConstant(0.0);
       }
     }
-    if (instr->m_rhs_val_use->m_value->m_type.IsConst()) {
-      auto c
-          = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->m_value);
+    if (instr->m_rhs_val_use->getValue()->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(
+          instr->m_rhs_val_use->getValue());
       assert(c != nullptr);
       auto res = c->Evaluate();
       if (instr->m_op == IROp::SDIV) {
-        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicInt());
+        assert(instr->m_lhs_val_use->getValue()->m_type.IsBasicInt());
         if (res.Equals(0)) {
           // a / 0 raise exception
           assert(false);  // ??????????
         } else if (res.Equals(1)) {
           // a / 1 = a
-          return instr->m_lhs_val_use->m_value;
+          return instr->m_lhs_val_use->getValue();
         } else if (res.Equals(-1)) {
           // a / -1 = -a = 0 - a
           instr->m_op = IROp::SUB;
-          instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->m_value);
+          instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->getValue());
           instr->m_lhs_val_use->UseValue(builder->GetIntConstant(0));
           return instr;
         }
       } else {
-        assert(instr->m_lhs_val_use->m_value->m_type.IsBasicFloat());
+        assert(instr->m_lhs_val_use->getValue()->m_type.IsBasicFloat());
         if (res.Equals(0.0f)) {
           assert(false);
         } else if (res.Equals(1.0f)) {
-          return instr->m_lhs_val_use->m_value;
+          return instr->m_lhs_val_use->getValue();
         } else if (res.Equals(-1.0f)) {
           instr->m_op = IROp::F_SUB;
-          instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->m_value);
+          instr->m_rhs_val_use->UseValue(instr->m_lhs_val_use->getValue());
           instr->m_lhs_val_use->UseValue(builder->GetFloatConstant(0.0f));
         }
       }
@@ -300,17 +286,17 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
   }
 
   if (instr->m_op == IROp::SREM) {
-    if (instr->m_lhs_val_use->m_value->m_type.IsConst()) {
-      auto c
-          = std::dynamic_pointer_cast<Constant>(instr->m_lhs_val_use->m_value);
+    if (instr->m_lhs_val_use->getValue()->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(
+          instr->m_lhs_val_use->getValue());
       if (c != nullptr && c->Evaluate().Equals(0)) {
         // 0 % a = 0
         return builder->GetIntConstant(0);
       }
     }
-    if (instr->m_rhs_val_use->m_value->m_type.IsConst()) {
-      auto c
-          = std::dynamic_pointer_cast<Constant>(instr->m_rhs_val_use->m_value);
+    if (instr->m_rhs_val_use->getValue()->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(
+          instr->m_rhs_val_use->getValue());
       if (c != nullptr) {
         if (c->Evaluate().Equals(0)) {
           // a % 0 raise exception
@@ -324,8 +310,8 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
     }
   }
 
-  if (GetValueNumber(instr->m_lhs_val_use->m_value, builder)
-      == GetValueNumber(instr->m_rhs_val_use->m_value, builder)) {
+  if (GetValueNumber(instr->m_lhs_val_use->getValue(), builder)
+      == GetValueNumber(instr->m_rhs_val_use->getValue(), builder)) {
     switch (instr->m_op) {
       case IROp::I_SGE:
       case IROp::I_SLE:
@@ -346,7 +332,7 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
     }
   }
 
-  if (IsICmp(instr->m_op) || IsFCmp(instr->m_op)) return instr;
+  if (instr->IsICmp() || instr->IsFCmp()) return instr;
 
   // find previous computed values from cloud
   int i = 0;
@@ -355,14 +341,14 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
         = std::dynamic_pointer_cast<BinaryInstruction>(old_instr)) {
       if (old_binary_instr != instr && old_binary_instr->m_op == instr->m_op) {
         // check if they are the same
-        auto old_lhs_vn
-            = GetValueNumber(old_binary_instr->m_lhs_val_use->m_value, builder);
+        auto old_lhs_vn = GetValueNumber(
+            old_binary_instr->m_lhs_val_use->getValue(), builder);
         auto new_lhs_vn
-            = GetValueNumber(instr->m_lhs_val_use->m_value, builder);
-        auto old_rhs_vn
-            = GetValueNumber(old_binary_instr->m_rhs_val_use->m_value, builder);
+            = GetValueNumber(instr->m_lhs_val_use->getValue(), builder);
+        auto old_rhs_vn = GetValueNumber(
+            old_binary_instr->m_rhs_val_use->getValue(), builder);
         auto new_rhs_vn
-            = GetValueNumber(instr->m_rhs_val_use->m_value, builder);
+            = GetValueNumber(instr->m_rhs_val_use->getValue(), builder);
         if (old_lhs_vn == new_lhs_vn && old_rhs_vn == new_rhs_vn) {
           // identical, return the result in vn table
           return new_val;
@@ -404,24 +390,25 @@ std::shared_ptr<Value> GetValue(std::shared_ptr<Value> val,
   } else if (auto zext_instr
              = std::dynamic_pointer_cast<ZExtInstruction>(val)) {
     // i1 to i32
-    if (zext_instr->m_val->m_value->m_type.IsConst()) {
-      auto c = std::dynamic_pointer_cast<Constant>(zext_instr->m_val->m_value);
+    if (zext_instr->m_val->getValue()->m_type.IsConst()) {
+      auto c
+          = std::dynamic_pointer_cast<Constant>(zext_instr->m_val->getValue());
       g_vns[idx].second = builder->GetIntConstant(c->Evaluate().IntVal());
     }
   } else if (auto sitofp_instr
              = std::dynamic_pointer_cast<SIToFPInstruction>(val)) {
     // i32 to float
-    if (sitofp_instr->m_val->m_value->m_type.IsConst()) {
-      auto c
-          = std::dynamic_pointer_cast<Constant>(sitofp_instr->m_val->m_value);
+    if (sitofp_instr->m_val->getValue()->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(
+          sitofp_instr->m_val->getValue());
       g_vns[idx].second = builder->GetFloatConstant(c->Evaluate().IntVal());
     }
   } else if (auto fptosi_instr
              = std::dynamic_pointer_cast<FPToSIInstruction>(val)) {
     // float to i32
-    if (fptosi_instr->m_val->m_value->m_type.IsConst()) {
-      auto c
-          = std::dynamic_pointer_cast<Constant>(fptosi_instr->m_val->m_value);
+    if (fptosi_instr->m_val->getValue()->m_type.IsConst()) {
+      auto c = std::dynamic_pointer_cast<Constant>(
+          fptosi_instr->m_val->getValue());
       g_vns[idx].second = builder->GetIntConstant(c->Evaluate().FloatVal());
     }
   }
@@ -445,7 +432,9 @@ void RunGVN(std::shared_ptr<Function> function,
         g_vns.pop_back();
         auto del = it;
         ++it;
+        // cannot really remove it, since it may be referenced in GVN later on
         bb->m_instr_list.erase(del);
+        // bb->RemoveInstruction(del);
       } else {
         ++it;
       }
@@ -455,6 +444,8 @@ void RunGVN(std::shared_ptr<Function> function,
 
 void IRPassManager::GVNPass() {
   SideEffectPass();
+  g_vns.clear();
+  g_idx.clear();
   for (auto &func : m_builder->m_module->m_function_list) {
     if (func->m_bb_list.empty()) continue;
     RunGVN(func, m_builder);

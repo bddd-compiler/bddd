@@ -22,7 +22,7 @@ void TailRecursionOptimization(std::unique_ptr<Module>& module) {
                 && (((func->ReturnType() == VarType::INT
                       || func->ReturnType() == VarType::FLOAT)
                      && ret_instr->m_ret
-                     && ret_instr->m_ret->m_value == call_instr)
+                     && ret_instr->m_ret->getValue() == call_instr)
                     || (func->ReturnType() == VarType::VOID
                         && ret_instr->m_ret == nullptr))) {
               if (!flag) {
@@ -48,15 +48,15 @@ void TailRecursionOptimization(std::unique_ptr<Module>& module) {
                   param_phis[i]->AddPhiOperand(new_entry, func->m_args[i]);
                 }
               }
-              bb->m_instr_list.remove(call_instr);
-              bb->m_instr_list.remove(ret_instr);
+              bb->RemoveInstruction(call_instr);
+              bb->RemoveInstruction(ret_instr);
               auto new_jump_instr
                   = std::make_shared<JumpInstruction>(old_entry, bb);
               bb->PushBackInstruction(new_jump_instr);
               assert(call_instr->m_params.size() == param_phis.size());
               for (int i = 0; i < param_phis.size(); ++i) {
-                param_phis[i]->AddPhiOperand(bb,
-                                             call_instr->m_params[i]->m_value);
+                param_phis[i]->AddPhiOperand(
+                    bb, call_instr->m_params[i]->getValue());
               }
             }
           }

@@ -39,11 +39,21 @@ void RemoveUnvisitedBasicBlocks(std::shared_ptr<Function> func) {
         auto del = it;
         ++it;
         func->m_bb_list.erase(del);
+        // FORGET removing ALL USES from the use_list of their VALUES???????
+
+        for (auto &instr : bb->m_instr_list) {
+          instr->KillAllUses();
+          instr->KillAllMyUses();
+        }
       } else {
         ++it;
       }
     }
     if (!changed) break;
+  }
+  if (cnt > 1) {
+    std::cerr << "[debug] "
+              << "remove unused block x" << cnt - 1 << std::endl;
   }
 }
 
@@ -73,9 +83,9 @@ void RemoveTrivialPhis(std::shared_ptr<Function> func) {
             continue;  // undef
           }
           if (val == nullptr) {
-            if (use->m_value != phi) val = use->m_value;
+            if (use->getValue() != phi) val = use->getValue();
           } else {
-            if (use->m_value != phi && use->m_value != val) {
+            if (use->getValue() != phi && use->getValue() != val) {
               // not correct
               flag = false;
               break;
@@ -92,14 +102,18 @@ void RemoveTrivialPhis(std::shared_ptr<Function> func) {
           assert(val != nullptr);  // phi operands cannot be all undef
           // otherwise, can be replaced by its one-and-only val
           phi->ReplaceUseBy(val);
-          phi->m_bb->m_instr_list.remove(phi);
+          phi->m_bb->RemoveInstruction(phi);
         } else {
           // empty phi instruction, just remove it
-          phi->m_bb->m_instr_list.remove(phi);
+          phi->m_bb->RemoveInstruction(phi);
         }
       }
     }
     if (!changed) break;
+  }
+  if (cnt > 1) {
+    std::cerr << "[debug] "
+              << "remove trivial phis x" << cnt - 1 << std::endl;
   }
 }
 
@@ -113,9 +127,9 @@ void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
       auto last_instr = bb->LastInstruction();
       if (auto br_instr
           = std::dynamic_pointer_cast<BranchInstruction>(last_instr)) {
-        if (br_instr->m_cond->m_value->m_type.IsConst()) {
-          auto c
-              = std::dynamic_pointer_cast<Constant>(br_instr->m_cond->m_value);
+        if (br_instr->m_cond->getValue()->m_type.IsConst()) {
+          auto c = std::dynamic_pointer_cast<Constant>(
+              br_instr->m_cond->getValue());
           std::shared_ptr<BasicBlock> target_block = nullptr;
           if (c->Evaluate().IsNotZero()) {
             // go to true_block
@@ -137,6 +151,10 @@ void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
       }
     }
     if (!changed) break;
+  }
+  if (cnt > 1) {
+    std::cerr << "[debug] "
+              << "replace trivial branch by jump x" << cnt - 1 << std::endl;
   }
 }
 
@@ -187,7 +205,7 @@ void RemoveTrivialBasicBlock(std::shared_ptr<Function> func) {
               pred->ReplaceSuccessorBy(bb, target_block);
               target_block->ReplacePredecessorBy(bb, pred);
             }
-            bb->m_instr_list.remove(instr);
+            bb->RemoveInstruction(instr);
             continue;
           }
         }
@@ -197,146 +215,8 @@ void RemoveTrivialBasicBlock(std::shared_ptr<Function> func) {
     if (!changed) break;
   }
   assert(cnt == 1);
+  if (cnt > 1) {
+    std::cerr << "[debug] "
+              << "remove trivial basic block x" << cnt - 1 << std::endl;
+  }
 }
-
-// global analysis
-// void BasicOptimization(std::unique_ptr<Module> &module) {
-//   while (true) {
-//     bool changed = false;
-//     for (auto &func : module->m_function_list) {
-//       // remove unused bb
-//       bool unused_bb = false;
-//       std::stack<std::shared_ptr<BasicBlock>> stack;
-//       for (auto &bb : func->m_bb_list) {
-//         bb->m_visited = false;
-//       }
-//       stack.push(func->m_bb_list.front());
-//       while (!stack.empty()) {
-//         std::shared_ptr<BasicBlock> bb = stack.top();
-//         stack.pop();
-//         if (bb->m_visited) continue;
-//         bb->m_visited = true;
-//         for (auto &s : bb->Successors()) {
-//           if (!s->m_visited) {
-//             stack.push(s);
-//           }
-//         }
-//       }
-//       for (auto it = func->m_bb_list.begin(); it != func->m_bb_list.end();) {
-//         // manually ++it
-//         auto bb = *it;
-//         if (!bb->m_visited) {
-//           unused_bb = changed = true;
-//           // remove bb
-//           for (auto &s : bb->Successors()) {
-//             s->m_predecessors.erase(bb);
-//           }
-//           auto del = it;
-//           ++it;
-//           func->m_bb_list.erase(del);
-//         } else {
-//           ++it;
-//         }
-//       }
-//       if (unused_bb) continue;
-//
-//       // remove meaningless phis
-//       bool meaningless_phi = false;
-//       for (auto &bb : func->m_bb_list) {
-//         std::vector<std::shared_ptr<PhiInstruction>> phis;
-//         for (auto &instr : bb->m_instr_list) {
-//           if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
-//             phis.push_back(phi);  // insert empty phi
-//           } else {
-//             break;
-//           }
-//         }
-//         // remove meaningless phis
-//         for (auto &phi : phis) {
-//           // check if all uses are the same
-//           std::shared_ptr<Value> val = nullptr;
-//           bool flag = true;
-//           for (auto [from_bb, use] : phi->m_contents) {
-//             if (use == nullptr) {
-//               continue;  // undef
-//             }
-//             if (val == nullptr) {
-//               if (use->m_value != phi) val = use->m_value;
-//             } else {
-//               if (use->m_value != phi && use->m_value != val) {
-//                 // not correct
-//                 flag = false;
-//                 break;
-//               }
-//             }
-//           }
-//           if (!flag) {
-//             // with at least two non-trivial different phi operands, cannot
-//             // be removed, look for another phi instruction
-//             continue;
-//           }
-//           assert(val != nullptr);  // phi operands cannot be all undef
-//           // otherwise, can be replaced by its one-and-only val
-//           phi->ReplaceUseBy(val);
-//           phi->m_bb->m_instr_list.remove(phi);
-//           meaningless_phi = changed = true;
-//         }
-//       }
-//       if (meaningless_phi) continue;
-//
-//       // remove trivial bb with only jump instruction
-//       bool trivial_bb = false;
-//       for (auto it = func->m_bb_list.begin(); it != func->m_bb_list.end();) {
-//         // manually ++it
-//         auto bb = *it;
-//         if (bb->m_instr_list.size() == 1) {
-//           auto instr = bb->m_instr_list.front();  // must be a terminator
-//           if (auto jump_instr
-//               = std::dynamic_pointer_cast<JumpInstruction>(instr)) {
-//             auto target_block = jump_instr->m_target_block;
-//             auto predecessors = bb->Predecessors();
-//
-//             // check if it can be removed
-//             bool flag = true;
-//             for (auto &pred : predecessors) {
-//               for (auto &instr2 : target_block->m_instr_list) {
-//                 if (auto phi
-//                     = std::dynamic_pointer_cast<PhiInstruction>(instr2)) {
-//                   auto pred_val = phi->GetValue(pred);
-//                   auto bb_val = phi->GetValue(bb);
-//                   if (pred_val != nullptr && bb_val != nullptr
-//                       && pred_val != bb_val) {
-//                     flag = false;
-//                     break;
-//                   }
-//                 } else {
-//                   break;
-//                 }
-//               }
-//               if (!flag) {
-//                 break;
-//               }
-//             }
-//             if (flag) {
-//               // can be removed
-//               trivial_bb = changed = true;
-//               for (auto &pred : predecessors) {
-//                 // try removing bb, construct pred_block -> target_block
-//                 // 记得一定要更新这两个bb的predecessors和successors
-//                 pred->ReplaceSuccessorBy(bb, target_block);
-//                 target_block->ReplacePredecessorBy(bb, pred);
-//               }
-//               ++it;
-//               bb->m_instr_list.remove(instr);
-//               continue;
-//             }
-//           }
-//         }
-//
-//         ++it;
-//       }
-//       if (trivial_bb) continue;
-//     }
-//     if (!changed) break;
-//   }
-// }
