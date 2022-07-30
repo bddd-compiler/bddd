@@ -340,22 +340,22 @@ std::shared_ptr<Instruction> IRBuilder::CreateBinaryInstruction(
   if (lhs_type.IsBasicBool() && rhs_type.IsBasicInt()) {
     // zext for lhs
     auto new_lhs = CreateZExtInstruction(instr->m_lhs_val_use->getValue());
-    instr->m_lhs_val_use->getValue()->KillUse(instr->m_lhs_val_use->getUser());
+    instr->m_lhs_val_use->getValue()->KillUse(instr->m_lhs_val_use);
     instr->m_lhs_val_use = new_lhs->AddUse(instr);
   } else if (lhs_type.IsBasicInt() && rhs_type.IsBasicBool()) {
     // zext for rhs
     auto new_rhs = CreateZExtInstruction(instr->m_rhs_val_use->getValue());
-    instr->m_rhs_val_use->getValue()->KillUse(instr->m_rhs_val_use->getUser());
+    instr->m_rhs_val_use->getValue()->KillUse(instr->m_rhs_val_use);
     instr->m_rhs_val_use = new_rhs->AddUse(instr);
   } else if (lhs_type.IsBasicInt() && rhs_type.IsBasicFloat()) {
     // sitofp for lhs
     auto new_lhs = CreateSIToFPInstruction(instr->m_lhs_val_use->getValue());
-    instr->m_lhs_val_use->getValue()->KillUse(instr->m_lhs_val_use->getUser());
+    instr->m_lhs_val_use->getValue()->KillUse(instr->m_lhs_val_use);
     instr->m_lhs_val_use = new_lhs->AddUse(instr);
   } else if (lhs_type.IsBasicFloat() && rhs_type.IsBasicInt()) {
     // sitofp for rhs
     auto new_rhs = CreateSIToFPInstruction(instr->m_rhs_val_use->getValue());
-    instr->m_rhs_val_use->getValue()->KillUse(instr->m_rhs_val_use->getUser());
+    instr->m_rhs_val_use->getValue()->KillUse(instr->m_rhs_val_use);
     instr->m_rhs_val_use = new_rhs->AddUse(instr);
   } else if (instr->m_lhs_val_use->getValue()->m_type
              != instr->m_rhs_val_use->getValue()->m_type) {

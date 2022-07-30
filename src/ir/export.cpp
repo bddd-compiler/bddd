@@ -234,7 +234,7 @@ void BasicBlock::ExportIR(std::ofstream& ofs, int depth) {
   ofs << "; (" << m_name << ") ";
   ofs << "preds: [";
   bool first = true;
-  for (auto pred : Predecessors()) {
+  for (auto& pred : Predecessors()) {
     if (first)
       first = false;
     else
@@ -245,6 +245,9 @@ void BasicBlock::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::endl;
   for (auto& instr : m_instr_list) {
     instr->ExportIR(ofs, depth);
+    if (instr->m_placed) {
+      ofs << "; (pinned)";
+    }
     ofs << std::endl;
   }
 }

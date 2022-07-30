@@ -48,7 +48,7 @@ void tarjan(size_t u) {
 }
 
 void ComputeDominanceRelationship(std::shared_ptr<Function> function) {
-  RemoveUnvisitedBasicBlocks(function);
+  RemoveUnusedBasicBlocks(function);
 
   // allocate id for each basic block
   bbs.clear();

@@ -32,9 +32,8 @@ void DeadCodeElimination(std::shared_ptr<Function> function) {
       if (!instr->m_visited) {
         auto del = it;
         ++it;
-        for (auto &op : instr->Operands()) {
-          op->getValue()->KillUse(instr);
-          op = nullptr;
+        for (auto op : instr->Operands()) {
+          op->getValue()->KillUse(op);
         }
         bb->RemoveInstruction(del);
         std::cerr << "dce" << std::endl;

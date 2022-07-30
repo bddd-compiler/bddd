@@ -225,7 +225,7 @@ public:
   Use(const Use &) = delete;
 
   // modify the value
-  void UseValue(const std::shared_ptr<Value> &value);
+  // void UseValue(const std::shared_ptr<Value> &value);
 
   [[nodiscard]] std::shared_ptr<Value> getValue() const {
     return m_value.lock();
@@ -234,6 +234,7 @@ public:
   [[nodiscard]] std::shared_ptr<Value> getUser() const { return m_user.lock(); }
 
   // void RemoveFromUseList();
+  // ~Use() { std::cerr << "[debug] ~Use" << std::endl; }
 };
 
 class BasicBlock;
@@ -279,8 +280,7 @@ public:
 
   // options:
   //
-  std::unique_ptr<Use> KillUse(const std::shared_ptr<Value> &user,
-                               bool mov = false);
+  std::unique_ptr<Use> KillUse(Use *use, bool mov = false);
 
   // kill all uses that use me
   void KillAllUses();
@@ -409,8 +409,11 @@ public:
   IROp m_op;
   bool m_visited;  // used in GCM
 
+  // test
+  bool m_placed;
+
   explicit Instruction(IROp op, std::shared_ptr<BasicBlock> bb)
-      : Value(std::move(bb)), m_op(op), m_visited(false) {}
+      : Value(std::move(bb)), m_op(op), m_visited(false), m_placed(false) {}
 
   bool HasSideEffect();
 
@@ -512,9 +515,9 @@ public:
   }
 
   void KillAllMyUses() override {
-    m_lhs_val_use->m_value.lock()->KillUse(shared_from_this());
+    m_lhs_val_use->m_value.lock()->KillUse(m_lhs_val_use);
     m_lhs_val_use = nullptr;
-    m_rhs_val_use->m_value.lock()->KillUse(shared_from_this());
+    m_rhs_val_use->m_value.lock()->KillUse(m_rhs_val_use);
     m_rhs_val_use = nullptr;
   }
 };
@@ -536,7 +539,7 @@ public:
   std::vector<Use *> Operands() override { return {m_lhs_val_use}; }
 
   void KillAllMyUses() override {
-    m_lhs_val_use->m_value.lock()->KillUse(shared_from_this());
+    m_lhs_val_use->m_value.lock()->KillUse(m_lhs_val_use);
     m_lhs_val_use = nullptr;
   }
 };
@@ -578,7 +581,7 @@ public:
   std::vector<Use *> Operands() override { return m_params; }
   void KillAllMyUses() override {
     for (auto param : m_params) {
-      param->m_value.lock()->KillUse(shared_from_this());
+      param->m_value.lock()->KillUse(param);
     }
     m_params.clear();
   }
@@ -605,7 +608,7 @@ public:
   bool IsTerminator() override { return true; }
   std::vector<Use *> Operands() override { return {m_cond}; }
   void KillAllMyUses() override {
-    m_cond->m_value.lock()->KillUse(shared_from_this());
+    m_cond->m_value.lock()->KillUse(m_cond);
     m_cond = nullptr;
   }
 };
@@ -644,7 +647,7 @@ public:
   }
   void KillAllMyUses() override {
     if (m_ret) {
-      m_ret->m_value.lock()->KillUse(shared_from_this());
+      m_ret->m_value.lock()->KillUse(m_ret);
       m_ret = nullptr;
     }
   }
@@ -675,10 +678,10 @@ public:
     return std::move(ret);
   }
   void KillAllMyUses() override {
-    m_addr->m_value.lock()->KillUse(shared_from_this());
+    m_addr->m_value.lock()->KillUse(m_addr);
     m_addr = nullptr;
     for (auto index : m_indices) {
-      index->m_value.lock()->KillUse(shared_from_this());
+      index->m_value.lock()->KillUse(index);
     }
     m_indices.clear();
   }
@@ -697,7 +700,7 @@ public:
   bool IsTerminator() override { return false; }
   std::vector<Use *> Operands() override { return {m_addr}; }
   void KillAllMyUses() override {
-    m_addr->m_value.lock()->KillUse(shared_from_this());
+    m_addr->m_value.lock()->KillUse(m_addr);
     m_addr = nullptr;
   }
 };
@@ -719,9 +722,9 @@ public:
 
   std::vector<Use *> Operands() override { return {m_addr, m_val}; }
   void KillAllMyUses() override {
-    m_addr->m_value.lock()->KillUse(shared_from_this());
+    m_addr->m_value.lock()->KillUse(m_addr);
     m_addr = nullptr;
-    m_val->m_value.lock()->KillUse(shared_from_this());
+    m_val->m_value.lock()->KillUse(m_val);
     m_val = nullptr;
   }
 };
@@ -827,7 +830,9 @@ public:
   }
   void KillAllMyUses() override {
     for (auto &content : m_contents) {
-      content.second->m_value.lock()->KillUse(shared_from_this());
+      if (content.second) {
+        content.second->m_value.lock()->KillUse(content.second);
+      }
     }
     m_contents.clear();
   }
@@ -852,7 +857,7 @@ public:
   bool IsTerminator() override { return false; }
   std::vector<Use *> Operands() override { return {m_val}; }
   void KillAllMyUses() override {
-    m_val->m_value.lock()->KillUse(shared_from_this());
+    m_val->m_value.lock()->KillUse(m_val);
     m_val = nullptr;
   }
 };
@@ -873,7 +878,7 @@ public:
   bool IsTerminator() override { return false; }
   std::vector<Use *> Operands() override { return {m_val}; }
   void KillAllMyUses() override {
-    m_val->m_value.lock()->KillUse(shared_from_this());
+    m_val->m_value.lock()->KillUse(m_val);
     m_val = nullptr;
   }
 };
@@ -892,7 +897,7 @@ public:
   bool IsTerminator() override { return false; }
   std::vector<Use *> Operands() override { return {m_val}; }
   void KillAllMyUses() override {
-    m_val->m_value.lock()->KillUse(shared_from_this());
+    m_val->m_value.lock()->KillUse(m_val);
     m_val = nullptr;
   }
 };
@@ -911,7 +916,7 @@ public:
   bool IsTerminator() override { return false; }
   std::vector<Use *> Operands() override { return {m_val}; }
   void KillAllMyUses() override {
-    m_val->m_value.lock()->KillUse(shared_from_this());
+    m_val->m_value.lock()->KillUse(m_val);
     m_val = nullptr;
   }
 };
@@ -980,7 +985,7 @@ public:
   }
 
   std::unordered_set<std::shared_ptr<BasicBlock>> Predecessors();
-  std::unordered_set<std::shared_ptr<BasicBlock>> Successors();
+  std::vector<std::shared_ptr<BasicBlock>> Successors();  // the order matters
 
   void RemovePredecessor(std::shared_ptr<BasicBlock> bb);
 
