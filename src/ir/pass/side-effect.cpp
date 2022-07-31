@@ -6,16 +6,18 @@
 
 std::unordered_map<std::shared_ptr<Function>,
                    std::vector<std::shared_ptr<Function>>>
-    called_graph;  // reversed graph of the original call graph
+    called_graph;  // reversed graph of the original call graph (except for
+                   // recursive relationship)
 
-void dfs(std::shared_ptr<Function> callee) {
+void dfs(std::shared_ptr<Function> callee, int depth) {
   if (callee->m_visited) return;
   callee->m_visited = true;
+  callee->m_called_depth = depth;
   for (auto &caller : called_graph[callee]) {
     if (callee->HasSideEffect()) {
       caller->m_side_effect = true;
     }
-    dfs(caller);
+    dfs(caller, depth + 1);
   }
 }
 
@@ -80,6 +82,7 @@ void ComputeSideEffect(std::unique_ptr<Module> &module) {
   for (auto &func : module->m_function_list) {
     func->m_visited = false;
     func->m_side_effect = false;  // 无罪推定是吧
+    func->m_calls.clear();
   }
   for (auto &func : module->m_function_list) {
     for (auto &bb : func->m_bb_list) {
@@ -91,15 +94,21 @@ void ComputeSideEffect(std::unique_ptr<Module> &module) {
         if (auto call_instr
             = std::dynamic_pointer_cast<CallInstruction>(instr)) {
           auto called_function = call_instr->m_function;
-          called_graph[called_function].push_back(func);
+          if (called_function != func) {
+            called_graph[called_function].push_back(func);
+            called_function->m_calls.emplace_back(call_instr, func);
+          }
         }
       }
     }
   }
 
   for (auto &func : module->m_function_list) {
-    dfs(func);  // check side effect from call graph
+    dfs(func, 1);  // check side effect from call graph
   }
 }
 
-void IRPassManager::SideEffectPass() { ComputeSideEffect(m_builder->m_module); }
+void IRPassManager::SideEffectPass() {
+  RemoveUnusedFunctions(m_builder->m_module);
+  ComputeSideEffect(m_builder->m_module);
+}

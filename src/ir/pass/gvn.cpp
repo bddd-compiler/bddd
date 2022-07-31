@@ -456,6 +456,7 @@ void IRPassManager::GVNPass() {
   g_idx.clear();
   for (auto &func : m_builder->m_module->m_function_list) {
     if (func->m_bb_list.empty()) continue;
+    ComputeDominanceRelationship(func);
     RunGVN(func, m_builder);
     // RemoveTrivialPhis(func);
     // ReplaceTrivialBranchByJump(func);

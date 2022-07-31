@@ -20,8 +20,8 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    // filename = "../testSource/buaa/part10/test1.c";
-    filename = "../testSource/functional/09_func_defn.c";
+    filename = "../testSource/buaa/inline/test2.c";
+    // filename = "../testSource/functional/09_func_defn.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -81,6 +81,10 @@ int main(int argc, char **argv) {
   // (some virtual registers do not dominate all of its uses)
   // we should hoist these VRs to a proper place, so use GCM
   pass_manager->GCMPass();
+
+  pass_manager->FunctionInliningPass();
+  // pass_manager->GVNPass();
+  // pass_manager->GCMPass();
 
   std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_ir.out");
   builder->m_module->ExportIR(ofs3, 0);

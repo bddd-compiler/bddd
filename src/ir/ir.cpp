@@ -184,6 +184,9 @@ bool BasicBlock::IsDominatedBy(std::shared_ptr<BasicBlock> bb) {
                          [=](const auto& x) { return x.get() == bb.get(); });
   return it != m_dominated.end();
 }
+void BasicBlock::AddPredecessor(std::shared_ptr<BasicBlock> bb) {
+  m_predecessors.insert(bb);
+}
 void BasicBlock::RemovePredecessor(std::shared_ptr<BasicBlock> bb) {
   for (auto& instr : m_instr_list) {
     if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
@@ -197,7 +200,7 @@ void BasicBlock::RemovePredecessor(std::shared_ptr<BasicBlock> bb) {
 void BasicBlock::ReplacePredecessorBy(std::shared_ptr<BasicBlock> old_block,
                                       std::shared_ptr<BasicBlock> new_block) {
   // only phi instructions matter the predecessor
-  for (auto instr : m_instr_list) {
+  for (auto& instr : m_instr_list) {
     if (auto phi_instr = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
       phi_instr->ReplacePhiOperand(old_block, new_block);
     } else {

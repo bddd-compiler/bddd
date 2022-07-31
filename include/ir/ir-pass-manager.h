@@ -9,9 +9,10 @@ void ComputeDominanceFrontier(std::shared_ptr<Function> function);
 void RemoveUnusedBasicBlocks(std::shared_ptr<Function> func);
 void RemoveTrivialPhis(std::shared_ptr<Function> func);
 void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func);
-void RemoveTrivialBasicBlock(std::shared_ptr<Function> func);
+void RemoveTrivialBasicBlocks(std::shared_ptr<Function> func);
 void ComputeLoopRelationship(std::shared_ptr<Function> func);
 void DeadCodeElimination(std::shared_ptr<Function> function);
+void RemoveUnusedFunctions(std::unique_ptr<Module> &module);
 
 class IRPassManager {
 public:

@@ -91,7 +91,7 @@ void RemoveTrivialPhis(std::shared_ptr<Function> func) {
       std::vector<std::shared_ptr<PhiInstruction>> phis;
       for (auto &instr : bb->m_instr_list) {
         if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
-          phis.push_back(phi);  // insert empty phi
+          phis.push_back(phi);  // insert phis
         } else {
           break;
         }
@@ -140,7 +140,6 @@ void RemoveTrivialPhis(std::shared_ptr<Function> func) {
   }
 }
 
-// TODO(garen): some problems here
 void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
   int cnt = 0;
   while (true) {
@@ -183,7 +182,7 @@ void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
 }
 
 // remove trivial bb with only jump instruction
-void RemoveTrivialBasicBlock(std::shared_ptr<Function> func) {
+void RemoveTrivialBasicBlocks(std::shared_ptr<Function> func) {
   int cnt = 0;
   while (true) {
     ++cnt;
@@ -191,15 +190,20 @@ void RemoveTrivialBasicBlock(std::shared_ptr<Function> func) {
     for (auto it = func->m_bb_list.begin(); it != func->m_bb_list.end();) {
       auto nxt = std::next(it);
       // manually ++it
-      auto bb = *it;
-      if (bb->m_instr_list.size() == 1) {
-        auto instr = bb->m_instr_list.front();  // must be a terminator
+      std::shared_ptr<BasicBlock> bb = *it;
+      // BUG: mysterious std::list::size() unmatch???????
+      if (std::next(bb->m_instr_list.begin()) == bb->m_instr_list.end()) {
+        auto terminator = bb->LastInstruction();  // must be a terminator
         if (auto jump_instr
-            = std::dynamic_pointer_cast<JumpInstruction>(instr)) {
+            = std::dynamic_pointer_cast<JumpInstruction>(terminator)) {
           auto target_block = jump_instr->m_target_block;
           auto predecessors = bb->Predecessors();
 
           // check if it can be removed
+          if (predecessors.empty() && it != func->m_bb_list.begin()) {
+            it = nxt;
+            continue;
+          }
           bool flag = true;
           for (auto &pred : predecessors) {
             for (auto &instr2 : target_block->m_instr_list) {
@@ -223,14 +227,22 @@ void RemoveTrivialBasicBlock(std::shared_ptr<Function> func) {
           if (flag) {
             // can be removed
             changed = true;
-            for (auto &pred : predecessors) {
-              // try removing bb, construct pred_block -> target_block
-              // 记得一定要更新这两个bb的predecessors和successors
-              pred->ReplaceSuccessorBy(bb, target_block);
-              target_block->ReplacePredecessorBy(bb, pred);
+            if (predecessors.empty()) {
+              // should not be any unused blocks
+              assert(it == func->m_bb_list.begin());
+              for (auto &s : bb->Successors()) {
+                s->RemovePredecessor(bb);
+              }
+            } else {
+              for (auto &pred : predecessors) {
+                // try removing bb, construct pred_block -> target_block
+                // 记得一定要更新这两个bb的predecessors和successors
+                pred->ReplaceSuccessorBy(bb, target_block);
+                target_block->ReplacePredecessorBy(bb, pred);
+              }
             }
-            bb->RemoveInstruction(instr);
-            continue;
+            bb->RemoveInstruction(terminator);
+            nxt = func->m_bb_list.erase(it);
           }
         }
       }
@@ -238,9 +250,48 @@ void RemoveTrivialBasicBlock(std::shared_ptr<Function> func) {
     }
     if (!changed) break;
   }
-  assert(cnt == 1);
   if (cnt > 1) {
     std::cerr << "[debug] "
               << "remove trivial basic block x" << cnt - 1 << std::endl;
+  }
+}
+
+void RemoveUnusedFunctions(std::unique_ptr<Module> &module) {
+  for (auto &func : module->m_function_list) {
+    func->m_visited = false;
+  }
+  std::stack<std::shared_ptr<Function>> stack;
+  auto it = std::find_if(module->m_function_list.begin(),
+                         module->m_function_list.end(),
+                         [](const auto &x) { return x->FuncName() == "main"; });
+  assert(it != module->m_function_list.end());
+  stack.push(*it);
+  while (!stack.empty()) {
+    std::shared_ptr<Function> f = stack.top();
+    stack.pop();
+    if (f->m_visited) continue;
+    f->m_visited = true;
+    for (auto &bb : f->m_bb_list) {
+      for (auto &instr : bb->m_instr_list) {
+        if (auto call = std::dynamic_pointer_cast<CallInstruction>(instr)) {
+          auto called_func = call->m_function;
+          if (!called_func->IsBuiltIn() && !called_func->m_visited) {
+            stack.push(called_func);
+          }
+        }
+      }
+    }
+  }
+  for (auto it = module->m_function_list.begin();
+       it != module->m_function_list.end();) {
+    // manually ++it
+    auto func = *it;
+    if (!func->m_visited) {
+      std::cerr << "removing function " << func->FuncName() << "..."
+                << std::endl;
+      it = module->m_function_list.erase(it);
+    } else {
+      ++it;
+    }
   }
 }

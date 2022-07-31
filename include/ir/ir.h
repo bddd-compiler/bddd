@@ -574,6 +574,27 @@ public:
     }
   }
 
+  explicit CallInstruction(BasicType return_type, std::string func_name,
+                           std::shared_ptr<BasicBlock> bb)
+      : Instruction(IROp::CALL, std::move(bb)),
+        m_func_name(std::move(func_name)),
+        m_function(nullptr),
+        m_params() {
+    switch (return_type) {
+      case BasicType::INT:
+        m_type.Set(BasicType::INT);
+        break;
+      case BasicType::FLOAT:
+        m_type.Set(BasicType::FLOAT);
+        break;
+      case BasicType::VOID:
+        m_type.Set(BasicType::VOID);
+        break;
+      default:
+        assert(false);  // unreachable
+    }
+  }
+
   // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
 
@@ -987,6 +1008,7 @@ public:
   std::unordered_set<std::shared_ptr<BasicBlock>> Predecessors();
   std::vector<std::shared_ptr<BasicBlock>> Successors();  // the order matters
 
+  void AddPredecessor(std::shared_ptr<BasicBlock> bb);
   void RemovePredecessor(std::shared_ptr<BasicBlock> bb);
 
   void ReplacePredecessorBy(std::shared_ptr<BasicBlock> old_block,
@@ -1001,6 +1023,8 @@ public:
   void ExportIR(std::ofstream &ofs, int depth) override;
 
   std::list<std::shared_ptr<Instruction>> GetInstList();
+
+  std::string Name() const { return m_name; }
 
   friend class Module;
 };
@@ -1063,6 +1087,11 @@ public:
 
   std::list<std::shared_ptr<BasicBlock>> m_rpo_bb_list;
 
+  std::vector<
+      std::pair<std::shared_ptr<CallInstruction>, std::shared_ptr<Function>>>
+      m_calls;  // who call me?
+  int m_called_depth;
+
   std::set<std::shared_ptr<Loop>> m_loops;
 
   bool m_visited;      // first used in ComputeSideEffect
@@ -1074,6 +1103,7 @@ public:
         m_bb_list(),
         m_args(),
         m_is_decl(func_ast->m_is_builtin),
+        m_called_depth(-1),
         m_current_bb(nullptr),
         m_visited(false),
         m_side_effect(false) {
@@ -1098,6 +1128,7 @@ public:
 
   [[nodiscard]] std::string FuncName() const { return m_func_name; }
   [[nodiscard]] VarType ReturnType() const { return m_func_ast->ReturnType(); }
+  bool IsBuiltIn() const { return m_is_decl; }
 
   std::shared_ptr<BasicBlock> GetCurrentBB() { return m_current_bb; }
 
