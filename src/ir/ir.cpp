@@ -17,11 +17,14 @@
 //   }
 // }
 //
-void Use::UseValue(const std::shared_ptr<Value>& value) {
-  assert(value != nullptr);
-  m_value = value;
-}
+// void Use::UseValue(const std::shared_ptr<Value>& value) {
+//   assert(value != nullptr);
+//   m_value = value;
+// }
 
+// m_use_list can contain multiple uses with the same user
+// value will always be the same
+// a value can use itself (e.g. phi node)
 Use* Value::AddUse(const std::shared_ptr<Value>& user) {
   auto this_ptr = shared_from_this();
   // maybe phi instruction can use itself
@@ -30,11 +33,9 @@ Use* Value::AddUse(const std::shared_ptr<Value>& user) {
   return m_use_list.back().get();
 }
 
-std::unique_ptr<Use> Value::KillUse(const std::shared_ptr<Value>& user,
-                                    bool mov) {
-  auto it = std::find_if(
-      m_use_list.begin(), m_use_list.end(),
-      [&user](const auto& use) { return use->getUser() == user; });
+std::unique_ptr<Use> Value::KillUse(Use* use, bool mov) {
+  auto it = std::find_if(m_use_list.begin(), m_use_list.end(),
+                         [&use](const auto& x) { return x.get() == use; });
   assert(it != m_use_list.end());
   // ATTENTION: no need to inform the user to remove the use
   // std::cerr << "[debug] killed" << std::endl;
@@ -49,9 +50,9 @@ std::unique_ptr<Use> Value::KillUse(const std::shared_ptr<Value>& user,
 }
 void Value::KillAllUses() {
   for (auto it = m_use_list.begin(); it != m_use_list.end();) {
-    auto user = (*it)->m_user.lock();
+    auto use = (*it).get();
     ++it;
-    KillUse(user);
+    KillUse(use);
   }
 }
 
@@ -61,10 +62,9 @@ void Value::ReplaceUseBy(const std::shared_ptr<Value>& new_val) {
     auto use = (*it).get();
     ++it;
     assert(use->getValue() == shared_from_this());
-    auto user = use->getUser();
     // SOMETHING NONTRIVIAL HERE: we just
     // 1. move the value's ownership out here
-    auto use_ptr = KillUse(user, true);
+    auto use_ptr = KillUse(use, true);
     assert(use_ptr.get() == use);
     // 2. change its value to the new_val
     use_ptr->m_value = new_val;
@@ -72,6 +72,7 @@ void Value::ReplaceUseBy(const std::shared_ptr<Value>& new_val) {
     new_val->m_use_list.push_back(std::move(use_ptr));
     // in this way, it is no need for this replacement action to inform users
   }
+  assert(m_use_list.empty());
 }
 
 // module, function, basic block
@@ -156,7 +157,7 @@ void BasicBlock::RemoveInstruction(
 std::unordered_set<std::shared_ptr<BasicBlock>> BasicBlock::Predecessors() {
   return m_predecessors;
 }
-std::unordered_set<std::shared_ptr<BasicBlock>> BasicBlock::Successors() {
+std::vector<std::shared_ptr<BasicBlock>> BasicBlock::Successors() {
   if (m_instr_list.empty()) return {};
   auto last_instr = LastInstruction();
   switch (last_instr->m_op) {

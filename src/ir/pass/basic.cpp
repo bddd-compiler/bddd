@@ -6,8 +6,9 @@
 
 #include "ir/ir-pass-manager.h"
 
-void RemoveUnvisitedBasicBlocks(std::shared_ptr<Function> func) {
+void RemoveUnusedBasicBlocks(std::shared_ptr<Function> func) {
   int cnt = 0;
+  std::vector<std::shared_ptr<BasicBlock>> unused_bbs;
   while (true) {
     ++cnt;
     bool changed = false;
@@ -40,11 +41,14 @@ void RemoveUnvisitedBasicBlocks(std::shared_ptr<Function> func) {
         ++it;
         func->m_bb_list.erase(del);
         // FORGET removing ALL USES from the use_list of their VALUES???????
-
-        for (auto &instr : bb->m_instr_list) {
-          instr->KillAllUses();
-          instr->KillAllMyUses();
-        }
+        unused_bbs.push_back(bb);
+        // for (auto it = bb->m_instr_list.rbegin(); it !=
+        // bb->m_instr_list.rend();
+        //      ++it) {
+        //   // if forward, the second instruction may have a dangling pointer
+        //   (*it)->KillAllMyUses();
+        //   (*it)->KillAllUses();
+        // }
       } else {
         ++it;
       }
@@ -52,8 +56,27 @@ void RemoveUnvisitedBasicBlocks(std::shared_ptr<Function> func) {
     if (!changed) break;
   }
   if (cnt > 1) {
+    if (!unused_bbs.empty()) {
+      std::sort(unused_bbs.begin(), unused_bbs.end(),
+                [](const auto &a, const auto &b) {
+                  return a->m_dom_depth > b->m_dom_depth;
+                });
+    }
+    for (auto &unused_bb : unused_bbs) {
+      std::reverse(unused_bb->m_instr_list.begin(),
+                   unused_bb->m_instr_list.end());
+      for (auto it = unused_bb->m_instr_list.begin();
+           it != unused_bb->m_instr_list.end();) {
+        auto instr = *it;
+        ++it;
+        unused_bb->RemoveInstruction(instr);
+      }
+      assert(unused_bb->m_instr_list.empty());
+    }
     std::cerr << "[debug] "
-              << "remove unused block x" << cnt - 1 << std::endl;
+              << "removed " << unused_bbs.size() << "unused blocks"
+              << std::endl;
+    unused_bbs.clear();
   }
 }
 
@@ -117,9 +140,10 @@ void RemoveTrivialPhis(std::shared_ptr<Function> func) {
   }
 }
 
+// TODO(garen): some problems here
 void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
   int cnt = 0;
-  while (true) {
+  while (false) {
     ++cnt;
     bool changed = false;
     for (auto &bb : func->m_bb_list) {
