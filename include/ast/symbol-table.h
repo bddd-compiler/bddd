@@ -19,6 +19,7 @@ class SymbolTable {
 private:
   std::vector<std::unordered_map<std::string, std::shared_ptr<AST>>> tables;
   std::vector<ScopeType> scopes;
+  std::shared_ptr<FuncDefAST> current_func;
 
 public:
   explicit SymbolTable();
@@ -40,6 +41,8 @@ public:
   // ScopeType currentScope();
 
   bool existScope(ScopeType scope);
+
+  std::shared_ptr<FuncDefAST> GetCurrentFunc();
 };
 
 #endif  // BDDD_SYMBOL_TABLE_H

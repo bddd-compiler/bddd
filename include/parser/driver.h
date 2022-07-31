@@ -21,8 +21,8 @@ public:
   // Run the parser on file F.
   // Return 0 on success.
   int parse(const std::string& f);
-  // The name of the file being parsed.
-  // Used later to pass the file name to the location tracker.
+  // The m_name of the file being parsed.
+  // Used later to pass the file m_name to the location tracker.
   std::string file;
   // Whether parser traces should be generated.
   bool trace_parsing;

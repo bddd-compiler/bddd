@@ -24,7 +24,7 @@ add_executable(bddd
 
   ${BISON_MyParser_OUTPUTS} ${FLEX_MyScanner_OUTPUTS} src/parser/driver.cpp
   src/ast/ast.cpp src/ast/symbol-table.cpp src/ast/type-check.cpp src/ast/debug.cpp src/ast/codegen.cpp
-  src/ir/ir.cpp 
-  )
+  src/ir/ir.cpp
+  src/ir/export.cpp src/ir/builder.cpp src/ir/pass/mem2reg.cpp src/ir/ir-name-allocator.cpp src/ir/pass/function-inlining.cpp src/ir/pass/gvn.cpp src/ir/pass/gcm.cpp src/ir/pass/dead-code-elimination.cpp src/ir/pass/side-effect.cpp src/ir/pass/dom.cpp src/ir/pass/rpo.cpp src/ir/pass/basic.cpp src/ir/pass/tail-recursion.cpp src/ir/pass/loop.cpp)
 
 target_include_directories(bddd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
