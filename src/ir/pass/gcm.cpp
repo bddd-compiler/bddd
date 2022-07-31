@@ -326,11 +326,12 @@ void RunGCM(std::shared_ptr<Function> function,
     }
 
     // sort unpinned instructions
+    // use topological sort to determine the order
     // now unpinned instructions include
     // 1. computational binary instructions
     // 2. getelementptr instructions
-    // 3. function calls without side-effect
-    std::map<std::shared_ptr<Instruction>, int> mmp;  // indegree
+    // 3. function calls without side effect
+    std::map<std::shared_ptr<Instruction>, int> mmp;  // in-degree
     for (auto &instr : unpinned) {
       assert(!instr->m_placed);
       if (auto binary_instr
@@ -340,17 +341,33 @@ void RunGCM(std::shared_ptr<Function> function,
         auto lhs = binary_instr->m_lhs_val_use->getValue();
         if (auto lhs_instr
             = std::dynamic_pointer_cast<BinaryInstruction>(lhs)) {
-          if (lhs_instr->m_bb == bb) {
+          if (std::find(unpinned.begin(), unpinned.end(), lhs_instr)
+              != unpinned.end()) {
             assert(!lhs_instr->m_placed);
             ++mmp[lhs_instr];
+          }
+        } else if (auto lhs_call
+                   = std::dynamic_pointer_cast<CallInstruction>(lhs)) {
+          if (std::find(unpinned.begin(), unpinned.end(), lhs_call)
+              != unpinned.end()) {
+            assert(!lhs_call->m_placed);
+            ++mmp[lhs_call];
           }
         }
         auto rhs = binary_instr->m_rhs_val_use->getValue();
         if (auto rhs_instr
             = std::dynamic_pointer_cast<BinaryInstruction>(rhs)) {
-          if (rhs_instr->m_bb == bb) {
+          if (std::find(unpinned.begin(), unpinned.end(), rhs_instr)
+              != unpinned.end()) {
             assert(!rhs_instr->m_placed);
             ++mmp[rhs_instr];
+          }
+        } else if (auto rhs_call
+                   = std::dynamic_pointer_cast<CallInstruction>(rhs)) {
+          if (std::find(unpinned.begin(), unpinned.end(), rhs_call)
+              != unpinned.end()) {
+            assert(!rhs_call->m_placed);
+            ++mmp[rhs_call];
           }
         }
       } else if (auto gep_instr
@@ -362,7 +379,8 @@ void RunGCM(std::shared_ptr<Function> function,
         // before this gep instruction
         if (auto gep_addr
             = std::dynamic_pointer_cast<GetElementPtrInstruction>(addr)) {
-          if (gep_addr->m_bb == bb) {
+          if (std::find(unpinned.begin(), unpinned.end(), gep_addr)
+              != unpinned.end()) {
             assert(!gep_addr->m_placed);
             ++mmp[gep_addr];
           }
@@ -371,9 +389,47 @@ void RunGCM(std::shared_ptr<Function> function,
           auto val = index->getValue();
           if (auto binary_index
               = std::dynamic_pointer_cast<BinaryInstruction>(val)) {
-            if (binary_index->m_bb == bb) {
+            if (std::find(unpinned.begin(), unpinned.end(), binary_index)
+                != unpinned.end()) {
               assert(!binary_index->m_placed);
               ++mmp[binary_index];
+            }
+          } else if (auto call_index
+                     = std::dynamic_pointer_cast<CallInstruction>(val)) {
+            if (std::find(unpinned.begin(), unpinned.end(), call_index)
+                != unpinned.end()) {
+              assert(!call_index->m_placed);
+              ++mmp[call_index];
+            }
+          }
+        }
+      } else if (auto call_instr
+                 = std::dynamic_pointer_cast<CallInstruction>(instr)) {
+        if (mmp.find(call_instr) == mmp.end()) mmp[call_instr] = 0;
+
+        for (auto param : call_instr->m_params) {
+          auto val = param->getValue();
+          if (auto binary_param
+              = std::dynamic_pointer_cast<BinaryInstruction>(val)) {
+            if (std::find(unpinned.begin(), unpinned.end(), binary_param)
+                != unpinned.end()) {
+              assert(!binary_param->m_placed);
+              ++mmp[binary_param];
+            }
+          } else if (auto gep_param
+                     = std::dynamic_pointer_cast<GetElementPtrInstruction>(
+                         val)) {
+            if (std::find(unpinned.begin(), unpinned.end(), gep_param)
+                != unpinned.end()) {
+              assert(!gep_param->m_placed);
+              ++mmp[gep_param];
+            }
+          } else if (auto call_param
+                     = std::dynamic_pointer_cast<CallInstruction>(val)) {
+            if (std::find(unpinned.begin(), unpinned.end(), call_param)
+                != unpinned.end()) {
+              assert(!call_param->m_placed);
+              ++mmp[call_param];
             }
           }
         }
@@ -396,18 +452,37 @@ void RunGCM(std::shared_ptr<Function> function,
         auto lhs = binary_instr->m_lhs_val_use->getValue();
         if (auto lhs_instr
             = std::dynamic_pointer_cast<BinaryInstruction>(lhs)) {
-          if (lhs_instr->m_bb == bb) {
+          if (std::find(unpinned.begin(), unpinned.end(), lhs_instr)
+              != unpinned.end()) {
             if (--mmp[lhs_instr] == 0) {
               q.push(lhs_instr);
             }
           }
+        } else if (auto lhs_call
+                   = std::dynamic_pointer_cast<CallInstruction>(lhs)) {
+          if (std::find(unpinned.begin(), unpinned.end(), lhs_call)
+              != unpinned.end()) {
+            if (--mmp[lhs_call] == 0) {
+              q.push(lhs_call);
+            }
+          }
         }
+
         auto rhs = binary_instr->m_rhs_val_use->getValue();
         if (auto rhs_instr
             = std::dynamic_pointer_cast<BinaryInstruction>(rhs)) {
-          if (rhs_instr->m_bb == bb) {
+          if (std::find(unpinned.begin(), unpinned.end(), rhs_instr)
+              != unpinned.end()) {
             if (--mmp[rhs_instr] == 0) {
               q.push(rhs_instr);
+            }
+          }
+        } else if (auto rhs_call
+                   = std::dynamic_pointer_cast<CallInstruction>(rhs)) {
+          if (std::find(unpinned.begin(), unpinned.end(), rhs_call)
+              != unpinned.end()) {
+            if (--mmp[rhs_call] == 0) {
+              q.push(rhs_call);
             }
           }
         }
@@ -416,7 +491,8 @@ void RunGCM(std::shared_ptr<Function> function,
         auto addr = gep_instr->m_addr->getValue();
         if (auto gep_addr
             = std::dynamic_pointer_cast<GetElementPtrInstruction>(addr)) {
-          if (gep_addr->m_bb == bb) {
+          if (std::find(unpinned.begin(), unpinned.end(), gep_addr)
+              != unpinned.end()) {
             if (--mmp[gep_addr] == 0) {
               q.push(gep_addr);
             }
@@ -426,9 +502,49 @@ void RunGCM(std::shared_ptr<Function> function,
           auto val = index->getValue();
           if (auto binary_index
               = std::dynamic_pointer_cast<BinaryInstruction>(val)) {
-            if (binary_index->m_bb == bb) {
+            if (std::find(unpinned.begin(), unpinned.end(), binary_index)
+                != unpinned.end()) {
               if (--mmp[binary_index] == 0) {
                 q.push(binary_index);
+              }
+            }
+          } else if (auto call_index
+                     = std::dynamic_pointer_cast<CallInstruction>(val)) {
+            if (std::find(unpinned.begin(), unpinned.end(), call_index)
+                != unpinned.end()) {
+              if (--mmp[call_index] == 0) {
+                q.push(call_index);
+              }
+            }
+          }
+        }
+      } else if (auto call_instr
+                 = std::dynamic_pointer_cast<CallInstruction>(instr)) {
+        for (auto param : call_instr->m_params) {
+          auto val = param->getValue();
+          if (auto binary_param
+              = std::dynamic_pointer_cast<BinaryInstruction>(val)) {
+            if (std::find(unpinned.begin(), unpinned.end(), binary_param)
+                != unpinned.end()) {
+              if (--mmp[binary_param] == 0) {
+                q.push(binary_param);
+              }
+            }
+          } else if (auto gep_param
+                     = std::dynamic_pointer_cast<GetElementPtrInstruction>(
+                         val)) {
+            if (std::find(unpinned.begin(), unpinned.end(), gep_param)
+                != unpinned.end()) {
+              if (--mmp[gep_param] == 0) {
+                q.push(gep_param);
+              }
+            }
+          } else if (auto call_param
+                     = std::dynamic_pointer_cast<CallInstruction>(val)) {
+            if (std::find(unpinned.begin(), unpinned.end(), call_param)
+                != unpinned.end()) {
+              if (--mmp[call_param] == 0) {
+                q.push(call_param);
               }
             }
           }
@@ -507,93 +623,12 @@ void RunGCM(std::shared_ptr<Function> function,
         instr->m_placed = true;
       }
     }
+
+    // check if all instructions are placed (important for later use!)
     for (auto &instr : bb->m_instr_list) {
       assert(instr->m_placed);
     }
 
-    // check if all instructions are placed (important later on!)
-    // unfortunately not
-    // these values are the computations that are hoisted from below to above
-    // using topological sort to determine the order
-    // it seems we should deal with two kinds of instruction
-    // 1. binary instructions (icmp/fcmp instructions are mostly close to br)
-    // 2. getelementptr instructions
-
-    // for (auto it = order.rbegin(); it != order.rend(); ++it) {
-    //   auto instr = *it;
-    //   MoveInstructionBefore(instr, bb->LastInstruction());
-    //   instr->m_placed = true;
-    // }
-    // for (auto &instr : bb->m_instr_list) {
-    //   assert(instr->m_placed);
-    // }
-
-    //   std::vector<std::shared_ptr<BinaryInstruction>> order;
-    //   std::map<std::shared_ptr<BinaryInstruction>, int> mmp;
-    //   for (auto &instr : unpinned) {
-    //     if (instr->m_placed) continue;
-    //     if (auto binary_instr
-    //         = std::dynamic_pointer_cast<BinaryInstruction>(instr)) {
-    //       if (mmp.find(binary_instr) == mmp.end()) {
-    //         mmp[binary_instr] = 0;
-    //       }
-    //       auto lhs = binary_instr->m_lhs_val_use->getValue();
-    //       if (auto lhs_instr
-    //           = std::dynamic_pointer_cast<BinaryInstruction>(lhs)) {
-    //         if (lhs_instr->m_bb == bb) {
-    //           assert(!lhs_instr->m_placed);
-    //           ++mmp[lhs_instr];
-    //         }
-    //       }
-    //       auto rhs = binary_instr->m_rhs_val_use->getValue();
-    //       if (auto rhs_instr
-    //           = std::dynamic_pointer_cast<BinaryInstruction>(rhs)) {
-    //         if (rhs_instr->m_bb == bb) {
-    //           assert(!rhs_instr->m_placed);
-    //           ++mmp[rhs_instr];
-    //         }
-    //       }
-    //     }
-    //   }
-    //   std::queue<std::shared_ptr<BinaryInstruction>> q;
-    //   for (auto &[comp, cnt] : mmp) {
-    //     if (cnt == 0) {
-    //       q.push(comp);
-    //     }
-    //   }
-    //   while (!q.empty()) {
-    //     std::shared_ptr<BinaryInstruction> instr = q.front();
-    //     q.pop();
-    //     order.push_back(instr);
-    //     auto lhs = instr->m_lhs_val_use->getValue();
-    //     if (auto lhs_instr =
-    //     std::dynamic_pointer_cast<BinaryInstruction>(lhs)) {
-    //       if (lhs_instr->m_bb == bb) {
-    //         --mmp[lhs_instr];
-    //         if (mmp[lhs_instr] == 0) {
-    //           q.push(lhs_instr);
-    //         }
-    //       }
-    //     }
-    //     auto rhs = instr->m_rhs_val_use->getValue();
-    //     if (auto rhs_instr =
-    //     std::dynamic_pointer_cast<BinaryInstruction>(rhs)) {
-    //       if (rhs_instr->m_bb == bb) {
-    //         --mmp[rhs_instr];
-    //         if (mmp[rhs_instr] == 0) {
-    //           q.push(rhs_instr);
-    //         }
-    //       }
-    //     }
-    //   }
-    //   assert(order.size() == mmp.size());
-    //   for (auto it = order.rbegin(); it != order.rend(); ++it) {
-    //     auto instr = *it;
-    //     MoveInstructionBefore(instr, bb->LastInstruction());
-    //     instr->m_placed = true;
-    //     // std::remove(unpinned.begin(), unpinned.end(), instr);
-    //   }
-    //
     // expand worklist
     auto succ = bb->Successors();
     for (auto it = succ.rbegin(); it != succ.rend(); ++it) {

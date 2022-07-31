@@ -14,8 +14,8 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    // filename = "../testSource/buaa/part5/test2.c";
-    filename = "../testSource/functional/62_percolation.c";
+    // filename = "../testSource/buaa/part10/test1.c";
+    filename = "../testSource/functional/09_func_defn.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -68,11 +68,9 @@ int main(int argc, char **argv) {
   ofs2.close();
 
   pass_manager->GVNPass();  // global value numbering
-
   // but IR after GVN may not be executable since the position is incorrect
   // (some virtual registers do not dominate all of its uses)
   // we should hoist these VRs to a proper place, so use GCM
-
   pass_manager->GCMPass();
 
   std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_ir.out");
