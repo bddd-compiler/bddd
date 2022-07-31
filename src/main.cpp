@@ -1,11 +1,11 @@
+#include <ctime>
 #include <iostream>
 #include <memory>
-#include <ctime>
 
-#include "asm/asm-optimization.h"
 #include "asm/asm-builder.h"
-#include "asm/asm-register.h"
 #include "asm/asm-fixed.h"
+#include "asm/asm-optimization.h"
+#include "asm/asm-register.h"
 #include "asm/asm.h"
 #include "ast/symbol-table.h"
 #include "exceptions.h"
@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
   std::ofstream ofs4(filename.substr(0, filename.rfind('.')) + "_tmp_asm.s");
   asm_module->exportASM(ofs4);
   ofs4.close();
-  
+
   std::cout << "allocating..." << std::endl;
   RegisterAllocator(asm_module, RegType::R).Allocate();
   RegisterAllocator(asm_module, RegType::S).Allocate();
