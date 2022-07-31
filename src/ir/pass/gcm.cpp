@@ -273,8 +273,12 @@ void RunGCM(std::shared_ptr<Function> function,
     stack.pop();
     if (bb->m_visited) continue;
     bb->m_visited = true;
-    std::cerr << "[debug]" << bb->m_id << std::endl;
+    std::cerr << "[debug] bb.id: " << bb->m_id << std::endl;
 
+    // determine "pinned" instructions and "unpinned" instructions
+    // here the concept is inside a basic block
+    // "pinned" instructions cannot change their relative relationship
+    // while "unpinned" ones can move as long as SSA properties hold
     std::vector<std::shared_ptr<Instruction>> unpinned, pinned;
     for (auto &instr : bb->m_instr_list) {
       if (!IsPinned(instr)) {
@@ -285,85 +289,8 @@ void RunGCM(std::shared_ptr<Function> function,
         pinned.push_back(instr);
       }
     }
-    // 2. getelementptr instructions
-    // need to place at least in front of the first load/store
-    std::vector<std::shared_ptr<GetElementPtrInstruction>> gep_order;
-    std::map<std::shared_ptr<GetElementPtrInstruction>, int> gep_mp;  // degree
-    for (auto it = unpinned.begin(); it != unpinned.end();) {
-      auto instr = *it;
-      if (auto gep_instr
-          = std::dynamic_pointer_cast<GetElementPtrInstruction>(instr)) {
-        if (gep_mp.find(gep_instr) == gep_mp.end()) {
-          gep_mp[gep_instr] = 0;
-        }
-        auto addr = gep_instr->m_addr->getValue();
-        // if addr is alloca or global variable, it does not matter
-        // if addr is another gep, then they have order
-        if (auto gep_addr
-            = std::dynamic_pointer_cast<GetElementPtrInstruction>(addr)) {
-          if (gep_addr->m_bb == bb) {
-            assert(!gep_addr->m_placed);
-            ++gep_mp[gep_instr];
-          }
-        }
-        it = unpinned.erase(it);
-      } else {
-        ++it;
-      }
-    }
-    std::queue<std::shared_ptr<GetElementPtrInstruction>> gep_queue;
-    for (auto &[gep, cnt] : gep_mp) {
-      if (cnt == 0) {
-        gep_queue.push(gep);
-      }
-    }
-    while (!gep_queue.empty()) {
-      std::shared_ptr<GetElementPtrInstruction> instr = gep_queue.front();
-      gep_queue.pop();
-      gep_order.push_back(instr);
-      auto addr = instr->m_addr->getValue();
-      if (auto gep_addr
-          = std::dynamic_pointer_cast<GetElementPtrInstruction>(addr)) {
-        if (gep_addr->m_bb == bb) {
-          --gep_mp[gep_addr];
-          if (gep_mp[gep_addr] == 0) {
-            gep_queue.push(gep_addr);
-          }
-        }
-      }
-    }
-    assert(gep_order.size() == gep_mp.size());
-    for (auto it = gep_order.rbegin(); it != gep_order.rend(); ++it) {
-      auto instr = *it;
-      // move to the proper position
-      // check all operands
-      long maxd = -1;
-      std::shared_ptr<Instruction> target = nullptr;
-      for (auto op : instr->Operands()) {
-        auto val = op->getValue();
-        auto val_instr = std::dynamic_pointer_cast<Instruction>(val);
-        if (val_instr != nullptr && val_instr->m_bb == bb) {
-          auto it2 = std::find(bb->m_instr_list.begin(), bb->m_instr_list.end(),
-                               val_instr);
-          assert(it2 != bb->m_instr_list.end());
-          auto distance = std::distance(bb->m_instr_list.begin(), it2);
-          if (maxd < distance) {
-            maxd = distance;
-            target = val_instr;
-          }
-        }
-      }
-      if (maxd == -1) {
-        MoveInstructionFront(instr, instr->m_bb);
-      } else {
-        assert(maxd < bb->m_instr_list.size());
-        assert(target != nullptr);
-        MoveInstructionBehind(instr, target);
-      }
-      instr->m_placed = true;
-      // std::remove(unpinned.begin(), unpinned.end(), instr);
-    }
 
+    // AllocaInstructions are unpinned, and should move to front
     for (auto it = unpinned.begin(); it != unpinned.end();) {
       auto instr = *it;
       if (instr->m_op == IROp::ALLOCA) {
@@ -375,6 +302,7 @@ void RunGCM(std::shared_ptr<Function> function,
         ++it;
       }
     }
+    // PhiInstructions are unpinned, and should move before allocas
     for (auto it = unpinned.begin(); it != unpinned.end();) {
       auto instr = *it;
       if (instr->m_op == IROp::PHI) {
@@ -386,50 +314,29 @@ void RunGCM(std::shared_ptr<Function> function,
         ++it;
       }
     }
+    // all remaining unpinned instructions are not been placed now
     for (auto &instr : unpinned) {
       assert(!instr->m_placed);
+      assert(instr->m_bb == bb);
     }
     // the order of pinned instruction cannot change
     for (auto &instr : pinned) {
       assert(instr->m_placed);  // instr->m_placed = true;
+      assert(instr->m_bb == bb);
     }
-    // for every pinned instruction, make sure all uses of operands appear
-    // at least before it
 
-    std::stack<std::shared_ptr<Instruction>> w;  // pinned instructions
-    for (auto it = pinned.rbegin(); it != pinned.rend(); ++it) {
-      if ((*it)->m_op != IROp::PHI) w.push(*it);
-    }
-    while (!w.empty()) {
-      std::shared_ptr<Instruction> instr = w.top();
-      w.pop();
-      assert(instr->m_placed);
-      for (auto operand : instr->Operands()) {
-        if (auto sub_instr
-            = std::dynamic_pointer_cast<Instruction>(operand->getValue())) {
-          if (!sub_instr->m_placed) {
-            MoveInstructionBefore(sub_instr, instr);
-            sub_instr->m_placed = true;
-            w.push(sub_instr);
-          }
-        }
-      }
-    }
-    // check if all instructions are placed (important later on!)
-    // unfortunately not
-    // these values are the computations that are hoisted from below to above
-    // using topological sort to determine the order
-    // it seems we should deal with two kinds of instruction
-    // 1. binary instructions (icmp/fcmp instructions are mostly close to br)
-    std::vector<std::shared_ptr<BinaryInstruction>> order;
-    std::map<std::shared_ptr<BinaryInstruction>, int> mmp;
+    // sort unpinned instructions
+    // now unpinned instructions include
+    // 1. computational binary instructions
+    // 2. getelementptr instructions
+    // 3. function calls without side-effect
+    std::map<std::shared_ptr<Instruction>, int> mmp;  // indegree
     for (auto &instr : unpinned) {
-      if (instr->m_placed) continue;
+      assert(!instr->m_placed);
       if (auto binary_instr
           = std::dynamic_pointer_cast<BinaryInstruction>(instr)) {
-        if (mmp.find(binary_instr) == mmp.end()) {
-          mmp[binary_instr] = 0;
-        }
+        if (mmp.find(binary_instr) == mmp.end()) mmp[binary_instr] = 0;
+
         auto lhs = binary_instr->m_lhs_val_use->getValue();
         if (auto lhs_instr
             = std::dynamic_pointer_cast<BinaryInstruction>(lhs)) {
@@ -446,45 +353,247 @@ void RunGCM(std::shared_ptr<Function> function,
             ++mmp[rhs_instr];
           }
         }
-      }
-    }
-    std::queue<std::shared_ptr<BinaryInstruction>> q;
-    for (auto &[comp, cnt] : mmp) {
-      if (cnt == 0) {
-        q.push(comp);
-      }
-    }
-    while (!q.empty()) {
-      std::shared_ptr<BinaryInstruction> instr = q.front();
-      q.pop();
-      order.push_back(instr);
-      auto lhs = instr->m_lhs_val_use->getValue();
-      if (auto lhs_instr = std::dynamic_pointer_cast<BinaryInstruction>(lhs)) {
-        if (lhs_instr->m_bb == bb) {
-          --mmp[lhs_instr];
-          if (mmp[lhs_instr] == 0) {
-            q.push(lhs_instr);
+      } else if (auto gep_instr
+                 = std::dynamic_pointer_cast<GetElementPtrInstruction>(instr)) {
+        if (mmp.find(gep_instr) == mmp.end()) mmp[gep_instr] = 0;
+
+        auto addr = gep_instr->m_addr->getValue();
+        // if addr is gep instruction, this gep instruction should be placed
+        // before this gep instruction
+        if (auto gep_addr
+            = std::dynamic_pointer_cast<GetElementPtrInstruction>(addr)) {
+          if (gep_addr->m_bb == bb) {
+            assert(!gep_addr->m_placed);
+            ++mmp[gep_addr];
+          }
+        }
+        for (auto index : gep_instr->m_indices) {
+          auto val = index->getValue();
+          if (auto binary_index
+              = std::dynamic_pointer_cast<BinaryInstruction>(val)) {
+            if (binary_index->m_bb == bb) {
+              assert(!binary_index->m_placed);
+              ++mmp[binary_index];
+            }
           }
         }
       }
-      auto rhs = instr->m_rhs_val_use->getValue();
-      if (auto rhs_instr = std::dynamic_pointer_cast<BinaryInstruction>(rhs)) {
-        if (rhs_instr->m_bb == bb) {
-          --mmp[rhs_instr];
-          if (mmp[rhs_instr] == 0) {
-            q.push(rhs_instr);
+    }
+
+    std::queue<std::shared_ptr<Instruction>> q;
+    for (auto &[instr, cnt] : mmp) {
+      if (cnt == 0) {
+        q.push(instr);
+      }
+    }
+    std::vector<std::shared_ptr<Instruction>> order;
+    while (!q.empty()) {
+      std::shared_ptr<Instruction> instr = q.front();
+      q.pop();
+      order.push_back(instr);
+      if (auto binary_instr
+          = std::dynamic_pointer_cast<BinaryInstruction>(instr)) {
+        auto lhs = binary_instr->m_lhs_val_use->getValue();
+        if (auto lhs_instr
+            = std::dynamic_pointer_cast<BinaryInstruction>(lhs)) {
+          if (lhs_instr->m_bb == bb) {
+            if (--mmp[lhs_instr] == 0) {
+              q.push(lhs_instr);
+            }
+          }
+        }
+        auto rhs = binary_instr->m_rhs_val_use->getValue();
+        if (auto rhs_instr
+            = std::dynamic_pointer_cast<BinaryInstruction>(rhs)) {
+          if (rhs_instr->m_bb == bb) {
+            if (--mmp[rhs_instr] == 0) {
+              q.push(rhs_instr);
+            }
+          }
+        }
+      } else if (auto gep_instr
+                 = std::dynamic_pointer_cast<GetElementPtrInstruction>(instr)) {
+        auto addr = gep_instr->m_addr->getValue();
+        if (auto gep_addr
+            = std::dynamic_pointer_cast<GetElementPtrInstruction>(addr)) {
+          if (gep_addr->m_bb == bb) {
+            if (--mmp[gep_addr] == 0) {
+              q.push(gep_addr);
+            }
+          }
+        }
+        for (auto index : gep_instr->m_indices) {
+          auto val = index->getValue();
+          if (auto binary_index
+              = std::dynamic_pointer_cast<BinaryInstruction>(val)) {
+            if (binary_index->m_bb == bb) {
+              if (--mmp[binary_index] == 0) {
+                q.push(binary_index);
+              }
+            }
           }
         }
       }
     }
     assert(order.size() == mmp.size());
-    for (auto it = order.rbegin(); it != order.rend(); ++it) {
-      auto instr = *it;
-      MoveInstructionBefore(instr, bb->LastInstruction());
-      instr->m_placed = true;
-      // std::remove(unpinned.begin(), unpinned.end(), instr);
+    // std::reverse(order.begin(), order.end());
+    if (!order.empty()) {
+      std::cerr << "[debug] size: " << order.size() << std::endl;
     }
 
+    // for every pinned instruction, make sure all uses of operands appear
+    // at least before it
+
+    std::stack<std::shared_ptr<Instruction>> w;  // pinned instructions
+    for (auto it = pinned.rbegin(); it != pinned.rend(); ++it) {
+      if ((*it)->m_op != IROp::PHI) w.push(*it);
+    }
+    while (!w.empty()) {
+      std::shared_ptr<Instruction> instr = w.top();
+      w.pop();
+      assert(instr->m_placed);
+      for (auto operand : instr->Operands()) {
+        if (auto sub_instr
+            = std::dynamic_pointer_cast<Instruction>(operand->getValue())) {
+          if (!sub_instr->m_placed) {
+            // auto it = std::find(unpinned.begin(), unpinned.end(), sub_instr);
+            // assert(it != unpinned.end());
+            // MoveInstructionBefore(sub_instr, instr);
+            // sub_instr->m_placed = true;
+            // w.push(sub_instr);
+            // unpinned.erase(it);
+
+            auto temp = std::find(order.begin(), order.end(), sub_instr);
+            if (temp == order.end())
+              continue;  // not computational binary, not gep
+            bool flag = true;
+            for (auto it = temp; it != order.end(); ++it) {
+              auto temp_instr = *it;
+              if (!temp_instr->m_placed) {
+                flag = false;  // not the time
+                break;
+              }
+            }
+            if (!flag) continue;
+            auto begin = std::find(order.rbegin(), order.rend(), sub_instr);
+            assert(begin != order.rend());
+            for (auto it = begin; it != order.rend(); ++it) {
+              auto temp_instr = *it;
+              if (!temp_instr->m_placed) {
+                MoveInstructionBefore(temp_instr, instr);
+                temp_instr->m_placed = true;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (auto &instr : order) {
+      if (!instr->m_placed) {
+        // place it right before its first use by others
+        for (auto use_instr : bb->m_instr_list) {
+          if (use_instr == instr || use_instr->m_op == IROp::PHI) continue;
+          auto it2
+              = std::find_if(instr->m_use_list.begin(), instr->m_use_list.end(),
+                             [&use_instr](std::unique_ptr<Use> &use) {
+                               return use->getUser() == use_instr;
+                             });
+          if (it2 != instr->m_use_list.end()) {
+            MoveInstructionBefore(instr, use_instr);
+            break;
+          }
+        }
+        instr->m_placed = true;
+      }
+    }
+    for (auto &instr : bb->m_instr_list) {
+      assert(instr->m_placed);
+    }
+
+    // check if all instructions are placed (important later on!)
+    // unfortunately not
+    // these values are the computations that are hoisted from below to above
+    // using topological sort to determine the order
+    // it seems we should deal with two kinds of instruction
+    // 1. binary instructions (icmp/fcmp instructions are mostly close to br)
+    // 2. getelementptr instructions
+
+    // for (auto it = order.rbegin(); it != order.rend(); ++it) {
+    //   auto instr = *it;
+    //   MoveInstructionBefore(instr, bb->LastInstruction());
+    //   instr->m_placed = true;
+    // }
+    // for (auto &instr : bb->m_instr_list) {
+    //   assert(instr->m_placed);
+    // }
+
+    //   std::vector<std::shared_ptr<BinaryInstruction>> order;
+    //   std::map<std::shared_ptr<BinaryInstruction>, int> mmp;
+    //   for (auto &instr : unpinned) {
+    //     if (instr->m_placed) continue;
+    //     if (auto binary_instr
+    //         = std::dynamic_pointer_cast<BinaryInstruction>(instr)) {
+    //       if (mmp.find(binary_instr) == mmp.end()) {
+    //         mmp[binary_instr] = 0;
+    //       }
+    //       auto lhs = binary_instr->m_lhs_val_use->getValue();
+    //       if (auto lhs_instr
+    //           = std::dynamic_pointer_cast<BinaryInstruction>(lhs)) {
+    //         if (lhs_instr->m_bb == bb) {
+    //           assert(!lhs_instr->m_placed);
+    //           ++mmp[lhs_instr];
+    //         }
+    //       }
+    //       auto rhs = binary_instr->m_rhs_val_use->getValue();
+    //       if (auto rhs_instr
+    //           = std::dynamic_pointer_cast<BinaryInstruction>(rhs)) {
+    //         if (rhs_instr->m_bb == bb) {
+    //           assert(!rhs_instr->m_placed);
+    //           ++mmp[rhs_instr];
+    //         }
+    //       }
+    //     }
+    //   }
+    //   std::queue<std::shared_ptr<BinaryInstruction>> q;
+    //   for (auto &[comp, cnt] : mmp) {
+    //     if (cnt == 0) {
+    //       q.push(comp);
+    //     }
+    //   }
+    //   while (!q.empty()) {
+    //     std::shared_ptr<BinaryInstruction> instr = q.front();
+    //     q.pop();
+    //     order.push_back(instr);
+    //     auto lhs = instr->m_lhs_val_use->getValue();
+    //     if (auto lhs_instr =
+    //     std::dynamic_pointer_cast<BinaryInstruction>(lhs)) {
+    //       if (lhs_instr->m_bb == bb) {
+    //         --mmp[lhs_instr];
+    //         if (mmp[lhs_instr] == 0) {
+    //           q.push(lhs_instr);
+    //         }
+    //       }
+    //     }
+    //     auto rhs = instr->m_rhs_val_use->getValue();
+    //     if (auto rhs_instr =
+    //     std::dynamic_pointer_cast<BinaryInstruction>(rhs)) {
+    //       if (rhs_instr->m_bb == bb) {
+    //         --mmp[rhs_instr];
+    //         if (mmp[rhs_instr] == 0) {
+    //           q.push(rhs_instr);
+    //         }
+    //       }
+    //     }
+    //   }
+    //   assert(order.size() == mmp.size());
+    //   for (auto it = order.rbegin(); it != order.rend(); ++it) {
+    //     auto instr = *it;
+    //     MoveInstructionBefore(instr, bb->LastInstruction());
+    //     instr->m_placed = true;
+    //     // std::remove(unpinned.begin(), unpinned.end(), instr);
+    //   }
+    //
     // expand worklist
     auto succ = bb->Successors();
     for (auto it = succ.rbegin(); it != succ.rend(); ++it) {
