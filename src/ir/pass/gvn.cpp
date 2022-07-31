@@ -458,7 +458,7 @@ void IRPassManager::GVNPass() {
     if (func->m_bb_list.empty()) continue;
     RunGVN(func, m_builder);
     // RemoveTrivialPhis(func);
-    ReplaceTrivialBranchByJump(func);
-    RemoveUnusedBasicBlocks(func);
+    // ReplaceTrivialBranchByJump(func);
+    // RemoveUnusedBasicBlocks(func);
   }
 }

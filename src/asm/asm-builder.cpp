@@ -140,11 +140,7 @@ std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value,
     return m_value_map[value];
   }
   if (auto val = std::dynamic_pointer_cast<Constant>(value)) {
-    if (val->m_type.IsBasicInt())
-      return GenerateConstant(val, genimm, checkimm);
-    auto ret = std::make_shared<Operand>(OperandType::VREG, true);
-    appendMOV(ret, std::make_shared<Operand>(val->m_float_val));
-    return ret;
+    return GenerateConstant(val, genimm, checkimm);
   }
   if (m_addr_map.find(value) != m_addr_map.end()) {
     auto& [op, offs] = m_addr_map[value];
@@ -222,8 +218,9 @@ std::shared_ptr<MOVInst> ASM_Builder::appendMOV(std::shared_ptr<Operand> dest,
     mov = std::make_shared<MOVInst>(dest, imm);
     m_cur_block->insert(mov);
   } else {
-    int temp = *(int *)&imm;
-    auto mov_temp = std::make_shared<MOVInst>(std::make_shared<Operand>(OperandType::VREG), temp);
+    int temp = *(int*)&imm;
+    auto mov_temp = std::make_shared<MOVInst>(
+        std::make_shared<Operand>(OperandType::VREG), temp);
     auto mov = std::make_shared<MOVInst>(dest, mov_temp->m_dest);
     m_cur_block->insert(mov_temp);
     m_cur_block->insert(mov);

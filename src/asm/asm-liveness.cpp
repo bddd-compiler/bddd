@@ -36,7 +36,7 @@ void RegisterAllocator::LivenessAnalysis() {
           b->m_def.insert(def);
         }
       }
-      for (auto& use : defs) {
+      for (auto& use : uses) {
         if (b->m_def.find(use) == b->m_def.end()) {
           b->m_use.insert(use);
         }
@@ -118,6 +118,9 @@ void LDRInst::replaceDef(std::shared_ptr<Operand> newOp,
                          std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);
   m_dest = newOp;
+  m_def.erase(oldOp);
+  m_f_def.erase(oldOp);
+  addDef(newOp);
 }
 
 void LDRInst::replaceUse(std::shared_ptr<Operand> newOp,
@@ -126,6 +129,9 @@ void LDRInst::replaceUse(std::shared_ptr<Operand> newOp,
   assert(m_src == oldOp || m_offs == oldOp);
   if (m_src == oldOp) m_src = newOp;
   if (m_offs == oldOp) m_offs = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
 }
 
 void STRInst::replaceDef(std::shared_ptr<Operand> newOp,
@@ -140,12 +146,18 @@ void STRInst::replaceUse(std::shared_ptr<Operand> newOp,
   if (m_src == oldOp) m_src = newOp;
   if (m_dest == oldOp) m_dest = newOp;
   if (m_offs == oldOp) m_offs = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
 }
 
 void MOVInst::replaceDef(std::shared_ptr<Operand> newOp,
                          std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);
   m_dest = newOp;
+  m_def.erase(oldOp);
+  m_f_def.erase(oldOp);
+  addDef(newOp);
 }
 
 void MOVInst::replaceUse(std::shared_ptr<Operand> newOp,
@@ -154,6 +166,9 @@ void MOVInst::replaceUse(std::shared_ptr<Operand> newOp,
   assert(m_dest == oldOp || m_src == oldOp);
   if (m_dest == oldOp) m_dest = newOp;
   if (m_src == oldOp) m_src = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
 }
 
 void PInst::replaceDef(std::shared_ptr<Operand> newOp,
@@ -196,6 +211,9 @@ void ShiftInst::replaceDef(std::shared_ptr<Operand> newOp,
                            std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);
   m_dest = newOp;
+  m_def.erase(oldOp);
+  m_f_def.erase(oldOp);
+  addDef(newOp);
 }
 
 void ShiftInst::replaceUse(std::shared_ptr<Operand> newOp,
@@ -203,12 +221,18 @@ void ShiftInst::replaceUse(std::shared_ptr<Operand> newOp,
   assert(m_src == oldOp || m_sval == oldOp);
   if (m_src == oldOp) m_src = newOp;
   if (m_sval == oldOp) m_sval = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
 }
 
 void ASInst::replaceDef(std::shared_ptr<Operand> newOp,
                         std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);
   m_dest = newOp;
+  m_def.erase(oldOp);
+  m_f_def.erase(oldOp);
+  addDef(newOp);
 }
 
 void ASInst::replaceUse(std::shared_ptr<Operand> newOp,
@@ -216,12 +240,18 @@ void ASInst::replaceUse(std::shared_ptr<Operand> newOp,
   assert(m_operand1 == oldOp || m_operand2 == oldOp);
   if (m_operand1 == oldOp) m_operand1 = newOp;
   if (m_operand2 == oldOp) m_operand2 = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
 }
 
 void MULInst::replaceDef(std::shared_ptr<Operand> newOp,
                          std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);
   m_dest = newOp;
+  m_def.erase(oldOp);
+  m_f_def.erase(oldOp);
+  addDef(newOp);
 }
 
 void MULInst::replaceUse(std::shared_ptr<Operand> newOp,
@@ -231,12 +261,18 @@ void MULInst::replaceUse(std::shared_ptr<Operand> newOp,
   if (m_operand1 == oldOp) m_operand1 = newOp;
   if (m_operand2 == oldOp) m_operand2 = newOp;
   if (m_append && m_append == oldOp) m_append = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
 }
 
 void SDIVInst::replaceDef(std::shared_ptr<Operand> newOp,
                           std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);
   m_dest = newOp;
+  m_def.erase(oldOp);
+  m_f_def.erase(oldOp);
+  addDef(newOp);
 }
 
 void SDIVInst::replaceUse(std::shared_ptr<Operand> newOp,
@@ -244,12 +280,18 @@ void SDIVInst::replaceUse(std::shared_ptr<Operand> newOp,
   assert(m_devidend == oldOp || m_devisor == oldOp);
   if (m_devidend == oldOp) m_devidend = newOp;
   if (m_devisor == oldOp) m_devisor = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
 }
 
 void BITInst::replaceDef(std::shared_ptr<Operand> newOp,
                          std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);
   m_dest = newOp;
+  m_def.erase(oldOp);
+  m_f_def.erase(oldOp);
+  addDef(newOp);
 }
 
 void BITInst::replaceUse(std::shared_ptr<Operand> newOp,
@@ -257,6 +299,9 @@ void BITInst::replaceUse(std::shared_ptr<Operand> newOp,
   assert(m_operand1 == oldOp || m_operand2 == oldOp);
   if (m_operand1 == oldOp) m_operand1 = newOp;
   if (m_operand2 == oldOp) m_operand2 = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
 }
 
 void CTInst::replaceDef(std::shared_ptr<Operand> newOp,
@@ -270,16 +315,25 @@ void CTInst::replaceUse(std::shared_ptr<Operand> newOp,
   assert(m_operand1 == oldOp || m_operand2 == oldOp);
   if (m_operand1 == oldOp) m_operand1 = newOp;
   if (m_operand2 == oldOp) m_operand2 = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
 }
 
 void VNEGInst::replaceDef(std::shared_ptr<Operand> newOp,
                           std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);
   m_dest = newOp;
+  m_def.erase(oldOp);
+  m_f_def.erase(oldOp);
+  addDef(newOp);
 }
 
 void VNEGInst::replaceUse(std::shared_ptr<Operand> newOp,
                           std::shared_ptr<Operand> oldOp) {
   assert(m_operand == oldOp);
   m_operand = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
 }

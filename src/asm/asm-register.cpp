@@ -569,8 +569,6 @@ void RegisterAllocator::RewriteProgram() {
           // replace use
           OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
           i->replaceUse(newOp, v);
-          uses.erase(v);
-          i->addUse(newOp);
           // insert a load instruction before use of newOp
           OpPtr offs;
           std::shared_ptr<MOVInst> mov = nullptr;
@@ -596,8 +594,6 @@ void RegisterAllocator::RewriteProgram() {
           // replace def
           OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
           i->replaceDef(newOp, v);
-          defs.erase(v);
-          i->addDef(newOp);
           // insert a store instruction after defination of newOp
           OpPtr offs;
           std::shared_ptr<MOVInst> mov = nullptr;

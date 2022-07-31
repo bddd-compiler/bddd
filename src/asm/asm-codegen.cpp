@@ -3,13 +3,19 @@
 
 std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
     std::shared_ptr<Constant> value, bool genimm, bool checkimm) {
-  assert(value->m_type.IsBasicInt());
-  int imm = value->m_int_val;
-  if (genimm && (!checkimm || Operand::immCheck(imm))) {
-    return std::make_shared<Operand>(imm);
+  assert(value->m_type.IsConst());
+  std::shared_ptr<Operand> ret;
+  if (value->m_type.IsBasicFloat()) {
+    ret = std::make_shared<Operand>(OperandType::VREG, true);
+    appendMOV(ret, std::make_shared<Operand>(value->m_float_val));
+  } else {
+    int imm = value->m_int_val;
+    if (genimm && (!checkimm || Operand::immCheck(imm))) {
+      return std::make_shared<Operand>(imm);
+    }
+    ret = std::make_shared<Operand>(OperandType::VREG);
+    appendMOV(ret, imm);
   }
-  auto ret = std::make_shared<Operand>(OperandType::VREG);
-  appendMOV(ret, imm);
   return ret;
 }
 
@@ -175,6 +181,20 @@ std::shared_ptr<Operand> GenerateBinaryInstruction(
 std::shared_ptr<Operand> GenerateCallInstruction(
     std::shared_ptr<CallInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
+  if (inst->m_func_name == "llvm.memset.p0i8.i32") {
+    builder->appendMOV(
+        Operand::getRReg(RReg::R0),
+        builder->getOperand(inst->m_params[0]->getValue(), true, false));
+    builder->appendMOV(
+        Operand::getRReg(RReg::R1),
+        builder->getOperand(inst->m_params[1]->getValue(), true, false));
+    builder->appendMOV(
+        Operand::getRReg(RReg::R2),
+        builder->getOperand(inst->m_params[2]->getValue(), true, false));
+    builder->appendCALL(VarType::VOID, "memset", 3);
+    return nullptr;
+  }
+
   int n = inst->m_params.size();
   // calculate the stack move size
   unsigned int stack_move_size = std::max(n - 4, 0) * 4;
@@ -229,6 +249,7 @@ std::shared_ptr<Operand> GenerateBranchInstruction(
   std::shared_ptr<BinaryInstruction> inst_cond;
   true_block = builder->getBlock(inst->m_true_block);
   false_block = builder->getBlock(inst->m_false_block);
+
   inst_cond
       = std::dynamic_pointer_cast<BinaryInstruction>(inst->m_cond->getValue());
   CondType cond = GetCondFromIR(inst_cond->m_op);
@@ -278,12 +299,16 @@ std::shared_ptr<Operand> getAddr(std::shared_ptr<Value> value,
 std::shared_ptr<Operand> GenerateGepInstruction(
     std::shared_ptr<GetElementPtrInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  auto base_addr = inst->m_addr->getValue();
-  auto dimensions = base_addr->m_type.m_dimensions;
-  auto indices = inst->m_indices;
-  int const_offs = 0;
+  auto base_addr = inst->m_addr->getValue();         // the base address
+  auto dimensions = base_addr->m_type.m_dimensions;  // dimensions
+  auto indices = inst->m_indices;  // indices of GetElementPtrInstruction
+
+  int const_offs = 0;                      // store offset of constant
+  std::shared_ptr<Operand> var_offs;       // store offset of variable
+  std::shared_ptr<Operand> const_offs_op;  // constant offset to operand
+  std::shared_ptr<Operand> var_offs_op;    // variable offset to operand
+  std::shared_ptr<Operand> offs_op;  // sum of const_offs_op and var_offs_op
   int attribute = 1;
-  std::shared_ptr<Operand> offs_op;
   bool first = true;
 
   // maybe redundant??
@@ -293,7 +318,7 @@ std::shared_ptr<Operand> GenerateGepInstruction(
       assert(val->m_type.IsBasicInt());
       const_offs = val->m_int_val * 4;
     } else {
-      offs_op = builder->getOperand(indices[0]->getValue());
+      var_offs_op = builder->getOperand(indices[0]->getValue());
     }
   }
   //
@@ -307,27 +332,24 @@ std::shared_ptr<Operand> GenerateGepInstruction(
       assert(val->m_type.IsBasicInt());
       const_offs += val->m_int_val * attribute * 4;
     } else {
+      var_offs = builder->getOperand(indices[i + 1]->getValue());
       if (first) {
         first = false;
-        offs_op = std::make_shared<Operand>(OperandType::VREG);
+        var_offs_op = std::make_shared<Operand>(OperandType::VREG);
         auto mov = builder->appendMOV(
             std::make_shared<Operand>(OperandType::VREG), attribute);
-        builder->appendMUL(InstOp::MUL, offs_op,
-                           builder->getOperand(indices[i + 1]->getValue()),
-                           mov->m_dest);
+        builder->appendMUL(InstOp::MUL, var_offs_op, var_offs, mov->m_dest);
       } else {
         auto mov = builder->appendMOV(
             std::make_shared<Operand>(OperandType::VREG), attribute);
-        builder->appendMUL(InstOp::MLA, offs_op,
-                           builder->getOperand(indices[i + 1]->getValue()),
-                           mov->m_dest, offs_op);
+        builder->appendMUL(InstOp::MLA, var_offs_op, var_offs, mov->m_dest,
+                           var_offs_op);
       }
     }
     attribute *= dimensions[i];
   }
 
   // const part offset obtained in ir phase
-  std::shared_ptr<Operand> const_offs_op;
   if (const_offs) {
     if (Operand::immCheck(const_offs)) {
       const_offs_op = std::make_shared<Operand>(const_offs);
@@ -337,10 +359,11 @@ std::shared_ptr<Operand> GenerateGepInstruction(
     }
   }
 
-  if (!offs_op) {
+  if (!var_offs_op) {
     offs_op = const_offs_op;
   } else {
-    builder->appendShift(InstOp::LSL, offs_op, offs_op,
+    offs_op = std::make_shared<Operand>(OperandType::VREG);
+    builder->appendShift(InstOp::LSL, offs_op, var_offs_op,
                          std::make_shared<Operand>(2));
     if (const_offs) {
       builder->appendAS(InstOp::ADD, offs_op, offs_op, const_offs_op);
@@ -351,16 +374,14 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   // actually, it would be better to return an offset form, like [Rn, Rm]
   // so that we can reduce the add instruction
   // TODO(Huang): optimize to offset form
-  if (offs_op) {
-    auto ret = builder->getOperand(inst);
-    builder->appendAS(InstOp::ADD, ret, getAddr(base_addr, builder), offs_op);
-    return ret;
-  }
-  builder->m_value_map.insert(
-      std::make_pair(inst, getAddr(base_addr, builder)));
 
-  // if wrong, try to append a mov inst
-  return getAddr(base_addr, builder);
+  auto ret = builder->getOperand(inst);
+  if (offs_op)
+    builder->appendAS(InstOp::ADD, ret, getAddr(base_addr, builder), offs_op);
+  else
+    builder->appendMOV(ret, getAddr(base_addr, builder));
+
+  return ret;
 }
 
 std::shared_ptr<Operand> GenerateLoadInstruction(
@@ -398,7 +419,7 @@ std::shared_ptr<Operand> GenerateAllocaInstruction(
     offs = std::make_shared<Operand>(sp_offs);
   } else {
     offs = std::make_shared<Operand>(OperandType::VREG);
-    builder->appendMOV(std::make_shared<Operand>(OperandType::VREG), sp_offs);
+    builder->appendMOV(offs, sp_offs);
   }
   auto ret = builder->getOperand(inst);
   builder->appendAS(InstOp::ADD, ret, Operand::getRReg(RReg::SP), offs);
@@ -420,6 +441,26 @@ std::shared_ptr<Operand> GeneratePhiInstruction(
     auto src = builder->getOperand(value->getValue(), true, false);
     block->appendFilledMOV(std::make_shared<MOVInst>(tmp, src));
   }
+  return ret;
+}
+
+std::shared_ptr<Operand> GenerateBitCastInstruction(
+    std::shared_ptr<BitCastInstruction> inst,
+    std::shared_ptr<ASM_Builder> builder) {
+  auto val = inst->m_val->getValue();
+  auto src = builder->getOperand(val);
+  auto ret = builder->getOperand(inst);
+  builder->appendMOV(ret, src);
+  return ret;
+}
+
+std::shared_ptr<Operand> GenerateZExtInstruction(
+    std::shared_ptr<ZExtInstruction> inst,
+    std::shared_ptr<ASM_Builder> builder) {
+  auto val = inst->m_val->getValue();
+  auto src = builder->getOperand(val);
+  auto ret = builder->getOperand(inst);
+  builder->appendMOV(ret, src);
   return ret;
 }
 
@@ -455,6 +496,11 @@ void GenerateInstruction(std::shared_ptr<Value> ir_value,
     GenerateAllocaInstruction(inst, builder);
   } else if (auto inst = std::dynamic_pointer_cast<PhiInstruction>(ir_value)) {
     GeneratePhiInstruction(inst, builder);
+  } else if (auto inst
+             = std::dynamic_pointer_cast<BitCastInstruction>(ir_value)) {
+    GenerateBitCastInstruction(inst, builder);
+  } else if (auto inst = std::dynamic_pointer_cast<ZExtInstruction>(ir_value)) {
+    GenerateZExtInstruction(inst, builder);
   }
 }
 
