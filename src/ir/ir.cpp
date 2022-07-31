@@ -137,6 +137,9 @@ void BasicBlock::InsertBackInstruction(const std::shared_ptr<Instruction>& elem,
   instr->m_bb = shared_from_base<BasicBlock>();
   m_instr_list.insert(it, std::move(instr));
 }
+std::list<std::shared_ptr<Instruction>> BasicBlock::GetInstList() {
+  return m_instr_list;
+}
 void BasicBlock::RemoveInstruction(const std::shared_ptr<Instruction>& elem) {
   auto it = std::find(m_instr_list.begin(), m_instr_list.end(), elem);
   assert(it != m_instr_list.end());

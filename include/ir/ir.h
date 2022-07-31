@@ -1000,6 +1000,8 @@ public:
   // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;
 
+  std::list<std::shared_ptr<Instruction>> GetInstList();
+
   friend class Module;
 };
 

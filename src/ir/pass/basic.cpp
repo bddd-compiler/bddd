@@ -143,7 +143,7 @@ void RemoveTrivialPhis(std::shared_ptr<Function> func) {
 // TODO(garen): some problems here
 void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
   int cnt = 0;
-  while (false) {
+  while (true) {
     ++cnt;
     bool changed = false;
     for (auto &bb : func->m_bb_list) {

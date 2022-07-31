@@ -1,6 +1,12 @@
 #include <iostream>
 #include <memory>
+#include <ctime>
 
+#include "asm/asm-optimization.h"
+#include "asm/asm-builder.h"
+#include "asm/asm-register.h"
+#include "asm/asm-fixed.h"
+#include "asm/asm.h"
 #include "ast/symbol-table.h"
 #include "exceptions.h"
 #include "ir/ir-pass-manager.h"
@@ -22,6 +28,8 @@ int main(int argc, char **argv) {
   }
   Driver driver;
 
+  std::cout << "compiling: " << filename << std::endl;
+  std::cout << "parsing..." << std::endl;
   /**
    * parse the source code into AST
    * ASTs can be accessed via driver.comp_unit
@@ -45,6 +53,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  std::cout << "generating ir..." << std::endl;
   auto module = std::make_unique<Module>();
   for (auto &builtin_func : g_builtin_funcs) {
     auto func_decl = std::make_shared<Function>(builtin_func);
@@ -76,6 +85,26 @@ int main(int argc, char **argv) {
   std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_ir.out");
   builder->m_module->ExportIR(ofs3, 0);
   ofs3.close();
+
+  // asm debug
+  std::cout << "generating asm..." << std::endl;
+  auto asm_module = std::make_shared<ASM_Module>();
+  auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
+  GenerateModule(std::move(builder->m_module), asm_builder);
+  std::ofstream ofs4(filename.substr(0, filename.rfind('.')) + "_tmp_asm.s");
+  asm_module->exportASM(ofs4);
+  ofs4.close();
+  
+  std::cout << "allocating..." << std::endl;
+  RegisterAllocator(asm_module, RegType::R).Allocate();
+  RegisterAllocator(asm_module, RegType::S).Allocate();
+
+  std::cout << "optimizing..." << std::endl;
+  optimize(asm_module);
+  generateLiteralPool(asm_module);
+  std::ofstream ofs5(filename.substr(0, filename.rfind('.')) + "_asm.s");
+  asm_module->exportASM(ofs5);
+  ofs5.close();
 
   return 0;
 }

@@ -19,12 +19,60 @@ FLEX_TARGET(
 )
 
 ADD_FLEX_BISON_DEPENDENCY(MyScanner MyParser)
+
+set(PARSER_SOURCE
+  ${BISON_MyParser_OUTPUTS}
+  ${FLEX_MyScanner_OUTPUTS}
+  src/parser/driver.cpp
+)
+
+set(AST_SOURCE
+  src/ast/ast.cpp
+  src/ast/symbol-table.cpp
+  src/ast/type-check.cpp
+  src/ast/debug.cpp
+  src/ast/codegen.cpp
+)
+
+set(IR_SOURCE
+  src/ir/ir.cpp
+  src/ir/export.cpp
+  src/ir/builder.cpp
+  src/ir/ir-name-allocator.cpp
+)
+
+set(IR_PASSES
+  src/ir/pass/mem2reg.cpp
+  src/ir/pass/function-inlining.cpp
+  src/ir/pass/gvn.cpp
+  src/ir/pass/gcm.cpp
+  src/ir/pass/dead-code-elimination.cpp
+  src/ir/pass/side-effect.cpp
+  src/ir/pass/dom.cpp
+  src/ir/pass/rpo.cpp 
+  src/ir/pass/basic.cpp 
+  src/ir/pass/tail-recursion.cpp
+  src/ir/pass/loop.cpp
+)
+
+set(ASM_SOURCE
+  src/asm/asm.cpp
+  src/asm/asm-builder.cpp
+  src/asm/asm-codegen.cpp
+  src/asm/asm-export.cpp
+  src/asm/asm-liveness.cpp
+  src/asm/asm-register.cpp
+  src/asm/asm-fixed.cpp
+  src/asm/asm-optimization.cpp
+)
+
 add_executable(bddd
   src/main.cpp
-
-  ${BISON_MyParser_OUTPUTS} ${FLEX_MyScanner_OUTPUTS} src/parser/driver.cpp
-  src/ast/ast.cpp src/ast/symbol-table.cpp src/ast/type-check.cpp src/ast/debug.cpp src/ast/codegen.cpp
-  src/ir/ir.cpp
-  src/ir/export.cpp src/ir/builder.cpp src/ir/pass/mem2reg.cpp src/ir/ir-name-allocator.cpp src/ir/pass/function-inlining.cpp src/ir/pass/gvn.cpp src/ir/pass/gcm.cpp src/ir/pass/dead-code-elimination.cpp src/ir/pass/side-effect.cpp src/ir/pass/dom.cpp src/ir/pass/rpo.cpp src/ir/pass/basic.cpp src/ir/pass/tail-recursion.cpp src/ir/pass/loop.cpp)
+  ${PARSER_SOURCE}
+  ${AST_SOURCE}
+  ${IR_SOURCE}
+  ${IR_PASSES}
+  ${ASM_SOURCE}
+)
 
 target_include_directories(bddd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
