@@ -227,7 +227,7 @@ void STRInst::exportASM(std::ofstream& ofs) {
 }
 
 void MOVInst::exportASM(std::ofstream& ofs) {
-  if (m_src->m_op_type == OperandType::IMM) {
+  if (m_src->m_op_type == OperandType::IMM && !m_src->m_is_float) {
     int imm = m_src->m_int_val;
     if (!Operand::immCheck(imm)) {
       if (Operand::immCheck(~imm)) {
@@ -331,4 +331,15 @@ void CTInst::exportASM(std::ofstream& ofs) {
     m_shift->exportASM(ofs);
   }
   ofs << std::endl;
+}
+
+void POOLInst::exportASM(std::ofstream& ofs) {
+  ofs << "\tB .pool_" << std::to_string(m_number) << std::endl;
+  ofs << "\t.pool" << std::endl;
+  ofs << ".pool_" << std::to_string(m_number) << ":" << std::endl;
+}
+
+void VNEGInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
+  ofs << m_dest->getName() << ", " << m_operand->getName() << std::endl;
 }

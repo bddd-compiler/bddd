@@ -20,9 +20,12 @@ public:
 // implement the register allocation algorithm in "Iterated Register Coalescing"
 class RegisterAllocator {
 private:
+  RegType m_reg_type;
+
   std::shared_ptr<ASM_Module> m_module;
   std::shared_ptr<ASM_Function> m_cur_func;
   std::set<RReg> rreg_avaliable;
+  std::set<SReg> sreg_avaliable;
   int K;
 
   std::unordered_map<OpPtr, int> m_depth_map;
@@ -59,7 +62,8 @@ private:
   std::unordered_map<OpPtr, std::unordered_set<std::shared_ptr<MOVInst>>>
       moveList;
   std::unordered_map<OpPtr, OpPtr> alias;
-  std::unordered_map<OpPtr, RReg> color;
+  std::unordered_map<OpPtr, RReg> color_r;
+  std::unordered_map<OpPtr, SReg> color_s;
 
   // procedure
   void AllocateCurFunc();  // Main() in "Iterated Register Coalescing"
@@ -102,6 +106,10 @@ private:
 
   void AssignColors();
 
+  void AssignColorsR();
+
+  void AssignColorsS();
+
   void RewriteProgram();
 
   bool AllOK(OpPtr u, OpPtr v);
@@ -117,10 +125,10 @@ private:
   void getInitial();
 
   // taken from tinbaccc
-  void updateDepth(std::shared_ptr<ASM_BasicBlock>, OpPtr node);
+  void updateDepth(std::shared_ptr<ASM_BasicBlock> block, OpPtr node);
 
 public:
-  RegisterAllocator(std::shared_ptr<ASM_Module> module = nullptr);
+  RegisterAllocator(std::shared_ptr<ASM_Module> module, RegType type);
 
   void Allocate();
 

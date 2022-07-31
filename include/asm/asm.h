@@ -1,17 +1,17 @@
 #ifndef BDDD_ASM_H
 #define BDDD_ASM_H
 
+#include <bitset>
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <list>
 #include <memory>
+#include <set>
 #include <stack>
 #include <string>
 #include <unordered_set>
 #include <vector>
-#include <set>
-#include <bitset>
 
 #include "ir/ir.h"
 
@@ -110,6 +110,7 @@ enum class InstOp {
   VMLS,
   VMUL,
   VDIV,
+  VNEG,
   VCMP,
   VLDR,
   VSTR,
@@ -118,6 +119,10 @@ enum class InstOp {
 enum class OperandType { REG, VREG, IMM };
 
 enum class CondType { NONE, NE, LT, LE, GT, GE, EQ };
+
+enum class MOVType { REG, IMM };
+
+enum class RegType { R, S };
 
 CondType GetCondFromIR(IROp op);
 
@@ -129,13 +134,14 @@ public:
   static int vsreg_cnt;
   static std::unordered_map<std::shared_ptr<Operand>, std::string> vreg_map;
   static std::unordered_map<RReg, std::shared_ptr<Operand>> rreg_map;
+  static std::unordered_map<SReg, std::shared_ptr<Operand>> sreg_map;
 
   std::shared_ptr<ASM_Instruction> m_inst;
   OperandType m_op_type;
   std::string m_name;
   RReg m_rreg;
   SReg m_sreg;
-  bool m_is_rreg;
+  bool m_is_float;
   int m_int_val;
   float m_float_val;
 
@@ -143,13 +149,13 @@ public:
   int lifespan = 0;
   bool rejected = false;
 
-  Operand(OperandType t, bool r = true) : m_op_type(t), m_is_rreg(r) {}
+  Operand(OperandType t, bool r = false) : m_op_type(t), m_is_float(r) {}
 
   Operand(int val)
-      : m_op_type(OperandType::IMM), m_int_val(val), m_is_rreg(true) {}
+      : m_op_type(OperandType::IMM), m_int_val(val), m_is_float(false) {}
 
   Operand(float val)
-      : m_op_type(OperandType::IMM), m_float_val(val), m_is_rreg(false) {}
+      : m_op_type(OperandType::IMM), m_float_val(val), m_is_float(true) {}
 
   std::string getName();
 
@@ -158,6 +164,8 @@ public:
   std::string getVRegName();
 
   static std::shared_ptr<Operand> getRReg(RReg r);
+
+  static std::shared_ptr<Operand> getSReg(SReg s);
 
   static bool immCheck(int imm);
 
@@ -285,6 +293,8 @@ public:
   std::shared_ptr<ASM_BasicBlock> m_block;
   std::unordered_set<std::shared_ptr<Operand>> m_def;
   std::unordered_set<std::shared_ptr<Operand>> m_use;
+  std::unordered_set<std::shared_ptr<Operand>> m_f_def;
+  std::unordered_set<std::shared_ptr<Operand>> m_f_use;
 
   std::string getOpName();
 
@@ -351,16 +361,15 @@ public:
                   std::shared_ptr<Operand> oldOp) override;
 };
 
-// TODO(Huang): class ADRInst
-class ADRInst;
-
 class MOVInst : public ASM_Instruction {
 public:
-  enum class RIType { REG, IMM } m_type;
+  MOVType m_type;
   std::shared_ptr<Operand> m_dest;
   std::shared_ptr<Operand> m_src;
 
   MOVInst(std::shared_ptr<Operand> dest, int imm);
+
+  MOVInst(std::shared_ptr<Operand> dest, float imm);
 
   MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src);
 
@@ -372,8 +381,6 @@ public:
   void replaceUse(std::shared_ptr<Operand> newOp,
                   std::shared_ptr<Operand> oldOp) override;
 };
-
-// TODO(Huang): class VMOVInst
 
 class PInst : public ASM_Instruction {
 public:
@@ -559,12 +566,20 @@ public:
                   std::shared_ptr<Operand> oldOp) override {}
 };
 
-// float-related instruction
-class VMOVInst : public ASM_Instruction {
+class VNEGInst : public ASM_Instruction {
 public:
-  
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_operand;
+
+  VNEGInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> operand);
+
+  void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
 };
-
-
 
 #endif  // BDDD_ASM_H

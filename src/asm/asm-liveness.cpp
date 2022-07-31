@@ -23,12 +23,20 @@ void RegisterAllocator::LivenessAnalysis() {
     b->m_def.clear();
     b->m_use.clear();
     for (auto& i : b->m_insts) {
-      for (auto& def : i->m_def) {
+      std::unordered_set<OpPtr> defs, uses;
+      if (m_reg_type == RegType::R) {
+        defs = i->m_def;
+        uses = i->m_use;
+      } else {
+        defs = i->m_f_def;
+        uses = i->m_f_use;
+      }
+      for (auto& def : defs) {
         if (b->m_use.find(def) == b->m_use.end()) {
           b->m_def.insert(def);
         }
       }
-      for (auto& use : i->m_use) {
+      for (auto& use : defs) {
         if (b->m_def.find(use) == b->m_def.end()) {
           b->m_use.insert(use);
         }
@@ -92,12 +100,18 @@ void RegisterAllocator::LivenessAnalysis() {
 }
 
 void ASM_Instruction::addDef(std::shared_ptr<Operand> def) {
-  m_def.insert(def);
+  if (def->m_is_float)
+    m_f_def.insert(def);
+  else
+    m_def.insert(def);
 }
 
 void ASM_Instruction::addUse(std::shared_ptr<Operand> use) {
   if (use->m_op_type == OperandType::IMM) return;
-  m_use.insert(use);
+  if (use->m_is_float)
+    m_f_use.insert(use);
+  else
+    m_use.insert(use);
 }
 
 void LDRInst::replaceDef(std::shared_ptr<Operand> newOp,
@@ -136,7 +150,7 @@ void MOVInst::replaceDef(std::shared_ptr<Operand> newOp,
 
 void MOVInst::replaceUse(std::shared_ptr<Operand> newOp,
                          std::shared_ptr<Operand> oldOp) {
-  assert(m_type == RIType::REG);
+  assert(m_type == MOVType::REG);
   assert(m_dest == oldOp || m_src == oldOp);
   if (m_dest == oldOp) m_dest = newOp;
   if (m_src == oldOp) m_src = newOp;
@@ -256,4 +270,16 @@ void CTInst::replaceUse(std::shared_ptr<Operand> newOp,
   assert(m_operand1 == oldOp || m_operand2 == oldOp);
   if (m_operand1 == oldOp) m_operand1 = newOp;
   if (m_operand2 == oldOp) m_operand2 = newOp;
+}
+
+void VNEGInst::replaceDef(std::shared_ptr<Operand> newOp,
+                          std::shared_ptr<Operand> oldOp) {
+  assert(m_dest == oldOp);
+  m_dest = newOp;
+}
+
+void VNEGInst::replaceUse(std::shared_ptr<Operand> newOp,
+                          std::shared_ptr<Operand> oldOp) {
+  assert(m_operand == oldOp);
+  m_operand = newOp;
 }

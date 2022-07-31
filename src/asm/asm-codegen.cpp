@@ -3,16 +3,13 @@
 
 std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
     std::shared_ptr<Constant> value, bool genimm, bool checkimm) {
-  std::shared_ptr<Operand> ret;
-  if (value->m_type.IsBasicFloat()) {
-    // TODO(Huang): float
-  } else {
-    int imm = value->m_int_val;
-    if (genimm && (!checkimm || Operand::immCheck(imm))) {
-      return std::make_shared<Operand>(imm);
-    }
-    ret = appendMOV(std::make_shared<Operand>(OperandType::VREG), imm)->m_dest;
+  assert(value->m_type.IsBasicInt());
+  int imm = value->m_int_val;
+  if (genimm && (!checkimm || Operand::immCheck(imm))) {
+    return std::make_shared<Operand>(imm);
   }
+  auto ret = std::make_shared<Operand>(OperandType::VREG);
+  appendMOV(ret, imm);
   return ret;
 }
 
@@ -20,17 +17,20 @@ std::shared_ptr<Operand> GenerateAddInstruction(
     std::shared_ptr<BinaryInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<Operand> operand1, operand2;
-  std::shared_ptr<Value> val1 = inst->m_lhs_val_use->m_value;
-  std::shared_ptr<Value> val2 = inst->m_rhs_val_use->m_value;
+  std::shared_ptr<Value> val1 = inst->m_lhs_val_use->getValue();
+  std::shared_ptr<Value> val2 = inst->m_rhs_val_use->getValue();
 
+  bool is_int = inst->m_op == IROp::ADD;
+  InstOp op = is_int ? InstOp::ADD : InstOp::VADD;
   if (std::dynamic_pointer_cast<Constant>(val1)) {
     std::swap(val1, val2);
   }
   operand1 = builder->getOperand(val1);
-  operand2 = builder->getOperand(val2, true);
+  operand2 = builder->getOperand(val2, is_int);
 
   auto ret = builder->getOperand(inst);
-  builder->appendAS(InstOp::ADD, ret, operand1, operand2);
+  if (!is_int) ret->m_is_float = true;
+  builder->appendAS(op, ret, operand1, operand2);
   return ret;
 }
 
@@ -38,22 +38,24 @@ std::shared_ptr<Operand> GenerateSubInstruction(
     std::shared_ptr<BinaryInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<Operand> operand1, operand2;
-  std::shared_ptr<Value> val1 = inst->m_lhs_val_use->m_value;
-  std::shared_ptr<Value> val2 = inst->m_rhs_val_use->m_value;
+  std::shared_ptr<Value> val1 = inst->m_lhs_val_use->getValue();
+  std::shared_ptr<Value> val2 = inst->m_rhs_val_use->getValue();
   bool is_const1 = (std::dynamic_pointer_cast<Constant>(val1) != nullptr);
   bool is_const2 = (std::dynamic_pointer_cast<Constant>(val2) != nullptr);
 
-  InstOp op;
-  if (is_const1) {
+  // not finished yet
+  bool is_int = inst->m_op == IROp::SUB;
+  InstOp op = is_int ? InstOp::SUB : InstOp::VSUB;
+  if (op == InstOp::SUB && is_const1) {
     op = InstOp::RSB;
     std::swap(val1, val2);
-  } else {
-    op = InstOp::SUB;
   }
+
   operand1 = builder->getOperand(val1);
-  operand2 = builder->getOperand(val2, true);
+  operand2 = builder->getOperand(val2, is_int);
 
   auto ret = builder->getOperand(inst);
+  if (!is_int) ret->m_is_float = true;
   builder->appendAS(op, ret, operand1, operand2);
   return ret;
 }
@@ -61,30 +63,36 @@ std::shared_ptr<Operand> GenerateSubInstruction(
 std::shared_ptr<Operand> GenerateMulInstruction(
     std::shared_ptr<BinaryInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  auto operand1 = builder->getOperand(inst->m_lhs_val_use->m_value);
-  auto operand2 = builder->getOperand(inst->m_rhs_val_use->m_value);
+  auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
+  auto operand2 = builder->getOperand(inst->m_rhs_val_use->getValue());
 
+  bool is_int = inst->m_op == IROp::MUL;
+  InstOp op = is_int ? InstOp::MUL : InstOp::VMUL;
   auto ret = builder->getOperand(inst);
-  builder->appendMUL(InstOp::MUL, ret, operand1, operand2);
+  if (!is_int) ret->m_is_float = true;
+  builder->appendMUL(op, ret, operand1, operand2);
   return ret;
 }
 
 std::shared_ptr<Operand> GenerateDivInstruction(
     std::shared_ptr<BinaryInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  auto operand1 = builder->getOperand(inst->m_lhs_val_use->m_value);
-  auto operand2 = builder->getOperand(inst->m_rhs_val_use->m_value);
+  auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
+  auto operand2 = builder->getOperand(inst->m_rhs_val_use->getValue());
 
+  bool is_int = inst->m_op == IROp::SDIV;
+  InstOp op = is_int ? InstOp::SDIV : InstOp::VDIV;
   auto ret = builder->getOperand(inst);
-  builder->appendMUL(InstOp::SDIV, ret, operand1, operand2);
+  if (!is_int) ret->m_is_float = true;
+  builder->appendMUL(op, ret, operand1, operand2);
   return ret;
 }
 
 std::shared_ptr<Operand> GenerateModInstruction(
     std::shared_ptr<BinaryInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  auto devidend = builder->getOperand(inst->m_lhs_val_use->m_value);
-  auto devisor = builder->getOperand(inst->m_rhs_val_use->m_value);
+  auto devidend = builder->getOperand(inst->m_lhs_val_use->getValue());
+  auto devisor = builder->getOperand(inst->m_rhs_val_use->getValue());
 
   auto div_ret = std::make_shared<Operand>(OperandType::VREG);
   auto ret = builder->getOperand(inst);
@@ -93,13 +101,38 @@ std::shared_ptr<Operand> GenerateModInstruction(
   return ret;
 }
 
+std::shared_ptr<Operand> GenerateFNegInstrcution(
+    std::shared_ptr<FNegInstruction> inst,
+    std::shared_ptr<ASM_Builder> builder) {
+  auto operand = builder->getOperand(inst->m_lhs_val_use->getValue());
+  auto ret = builder->getOperand(inst);
+  ret->m_is_float = true;
+  builder->appendVNEG(ret, operand);
+  return ret;
+}
+
 std::shared_ptr<Operand> GenerateCMPInstruction(
     std::shared_ptr<BinaryInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
   // TODO(Huang): swap op1 and op2 if op1 is constant, then change the cond
-  auto operand1 = builder->getOperand(inst->m_lhs_val_use->m_value);
-  auto operand2 = builder->getOperand(inst->m_rhs_val_use->m_value, true);
-  builder->appendCT(InstOp::CMP, operand1, operand2);
+  bool is_int = ((int)inst->m_op <= 15);
+  auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
+  std::shared_ptr<Operand> operand2;
+
+  // vcmp allow op2 to be constant 0.0
+  if (!is_int) {
+    auto float_val
+        = std::dynamic_pointer_cast<Constant>(inst->m_rhs_val_use->getValue());
+    if (float_val && float_val->m_float_val == (float)0.0) {
+      operand2 = std::make_shared<Operand>((float)0.0);
+      builder->appendCT(InstOp::VCMP, operand1, operand2);
+      return nullptr;
+    }
+  }
+
+  operand2 = builder->getOperand(inst->m_rhs_val_use->getValue(), is_int);
+  InstOp op = is_int ? InstOp::CMP : InstOp::VCMP;
+  builder->appendCT(op, operand1, operand2);
   return nullptr;
 }
 
@@ -108,12 +141,16 @@ std::shared_ptr<Operand> GenerateBinaryInstruction(
     std::shared_ptr<ASM_Builder> builder) {
   switch (inst->m_op) {
     case IROp::ADD:
+    case IROp::F_ADD:
       return GenerateAddInstruction(inst, builder);
     case IROp::SUB:
+    case IROp::F_SUB:
       return GenerateSubInstruction(inst, builder);
     case IROp::MUL:
+    case IROp::F_MUL:
       return GenerateMulInstruction(inst, builder);
     case IROp::SDIV:
+    case IROp::F_DIV:
       return GenerateDivInstruction(inst, builder);
     case IROp::SREM:
       return GenerateModInstruction(inst, builder);
@@ -123,12 +160,18 @@ std::shared_ptr<Operand> GenerateBinaryInstruction(
     case IROp::I_SLT:
     case IROp::I_EQ:
     case IROp::I_NE:
+    case IROp::F_EQ:
+    case IROp::F_NE:
+    case IROp::F_GT:
+    case IROp::F_GE:
+    case IROp::F_LT:
+    case IROp::F_LE:
       return GenerateCMPInstruction(inst, builder);
   }
   return nullptr;
 }
 
-//
+// not support float yet
 std::shared_ptr<Operand> GenerateCallInstruction(
     std::shared_ptr<CallInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
@@ -142,14 +185,14 @@ std::shared_ptr<Operand> GenerateCallInstruction(
   int i = 0;
   // save params to r0 ~ r3
   while (i < 4 && i < n) {
-    std::shared_ptr<Value> value = inst->m_params[i]->m_value;
+    std::shared_ptr<Value> value = inst->m_params[i]->getValue();
     std::shared_ptr<Operand> reg = Operand::getRReg((RReg)i);
     builder->appendMOV(reg, builder->getOperand(value, true, false));
     i++;
   }
   // save params to stack
   while (i < n) {
-    std::shared_ptr<Value> value = inst->m_params[i]->m_value;
+    std::shared_ptr<Value> value = inst->m_params[i]->getValue();
     int sp_offs = (i - 4) * 4;
     std::shared_ptr<Operand> offs;
     if (0 <= sp_offs && sp_offs < 4096) {
@@ -187,7 +230,7 @@ std::shared_ptr<Operand> GenerateBranchInstruction(
   true_block = builder->getBlock(inst->m_true_block);
   false_block = builder->getBlock(inst->m_false_block);
   inst_cond
-      = std::dynamic_pointer_cast<BinaryInstruction>(inst->m_cond->m_value);
+      = std::dynamic_pointer_cast<BinaryInstruction>(inst->m_cond->getValue());
   CondType cond = GetCondFromIR(inst_cond->m_op);
   assert(cond != CondType::NONE);
   builder->m_cur_block->m_branch_pos = --builder->m_cur_block->m_insts.end();
@@ -210,8 +253,8 @@ std::shared_ptr<Operand> GenerateReturnInstruction(
     std::shared_ptr<ReturnInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<Value> ret_val;
-  if (inst->m_ret && inst->m_ret->m_value) {
-    ret_val = inst->m_ret->m_value;
+  if (inst->m_ret && inst->m_ret->getValue()) {
+    ret_val = inst->m_ret->getValue();
     builder->appendMOV(Operand::getRReg(RReg::R0),
                        builder->getOperand(ret_val, true, false));
   }
@@ -222,9 +265,12 @@ std::shared_ptr<Operand> GenerateReturnInstruction(
 
 std::shared_ptr<Operand> getAddr(std::shared_ptr<Value> value,
                                  std::shared_ptr<ASM_Builder> builder) {
-  auto ret = builder->getOperand(value);
+  std::shared_ptr<Operand> ret;
   if (auto var = std::dynamic_pointer_cast<GlobalVariable>(value)) {
+    ret = std::make_shared<Operand>(OperandType::VREG);
     builder->appendLDR(ret, var->m_name);
+  } else {
+    ret = builder->getOperand(value);
   }
   return ret;
 }
@@ -232,7 +278,7 @@ std::shared_ptr<Operand> getAddr(std::shared_ptr<Value> value,
 std::shared_ptr<Operand> GenerateGepInstruction(
     std::shared_ptr<GetElementPtrInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  auto base_addr = inst->m_addr->m_value;
+  auto base_addr = inst->m_addr->getValue();
   auto dimensions = base_addr->m_type.m_dimensions;
   auto indices = inst->m_indices;
   int const_offs = 0;
@@ -242,11 +288,12 @@ std::shared_ptr<Operand> GenerateGepInstruction(
 
   // maybe redundant??
   if (indices.size() == 1) {
-    if (auto val = std::dynamic_pointer_cast<Constant>(indices[0]->m_value)) {
+    if (auto val
+        = std::dynamic_pointer_cast<Constant>(indices[0]->getValue())) {
       assert(val->m_type.IsBasicInt());
       const_offs = val->m_int_val * 4;
     } else {
-      offs_op = builder->getOperand(indices[0]->m_value);
+      offs_op = builder->getOperand(indices[0]->getValue());
     }
   }
   //
@@ -256,7 +303,7 @@ std::shared_ptr<Operand> GenerateGepInstruction(
       continue;
     }
     if (auto val
-        = std::dynamic_pointer_cast<Constant>(indices[i + 1]->m_value)) {
+        = std::dynamic_pointer_cast<Constant>(indices[i + 1]->getValue())) {
       assert(val->m_type.IsBasicInt());
       const_offs += val->m_int_val * attribute * 4;
     } else {
@@ -266,13 +313,13 @@ std::shared_ptr<Operand> GenerateGepInstruction(
         auto mov = builder->appendMOV(
             std::make_shared<Operand>(OperandType::VREG), attribute);
         builder->appendMUL(InstOp::MUL, offs_op,
-                           builder->getOperand(indices[i + 1]->m_value),
+                           builder->getOperand(indices[i + 1]->getValue()),
                            mov->m_dest);
       } else {
         auto mov = builder->appendMOV(
             std::make_shared<Operand>(OperandType::VREG), attribute);
         builder->appendMUL(InstOp::MLA, offs_op,
-                           builder->getOperand(indices[i + 1]->m_value),
+                           builder->getOperand(indices[i + 1]->getValue()),
                            mov->m_dest, offs_op);
       }
     }
@@ -309,6 +356,8 @@ std::shared_ptr<Operand> GenerateGepInstruction(
     builder->appendAS(InstOp::ADD, ret, getAddr(base_addr, builder), offs_op);
     return ret;
   }
+  builder->m_value_map.insert(
+      std::make_pair(inst, getAddr(base_addr, builder)));
 
   // if wrong, try to append a mov inst
   return getAddr(base_addr, builder);
@@ -317,7 +366,7 @@ std::shared_ptr<Operand> GenerateGepInstruction(
 std::shared_ptr<Operand> GenerateLoadInstruction(
     std::shared_ptr<LoadInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  auto src_value = inst->m_addr->m_value;
+  auto src_value = inst->m_addr->getValue();
   auto ret = builder->getOperand(inst);
   builder->appendLDR(ret, getAddr(src_value, builder),
                      std::make_shared<Operand>(0));
@@ -327,8 +376,8 @@ std::shared_ptr<Operand> GenerateLoadInstruction(
 std::shared_ptr<Operand> GenerateStoreInstruction(
     std::shared_ptr<StoreInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  auto addr = inst->m_addr->m_value;
-  auto val = inst->m_val->m_value;
+  auto addr = inst->m_addr->getValue();
+  auto val = inst->m_val->getValue();
   auto src = builder->getOperand(val);
   builder->appendSTR(src, getAddr(addr, builder), std::make_shared<Operand>(0));
   return nullptr;
@@ -368,7 +417,7 @@ std::shared_ptr<Operand> GeneratePhiInstruction(
     std::shared_ptr<ASM_BasicBlock> block = builder->getBlock(ir_block);
     assert(block);
     if (!value) continue;
-    auto src = builder->getOperand(value->m_value, true, false);
+    auto src = builder->getOperand(value->getValue(), true, false);
     block->appendFilledMOV(std::make_shared<MOVInst>(tmp, src));
   }
   return ret;
@@ -381,6 +430,8 @@ void GenerateInstruction(std::shared_ptr<Value> ir_value,
   } else if (auto inst
              = std::dynamic_pointer_cast<BinaryInstruction>(ir_value)) {
     GenerateBinaryInstruction(inst, builder);
+  } else if (auto inst = std::dynamic_pointer_cast<FNegInstruction>(ir_value)) {
+    GenerateFNegInstrcution(inst, builder);
   } else if (auto inst = std::dynamic_pointer_cast<CallInstruction>(ir_value)) {
     GenerateCallInstruction(inst, builder);
   } else if (auto inst

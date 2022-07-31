@@ -2,8 +2,10 @@
 
 #include "asm/asm-fixed.h"
 
-RegisterAllocator::RegisterAllocator(std::shared_ptr<ASM_Module> module) {
+RegisterAllocator::RegisterAllocator(std::shared_ptr<ASM_Module> module,
+                                     RegType type) {
   m_module = module;
+  m_reg_type = type;
 }
 
 void RegisterAllocator::Allocate() {
@@ -14,15 +16,27 @@ void RegisterAllocator::Allocate() {
     initialColors();
     getInitial();
     AllocateCurFunc();
-    for (auto& node : coloredNodes) {
-      RReg rreg = color[node];
-      if (node->m_op_type == OperandType::VREG) {
-        node->m_op_type = OperandType::REG;
-        node->m_is_rreg = true;
-        node->m_rreg = rreg;
+    if (m_reg_type == RegType::R) {
+      for (auto& node : coloredNodes) {
+        RReg rreg = color_r[node];
+        if (node->m_op_type == OperandType::VREG) {
+          node->m_op_type = OperandType::REG;
+          node->m_is_float = false;
+          node->m_rreg = rreg;
+        }
+        if (4 <= (int)rreg && (int)rreg <= 11) {
+          storeRegisters(func, Operand::getRReg(rreg));
+        }
       }
-      if (4 <= (int)rreg && (int)rreg <= 11) {
-        storeRegisters(func, Operand::getRReg(rreg));
+    }
+    else {
+      for (auto& node : coloredNodes) {
+        SReg sreg = color_s[node];
+        if (node->m_op_type == OperandType::VREG) {
+          node->m_op_type = OperandType::REG;
+          node->m_is_float = true;
+          node->m_sreg = sreg;
+        }
       }
     }
     initial.clear();
@@ -54,26 +68,42 @@ void RegisterAllocator::init() {
   degree.clear();
   moveList.clear();
   alias.clear();
-  color.clear();
+  color_r.clear();
   isSelectSpill = false;
 }
 
 void RegisterAllocator::initialColors() {
-  rreg_avaliable = {RReg::R4, RReg::R5,  RReg::R6,  RReg::R7, RReg::R8,
-                    RReg::R9, RReg::R10, RReg::R12, RReg::LR};
-  if (m_cur_func->m_params <= 4) {
-    rreg_avaliable.insert(RReg::R11);
+  if (m_reg_type == RegType::R) {
+    rreg_avaliable = {RReg::R4, RReg::R5,  RReg::R6,  RReg::R7, RReg::R8,
+                      RReg::R9, RReg::R10, RReg::R12, RReg::LR};
+    if (m_cur_func->m_params <= 4) {
+      rreg_avaliable.insert(RReg::R11);
+    }
+    K = rreg_avaliable.size();
+  } else {
+    for (int i = 0; i < 32; i++) {
+      sreg_avaliable.insert((SReg)i);
+    }
+    K = 32;
   }
-  K = rreg_avaliable.size();
 }
 
 void RegisterAllocator::getInitial() {
+  bool flag = m_reg_type == RegType::R;
   for (auto& b : m_cur_func->m_blocks) {
     for (auto& i : b->m_insts) {
-      for (auto& op : i->m_def) {
+      std::unordered_set<OpPtr> defs, uses;
+      if (m_reg_type == RegType::R) {
+        defs = i->m_def;
+        uses = i->m_use;
+      } else {
+        defs = i->m_f_def;
+        uses = i->m_f_use;
+      }
+      for (auto& op : defs) {
         if (op->m_op_type == OperandType::VREG) initial.insert(op);
       }
-      for (auto& op : i->m_use) {
+      for (auto& op : uses) {
         if (op->m_op_type == OperandType::VREG) initial.insert(op);
       }
     }
@@ -150,17 +180,25 @@ void RegisterAllocator::Build() {
     int cnt = 0;
     for (auto iter = b->m_insts.rbegin(); iter != b->m_insts.rend(); iter++) {
       std::shared_ptr<ASM_Instruction>& inst = *iter;
+      std::unordered_set<OpPtr> defs, uses;
+      if (m_reg_type == RegType::R) {
+        defs = inst->m_def;
+        uses = inst->m_use;
+      } else {
+        defs = inst->m_f_def;
+        uses = inst->m_f_use;
+      }
       if (auto I = std::dynamic_pointer_cast<MOVInst>(inst)) {
         cnt++;
-        if (I->m_type != MOVInst::RIType::IMM) {
-          for (auto& use : I->m_use) {
+        if (I->m_type != MOVType::IMM) {
+          for (auto& use : uses) {
             live.erase(use);
           }
-          for (auto& n : I->m_def) {
+          for (auto& n : defs) {
             moveList[n].insert(I);
             updateDepth(I->m_block, n);
           }
-          for (auto& n : I->m_use) {
+          for (auto& n : uses) {
             if (n->m_op_type == OperandType::IMM) {
               continue;
             }
@@ -170,10 +208,10 @@ void RegisterAllocator::Build() {
           worklistMoves.insert(I);
         }
       }
-      for (auto& def : inst->m_def) {
+      for (auto& def : defs) {
         live.insert(def);
       }
-      for (auto& d : inst->m_def) {
+      for (auto& d : defs) {
         for (auto& l : live) {
           AddEdge(l, d);
           updateDepth(inst->m_block, l);
@@ -181,13 +219,13 @@ void RegisterAllocator::Build() {
         }
       }
       // live := use(I) ∪ (live\def(I))
-      for (auto& def : inst->m_def) {
+      for (auto& def : defs) {
         live.erase(def);
         if (lifespan_map.find(def) != lifespan_map.end()) {
           def->lifespan = cnt - lifespan_map[def];
         }
       }
-      for (auto& use : inst->m_use) {
+      for (auto& use : uses) {
         if (use->m_op_type == OperandType::IMM) {
           continue;
         }
@@ -428,6 +466,13 @@ void RegisterAllocator::SelectSpill() {
 }
 
 void RegisterAllocator::AssignColors() {
+  if (m_reg_type == RegType::R)
+    AssignColorsR();
+  else if (m_reg_type == RegType::S)
+    AssignColorsS();
+}
+
+void RegisterAllocator::AssignColorsR() {
   // debug("AssignColors");
   while (!selectStack.empty()) {
     OpPtr n = selectStack.back();
@@ -439,7 +484,7 @@ void RegisterAllocator::AssignColors() {
     for (auto& w : adjList[n]) {
       OpPtr a = GetAlias(w);
       if (coloredNodes.find(a) != coloredNodes.end()) {
-        okColors.erase(color[GetAlias(w)]);
+        okColors.erase(color_r[GetAlias(w)]);
       } else if (a->m_op_type == OperandType::REG) {
         okColors.erase(a->m_rreg);
       }
@@ -449,11 +494,43 @@ void RegisterAllocator::AssignColors() {
     } else {
       coloredNodes.insert(n);
       RReg rreg = *okColors.begin();
-      color[n] = rreg;
+      color_r[n] = rreg;
     }
   }
   for (auto& n : coalescedNodes) {
-    color[n] = color[GetAlias(n)];
+    color_r[n] = color_r[GetAlias(n)];
+    coloredNodes.insert(n);
+  }
+  coalescedNodes.clear();
+}
+
+void RegisterAllocator::AssignColorsS() {
+  // debug("AssignColors");
+  while (!selectStack.empty()) {
+    OpPtr n = selectStack.back();
+    selectStack.pop_back();
+    std::set<SReg> okColors;
+    for (auto r : sreg_avaliable) {
+      okColors.insert(r);
+    }
+    for (auto& w : adjList[n]) {
+      OpPtr a = GetAlias(w);
+      if (coloredNodes.find(a) != coloredNodes.end()) {
+        okColors.erase(color_s[GetAlias(w)]);
+      } else if (a->m_op_type == OperandType::REG) {
+        okColors.erase(a->m_sreg);
+      }
+    }
+    if (okColors.empty()) {
+      spilledNodes.insert(n);
+    } else {
+      coloredNodes.insert(n);
+      SReg sreg = *okColors.begin();
+      color_s[n] = sreg;
+    }
+  }
+  for (auto& n : coalescedNodes) {
+    color_s[n] = color_s[GetAlias(n)];
     coloredNodes.insert(n);
   }
   coalescedNodes.clear();
@@ -480,11 +557,19 @@ void RegisterAllocator::RewriteProgram() {
     for (auto& b : m_cur_func->m_blocks) {
       for (auto iter = b->m_insts.begin(); iter != b->m_insts.end(); iter++) {
         auto& i = *iter;
-        if (i->m_use.find(v) != i->m_use.end()) {
+        std::unordered_set<OpPtr> defs, uses;
+        if (m_reg_type == RegType::R) {
+          defs = i->m_def;
+          uses = i->m_use;
+        } else {
+          defs = i->m_f_def;
+          uses = i->m_f_use;
+        }
+        if (uses.find(v) != uses.end()) {
           // replace use
           OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
           i->replaceUse(newOp, v);
-          i->m_use.erase(v);
+          uses.erase(v);
           i->addUse(newOp);
           // insert a load instruction before use of newOp
           OpPtr offs;
@@ -507,11 +592,11 @@ void RegisterAllocator::RewriteProgram() {
           newTemps.insert(newOp);
           updateDepth(b, newOp);
         }
-        if (i->m_def.find(v) != i->m_def.end()) {
+        if (defs.find(v) != defs.end()) {
           // replace def
           OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
           i->replaceDef(newOp, v);
-          i->m_def.erase(v);
+          defs.erase(v);
           i->addDef(newOp);
           // insert a store instruction after defination of newOp
           OpPtr offs;

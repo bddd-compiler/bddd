@@ -814,14 +814,6 @@ public:
       }
     }
   }
-  void RemoveByBasicBlock(std::shared_ptr<BasicBlock> bb) {
-    for (auto it = m_contents.begin(); it != m_contents.end(); ++it) {
-      if (it->first == bb) {
-        m_contents.erase(it);
-        return;
-      }
-    }
-  }
 
   // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
   void ExportIR(std::ofstream &ofs, int depth) override;

@@ -20,12 +20,8 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-<<<<<<< HEAD
-    filename = "../testSource/functional/62_percolation.c";
-=======
     // filename = "../testSource/buaa/part12/test1.c";
     filename = "../testSource/functional/86_long_code2.c";
->>>>>>> garen_dev
   } else {
     std::cerr << "???";
     return 1;
@@ -102,10 +98,8 @@ int main(int argc, char **argv) {
   ofs4.close();
   
   std::cout << "allocating..." << std::endl;
-  RegisterAllocator(asm_module).Allocate();
-  std::ofstream ofs6(filename.substr(0, filename.rfind('.')) + "_asm_1.s");
-  asm_module->exportASM(ofs6);
-  ofs6.close();
+  RegisterAllocator(asm_module, RegType::R).Allocate();
+  RegisterAllocator(asm_module, RegType::S).Allocate();
 
   std::cout << "optimizing..." << std::endl;
   optimize(asm_module);

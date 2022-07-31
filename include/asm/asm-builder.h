@@ -69,6 +69,8 @@ public:
   // appendMOV
   std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, int imm);
 
+  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, float imm);
+
   std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest,
                                      std::shared_ptr<Operand> src);
 
@@ -117,9 +119,12 @@ public:
   std::shared_ptr<CTInst> appendCT(InstOp op, std::shared_ptr<Operand> operand1,
                                    std::shared_ptr<Operand> operand2);
 
-  std::shared_ptr<Operand> GenerateConstant(
-      std::shared_ptr<Constant> value, bool genimm,
-      bool checkimm);
+  // appendVNEG
+  std::shared_ptr<VNEGInst> appendVNEG(std::shared_ptr<Operand> dest,
+                                       std::shared_ptr<Operand> operand);
+
+  std::shared_ptr<Operand> GenerateConstant(std::shared_ptr<Constant> value,
+                                            bool genimm, bool checkimm);
 };
 
 void GenerateModule(std::shared_ptr<Module> ir_module,

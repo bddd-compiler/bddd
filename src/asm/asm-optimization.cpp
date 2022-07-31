@@ -7,7 +7,7 @@ void reduceRedundantMOV(std::shared_ptr<ASM_Module> module) {
       while (iter != block->m_insts.end()) {
         auto inst = std::dynamic_pointer_cast<MOVInst>(*iter);
         if (!inst || inst->m_src->m_op_type != OperandType::REG
-            || inst->m_dest->m_is_rreg ^ inst->m_src->m_is_rreg) {
+            || inst->m_dest->m_is_float ^ inst->m_src->m_is_float) {
           iter++;
           continue;
         }

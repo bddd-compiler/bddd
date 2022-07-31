@@ -3,16 +3,22 @@
 CondType GetCondFromIR(IROp op) {
   switch (op) {
     case IROp::I_SGE:
+    case IROp::F_GE:
       return CondType::GE;
     case IROp::I_SGT:
+    case IROp::F_GT:
       return CondType::GT;
     case IROp::I_SLE:
+    case IROp::F_LE:
       return CondType::LE;
     case IROp::I_SLT:
+    case IROp::F_LT:
       return CondType::LT;
     case IROp::I_EQ:
+    case IROp::F_EQ:
       return CondType::EQ;
     case IROp::I_NE:
+    case IROp::F_NE:
       return CondType::NE;
   }
   return CondType::NONE;
@@ -22,6 +28,7 @@ int Operand::vrreg_cnt = 0;
 int Operand::vsreg_cnt = 0;
 std::unordered_map<std::shared_ptr<Operand>, std::string> Operand::vreg_map;
 std::unordered_map<RReg, std::shared_ptr<Operand>> Operand::rreg_map;
+std::unordered_map<SReg, std::shared_ptr<Operand>> Operand::sreg_map;
 
 unsigned int ASM_Function::getStackSize() { return m_local_alloc; }
 
@@ -33,8 +40,7 @@ void ASM_Function::appendPush(std::shared_ptr<Operand> reg) {
 }
 
 void ASM_Function::appendPop(std::shared_ptr<Operand> reg) {
-  if (m_pop->m_regs.find(reg) == m_pop->m_regs.end())
-    m_pop->m_regs.insert(reg);
+  if (m_pop->m_regs.find(reg) == m_pop->m_regs.end()) m_pop->m_regs.insert(reg);
 }
 
 int ASM_BasicBlock::block_cnt = 0;
@@ -140,6 +146,7 @@ bool Operand::immCheck(float imm) {
 std::string Operand::getName() {
   switch (m_op_type) {
     case OperandType::IMM:
+      if (m_is_float) return ("#" + std::to_string(m_float_val));
       return ("#" + std::to_string(m_int_val));
     case OperandType::REG:
       return getRegName();
@@ -151,7 +158,7 @@ std::string Operand::getName() {
 
 std::string Operand::getRegName() {
   // rreg
-  if (m_is_rreg) {
+  if (!m_is_float) {
     switch (m_rreg) {
       case RReg::SP:
         return "SP";
@@ -173,8 +180,8 @@ std::string Operand::getVRegName() {
   if (it != vreg_map.end()) {
     return it->second;
   }
-  std::string name = m_is_rreg ? "VR" + std::to_string(vrreg_cnt++)
-                               : "VS" + std::to_string(vsreg_cnt++);
+  std::string name = m_is_float ? "VS" + std::to_string(vsreg_cnt++)
+                                : "VR" + std::to_string(vrreg_cnt++);
   vreg_map.insert(std::make_pair(_this, name));
   return name;
 }
@@ -186,6 +193,16 @@ std::shared_ptr<Operand> Operand::getRReg(RReg r) {
   auto ret = std::make_shared<Operand>(OperandType::REG);
   ret->m_rreg = r;
   Operand::rreg_map[r] = ret;
+  return ret;
+}
+
+std::shared_ptr<Operand> Operand::getSReg(SReg s) {
+  if (Operand::sreg_map.find(s) != Operand::sreg_map.end()) {
+    return Operand::sreg_map[s];
+  }
+  auto ret = std::make_shared<Operand>(OperandType::REG);
+  ret->m_sreg = s;
+  Operand::sreg_map[s] = ret;
   return ret;
 }
 
@@ -284,6 +301,8 @@ std::string ASM_Instruction::getOpName() {
       return "VMUL";
     case InstOp::VDIV:
       return "VDIV";
+    case InstOp::VNEG:
+      return "VNEG";
     case InstOp::VCMP:
       return "VCMP";
     case InstOp::VLDR:
@@ -303,6 +322,7 @@ std::string ASM_Instruction::getOpSuffixName() {
     case InstOp::VMLS:
     case InstOp::VMUL:
     case InstOp::VDIV:
+    case InstOp::VNEG:
     case InstOp::VCMP:
       return ".F32";
     case InstOp::VLDR:
@@ -370,7 +390,17 @@ STRInst::STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
 MOVInst::MOVInst(std::shared_ptr<Operand> dest, int imm) {
   m_op = InstOp::MOV;
   m_cond = CondType::NONE;
-  m_type = RIType::IMM;
+  m_type = MOVType::IMM;
+  m_dest = dest;
+  m_src = std::make_shared<Operand>(imm);
+
+  addDef(dest);
+}
+
+MOVInst::MOVInst(std::shared_ptr<Operand> dest, float imm) {
+  m_op = InstOp::VMOV;
+  m_cond = CondType::NONE;
+  m_type = MOVType::IMM;
   m_dest = dest;
   m_src = std::make_shared<Operand>(imm);
 
@@ -378,9 +408,12 @@ MOVInst::MOVInst(std::shared_ptr<Operand> dest, int imm) {
 }
 
 MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
-  m_op = InstOp::MOV;
+  if (dest->m_is_float || src->m_is_float)
+    m_op = InstOp::VMOV;
+  else
+    m_op = InstOp::MOV;
   m_cond = CondType::NONE;
-  m_type = src->m_op_type == OperandType::IMM ? RIType::IMM : RIType::REG;
+  m_type = src->m_op_type == OperandType::IMM ? MOVType::IMM : MOVType::REG;
   m_dest = dest;
   m_src = src;
 
@@ -391,9 +424,12 @@ MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
 PInst::PInst(InstOp op) {
   m_op = op;
   m_cond = CondType::NONE;
-  if (op == InstOp::PUSH) m_regs.insert(Operand::getRReg(RReg::LR));
-  else if (op == InstOp::POP) m_regs.insert(Operand::getRReg(RReg::PC));
-  else assert(false);
+  if (op == InstOp::PUSH)
+    m_regs.insert(Operand::getRReg(RReg::LR));
+  else if (op == InstOp::POP)
+    m_regs.insert(Operand::getRReg(RReg::PC));
+  else
+    assert(false);
 }
 
 BInst::BInst(std::shared_ptr<ASM_BasicBlock> block) {
@@ -514,8 +550,13 @@ CTInst::CTInst(InstOp op, std::shared_ptr<Operand> operand1,
   addUse(operand2);
 }
 
-void POOLInst::exportASM(std::ofstream& ofs) {
-  ofs << "\tB .pool_" << std::to_string(m_number) << std::endl;
-  ofs << "\t.pool" << std::endl;
-  ofs << ".pool_" << std::to_string(m_number) << ":" << std::endl;
+VNEGInst::VNEGInst(std::shared_ptr<Operand> dest,
+                   std::shared_ptr<Operand> operand) {
+  m_op = InstOp::VNEG;
+  m_cond = CondType::NONE;
+  m_dest = dest;
+  m_operand = operand;
+
+  addDef(dest);
+  addUse(operand);
 }
