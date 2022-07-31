@@ -149,7 +149,7 @@ public:
   int lifespan = 0;
   bool rejected = false;
 
-  Operand(OperandType t, bool r = false) : m_op_type(t), m_is_float(r) {}
+  Operand(OperandType t, bool f = false) : m_op_type(t), m_is_float(f) {}
 
   Operand(int val)
       : m_op_type(OperandType::IMM), m_int_val(val), m_is_float(false) {}
@@ -170,6 +170,8 @@ public:
   static bool immCheck(int imm);
 
   static bool immCheck(float imm);
+
+  static bool addrOffsCheck(int offs, bool is_float);
 };
 
 class ASM_Instruction;

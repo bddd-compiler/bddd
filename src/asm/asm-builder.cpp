@@ -32,7 +32,8 @@ void ASM_Builder::setParams() {
   // set params in r0 ~ r3
   while (i < 4 && i < n) {
     value = m_cur_func->m_ir_func->m_args[i];
-    auto ret = std::make_shared<Operand>(OperandType::VREG);
+    bool is_float = value->m_type.IsBasicFloat();
+    auto ret = std::make_shared<Operand>(OperandType::VREG, is_float);
     auto mov = std::make_shared<MOVInst>(ret, Operand::getRReg((RReg)i));
     m_cur_func->m_params_set_list.push_back(mov);
     m_value_map.insert(std::make_pair(value, ret));
@@ -144,8 +145,9 @@ std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value,
   }
   if (m_addr_map.find(value) != m_addr_map.end()) {
     auto& [op, offs] = m_addr_map[value];
-    auto ret = std::make_shared<Operand>(OperandType::VREG);
-    if (0 <= offs && offs < 4096) {
+    auto is_float = value->m_type.IsBasicFloat();
+    auto ret = std::make_shared<Operand>(OperandType::VREG, is_float);
+    if (Operand::addrOffsCheck(offs, is_float)) {
       appendLDR(ret, op, std::make_shared<Operand>(offs));
     } else {
       auto temp = std::make_shared<Operand>(OperandType::VREG);
@@ -160,7 +162,8 @@ std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value,
 
 std::shared_ptr<Operand> ASM_Builder::createOperand(
     std::shared_ptr<Value> value) {
-  auto ret = std::make_shared<Operand>(OperandType::VREG);
+  auto is_float = value->m_type.IsBasicFloat();
+  auto ret = std::make_shared<Operand>(OperandType::VREG, is_float);
   m_value_map.insert(std::make_pair(value, ret));
   return ret;
 }

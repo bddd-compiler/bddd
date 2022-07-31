@@ -227,10 +227,15 @@ void STRInst::exportASM(std::ofstream& ofs) {
 }
 
 void MOVInst::exportASM(std::ofstream& ofs) {
-  if (m_src->m_op_type == OperandType::IMM && !m_src->m_is_float) {
-    int imm = m_src->m_int_val;
-    if (!Operand::immCheck(imm)) {
-      if (Operand::immCheck(~imm)) {
+  if (m_src->m_op_type == OperandType::IMM) {
+    if (m_src->m_is_float) {
+      // TODO(Huang): export vmov(imm);
+    } else {
+      int imm = m_src->m_int_val;
+      if (Operand::immCheck(imm)) {
+        ofs << "\tMOV" << getCondName() << " " << m_dest->getName() << ", #"
+            << std::to_string(imm) << std::endl;
+      } else if (Operand::immCheck(~imm)) {
         ofs << "\tMVN" << getCondName() << " " << m_dest->getName() << ", #"
             << std::to_string(~imm) << std::endl;
       } else {
@@ -239,8 +244,8 @@ void MOVInst::exportASM(std::ofstream& ofs) {
         ofs << "\tMOVT" << getCondName() << " " << m_dest->getName() << ", #"
             << std::to_string((unsigned int)imm >> 16) << std::endl;
       }
-      return;
     }
+    return;
   }
   exportInstHead(ofs);
   ofs << m_dest->getName() << ", " << m_src->getName() << std::endl;

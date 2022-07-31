@@ -2,6 +2,8 @@
 
 #include "asm/asm-fixed.h"
 
+// #define REG_ALLOC_DEBUG
+
 RegisterAllocator::RegisterAllocator(std::shared_ptr<ASM_Module> module,
                                      RegType type) {
   m_module = module;
@@ -20,16 +22,17 @@ void RegisterAllocator::Allocate() {
       for (auto& node : coloredNodes) {
         RReg rreg = color_r[node];
         if (node->m_op_type == OperandType::VREG) {
+          // std::cout << node->getName() << "->";
           node->m_op_type = OperandType::REG;
           node->m_is_float = false;
           node->m_rreg = rreg;
+          // std::cout << node->getName() << std::endl;
         }
         if (4 <= (int)rreg && (int)rreg <= 11) {
           storeRegisters(func, Operand::getRReg(rreg));
         }
       }
-    }
-    else {
+    } else {
       for (auto& node : coloredNodes) {
         SReg sreg = color_s[node];
         if (node->m_op_type == OperandType::VREG) {
@@ -69,6 +72,7 @@ void RegisterAllocator::init() {
   moveList.clear();
   alias.clear();
   color_r.clear();
+  color_s.clear();
   isSelectSpill = false;
 }
 
@@ -93,7 +97,7 @@ void RegisterAllocator::getInitial() {
   for (auto& b : m_cur_func->m_blocks) {
     for (auto& i : b->m_insts) {
       std::unordered_set<OpPtr> defs, uses;
-      if (m_reg_type == RegType::R) {
+      if (flag) {
         defs = i->m_def;
         uses = i->m_use;
       } else {
@@ -127,7 +131,9 @@ void RegisterAllocator::updateDepth(std::shared_ptr<ASM_BasicBlock> block,
 }
 
 void RegisterAllocator::AllocateCurFunc() {
-  // debug("AllocateCurFunc");
+#ifdef REG_ALLOC_DEBUG
+  debug("AllocateCurFunc");
+#endif
   LivenessAnalysis();
   Build();
   MkWorklist();
@@ -156,7 +162,9 @@ void RegisterAllocator::AllocateCurFunc() {
 }
 
 void RegisterAllocator::AddEdge(OpPtr u, OpPtr v) {
-  // debug("AddEdge");
+#ifdef REG_ALLOC_DEBUG
+  debug("AddEdge");
+#endif
   auto e = std::make_pair(u, v);
   if (adjSet.find(e) == adjSet.end() && u != v) {
     adjSet.insert(e);
@@ -173,7 +181,9 @@ void RegisterAllocator::AddEdge(OpPtr u, OpPtr v) {
 }
 
 void RegisterAllocator::Build() {
-  // debug("Build");
+#ifdef REG_ALLOC_DEBUG
+  debug("Build");
+#endif
   for (auto& b : m_cur_func->m_blocks) {
     std::unordered_set<OpPtr>& live = b->m_liveout;
     std::map<OpPtr, int> lifespan_map;
@@ -190,7 +200,8 @@ void RegisterAllocator::Build() {
       }
       if (auto I = std::dynamic_pointer_cast<MOVInst>(inst)) {
         cnt++;
-        if (I->m_type != MOVType::IMM) {
+        if (I->m_type != MOVType::IMM
+            && !(I->m_dest->m_is_float ^ I->m_src->m_is_float)) {
           for (auto& use : uses) {
             live.erase(use);
           }
@@ -245,7 +256,9 @@ void RegisterAllocator::Build() {
 }
 
 std::unordered_set<OpPtr> RegisterAllocator::Adjacent(OpPtr n) {
-  // debug("Adjacent");
+#ifdef REG_ALLOC_DEBUG
+  debug("Adjacent");
+#endif
   if (adjList.find(n) == adjList.end()) {
     return {};
   }
@@ -278,7 +291,9 @@ std::unordered_set<std::shared_ptr<MOVInst>> RegisterAllocator::NodeMoves(
 bool RegisterAllocator::MoveRelated(OpPtr n) { return !NodeMoves(n).empty(); }
 
 void RegisterAllocator::MkWorklist() {
-  // debug("MkWorklist");
+#ifdef REG_ALLOC_DEBUG
+  debug("MkWorklist");
+#endif
   for (auto& n : initial) {
     if (degree[n] >= K) {
       // std::cout << "spill: " << n->getName() << std::endl;
@@ -295,7 +310,9 @@ void RegisterAllocator::MkWorklist() {
 }
 
 void RegisterAllocator::Simplify() {
-  // debug("Simplify");
+#ifdef REG_ALLOC_DEBUG
+  debug("Simplify");
+#endif
   assert(!simplifyWorklist.empty());
   OpPtr n = *simplifyWorklist.begin();
   simplifyWorklist.erase(simplifyWorklist.begin());
@@ -306,7 +323,9 @@ void RegisterAllocator::Simplify() {
 }
 
 void RegisterAllocator::DecrementDegree(OpPtr m) {
-  // debug("DecrementDegree");
+#ifdef REG_ALLOC_DEBUG
+  debug("DecrementDegree");
+#endif
   int d = degree[m]--;
   if (d == K) {
     auto adj = Adjacent(m);
@@ -322,7 +341,9 @@ void RegisterAllocator::DecrementDegree(OpPtr m) {
 }
 
 void RegisterAllocator::EnableMoves(std::unordered_set<OpPtr>& nodes) {
-  // debug("EnableMoves");
+#ifdef REG_ALLOC_DEBUG
+  debug("EnableMoves");
+#endif
   for (auto& n : nodes)
     for (auto& m : NodeMoves(n))
       if (activeMoves.find(m) != activeMoves.end()) {
@@ -332,7 +353,9 @@ void RegisterAllocator::EnableMoves(std::unordered_set<OpPtr>& nodes) {
 }
 
 void RegisterAllocator::Coalesce() {
-  // debug("Coalesce");
+#ifdef REG_ALLOC_DEBUG
+  debug("Coalesce");
+#endif
   assert(!worklistMoves.empty());
   auto m = *worklistMoves.begin();
   auto x = GetAlias(m->m_src);
@@ -362,7 +385,9 @@ void RegisterAllocator::Coalesce() {
 }
 
 void RegisterAllocator::AddWorkList(OpPtr u) {
-  // debug("AddWorkList");
+#ifdef REG_ALLOC_DEBUG
+  debug("AddWorkList");
+#endif
   if (u->m_op_type != OperandType::REG && !MoveRelated(u) && degree[u] < K) {
     freezeWorklist.erase(u);
     simplifyWorklist.insert(u);
@@ -387,7 +412,9 @@ OpPtr RegisterAllocator::GetAlias(OpPtr n) {
 }
 
 void RegisterAllocator::Combine(OpPtr u, OpPtr v) {
-  // debug("Combine");
+#ifdef REG_ALLOC_DEBUG
+  debug("Combine");
+#endif
   if (freezeWorklist.find(v) != freezeWorklist.end()) {
     freezeWorklist.erase(v);
   } else {
@@ -410,7 +437,9 @@ void RegisterAllocator::Combine(OpPtr u, OpPtr v) {
 }
 
 void RegisterAllocator::Freeze() {
-  // debug("Freeze");
+#ifdef REG_ALLOC_DEBUG
+  debug("Freeze");
+#endif
   assert(!freezeWorklist.empty());
   auto u = *freezeWorklist.begin();
   freezeWorklist.erase(freezeWorklist.begin());
@@ -419,7 +448,9 @@ void RegisterAllocator::Freeze() {
 }
 
 void RegisterAllocator::FreezeMoves(OpPtr u) {
-  // debug("FreezeMoves");
+#ifdef REG_ALLOC_DEBUG
+  debug("FreezeMoves");
+#endif
   for (auto& m : NodeMoves(u)) {
     if (activeMoves.find(m) != activeMoves.end()) {
       activeMoves.erase(m);
@@ -436,7 +467,9 @@ void RegisterAllocator::FreezeMoves(OpPtr u) {
 }
 
 void RegisterAllocator::SelectSpill() {
-  // debug("SelectSpill");
+#ifdef REG_ALLOC_DEBUG
+  debug("SelectSpill");
+#endif
   // TODO(Huang): use a better heuristic algorithm
   // Note: avoid choosing nodes that are the tiny live ranges
   // resulting from the fetches of previously spilled registers
@@ -466,6 +499,9 @@ void RegisterAllocator::SelectSpill() {
 }
 
 void RegisterAllocator::AssignColors() {
+#ifdef REG_ALLOC_DEBUG
+  debug("AssignColors");
+#endif
   if (m_reg_type == RegType::R)
     AssignColorsR();
   else if (m_reg_type == RegType::S)
@@ -473,7 +509,6 @@ void RegisterAllocator::AssignColors() {
 }
 
 void RegisterAllocator::AssignColorsR() {
-  // debug("AssignColors");
   while (!selectStack.empty()) {
     OpPtr n = selectStack.back();
     selectStack.pop_back();
@@ -505,13 +540,15 @@ void RegisterAllocator::AssignColorsR() {
 }
 
 void RegisterAllocator::AssignColorsS() {
-  // debug("AssignColors");
+#ifdef REG_ALLOC_DEBUG
+  debug("AssignColors");
+#endif
   while (!selectStack.empty()) {
     OpPtr n = selectStack.back();
     selectStack.pop_back();
     std::set<SReg> okColors;
-    for (auto r : sreg_avaliable) {
-      okColors.insert(r);
+    for (auto s : sreg_avaliable) {
+      okColors.insert(s);
     }
     for (auto& w : adjList[n]) {
       OpPtr a = GetAlias(w);
@@ -537,7 +574,9 @@ void RegisterAllocator::AssignColorsS() {
 }
 
 void RegisterAllocator::RewriteProgram() {
-  // debug("RewriteProgram");
+#ifdef REG_ALLOC_DEBUG
+  debug("RewriteProgram");
+#endif
   // Allocate memory locations for each v ∈ spilledNodes,
   // Create a new temporary vi for each definition and each use,
   // In the program (instructions), insert a store after each
@@ -567,12 +606,13 @@ void RegisterAllocator::RewriteProgram() {
         }
         if (uses.find(v) != uses.end()) {
           // replace use
-          OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
+          OpPtr newOp
+              = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
           i->replaceUse(newOp, v);
           // insert a load instruction before use of newOp
           OpPtr offs;
           std::shared_ptr<MOVInst> mov = nullptr;
-          if (0 <= sp_offs && sp_offs < 4096) {
+          if (Operand::addrOffsCheck(sp_offs, newOp->m_is_float)) {
             offs = std::make_shared<Operand>(sp_offs);
           } else {
             offs = std::make_shared<Operand>(OperandType::VREG);
@@ -592,12 +632,13 @@ void RegisterAllocator::RewriteProgram() {
         }
         if (defs.find(v) != defs.end()) {
           // replace def
-          OpPtr newOp = std::make_shared<Operand>(OperandType::VREG);
+          OpPtr newOp
+              = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
           i->replaceDef(newOp, v);
           // insert a store instruction after defination of newOp
           OpPtr offs;
           std::shared_ptr<MOVInst> mov = nullptr;
-          if (0 <= sp_offs && sp_offs < 4096) {
+          if (Operand::addrOffsCheck(sp_offs, newOp->m_is_float)) {
             offs = std::make_shared<Operand>(sp_offs);
           } else {
             offs = std::make_shared<Operand>(OperandType::VREG);

@@ -19,9 +19,8 @@ std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateAddInstruction(
-    std::shared_ptr<BinaryInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateAdd(std::shared_ptr<BinaryInstruction> inst,
+                                     std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<Operand> operand1, operand2;
   std::shared_ptr<Value> val1 = inst->m_lhs_val_use->getValue();
   std::shared_ptr<Value> val2 = inst->m_rhs_val_use->getValue();
@@ -40,9 +39,8 @@ std::shared_ptr<Operand> GenerateAddInstruction(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateSubInstruction(
-    std::shared_ptr<BinaryInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateSub(std::shared_ptr<BinaryInstruction> inst,
+                                     std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<Operand> operand1, operand2;
   std::shared_ptr<Value> val1 = inst->m_lhs_val_use->getValue();
   std::shared_ptr<Value> val2 = inst->m_rhs_val_use->getValue();
@@ -66,9 +64,8 @@ std::shared_ptr<Operand> GenerateSubInstruction(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateMulInstruction(
-    std::shared_ptr<BinaryInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateMul(std::shared_ptr<BinaryInstruction> inst,
+                                     std::shared_ptr<ASM_Builder> builder) {
   auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
   auto operand2 = builder->getOperand(inst->m_rhs_val_use->getValue());
 
@@ -80,9 +77,8 @@ std::shared_ptr<Operand> GenerateMulInstruction(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateDivInstruction(
-    std::shared_ptr<BinaryInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateDiv(std::shared_ptr<BinaryInstruction> inst,
+                                     std::shared_ptr<ASM_Builder> builder) {
   auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
   auto operand2 = builder->getOperand(inst->m_rhs_val_use->getValue());
 
@@ -94,9 +90,8 @@ std::shared_ptr<Operand> GenerateDivInstruction(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateModInstruction(
-    std::shared_ptr<BinaryInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateMod(std::shared_ptr<BinaryInstruction> inst,
+                                     std::shared_ptr<ASM_Builder> builder) {
   auto devidend = builder->getOperand(inst->m_lhs_val_use->getValue());
   auto devisor = builder->getOperand(inst->m_rhs_val_use->getValue());
 
@@ -107,9 +102,8 @@ std::shared_ptr<Operand> GenerateModInstruction(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateFNegInstrcution(
-    std::shared_ptr<FNegInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateFNeg(std::shared_ptr<FNegInstruction> inst,
+                                      std::shared_ptr<ASM_Builder> builder) {
   auto operand = builder->getOperand(inst->m_lhs_val_use->getValue());
   auto ret = builder->getOperand(inst);
   ret->m_is_float = true;
@@ -117,9 +111,8 @@ std::shared_ptr<Operand> GenerateFNegInstrcution(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateCMPInstruction(
-    std::shared_ptr<BinaryInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateCMP(std::shared_ptr<BinaryInstruction> inst,
+                                     std::shared_ptr<ASM_Builder> builder) {
   // TODO(Huang): swap op1 and op2 if op1 is constant, then change the cond
   bool is_int = ((int)inst->m_op <= 15);
   auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
@@ -142,24 +135,23 @@ std::shared_ptr<Operand> GenerateCMPInstruction(
   return nullptr;
 }
 
-std::shared_ptr<Operand> GenerateBinaryInstruction(
-    std::shared_ptr<BinaryInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateBinary(std::shared_ptr<BinaryInstruction> inst,
+                                        std::shared_ptr<ASM_Builder> builder) {
   switch (inst->m_op) {
     case IROp::ADD:
     case IROp::F_ADD:
-      return GenerateAddInstruction(inst, builder);
+      return GenerateAdd(inst, builder);
     case IROp::SUB:
     case IROp::F_SUB:
-      return GenerateSubInstruction(inst, builder);
+      return GenerateSub(inst, builder);
     case IROp::MUL:
     case IROp::F_MUL:
-      return GenerateMulInstruction(inst, builder);
+      return GenerateMul(inst, builder);
     case IROp::SDIV:
     case IROp::F_DIV:
-      return GenerateDivInstruction(inst, builder);
+      return GenerateDiv(inst, builder);
     case IROp::SREM:
-      return GenerateModInstruction(inst, builder);
+      return GenerateMod(inst, builder);
     case IROp::I_SGE:
     case IROp::I_SGT:
     case IROp::I_SLE:
@@ -172,15 +164,14 @@ std::shared_ptr<Operand> GenerateBinaryInstruction(
     case IROp::F_GE:
     case IROp::F_LT:
     case IROp::F_LE:
-      return GenerateCMPInstruction(inst, builder);
+      return GenerateCMP(inst, builder);
   }
   return nullptr;
 }
 
 // not support float yet
-std::shared_ptr<Operand> GenerateCallInstruction(
-    std::shared_ptr<CallInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
+                                      std::shared_ptr<ASM_Builder> builder) {
   if (inst->m_func_name == "llvm.memset.p0i8.i32") {
     builder->appendMOV(
         Operand::getRReg(RReg::R0),
@@ -215,7 +206,7 @@ std::shared_ptr<Operand> GenerateCallInstruction(
     std::shared_ptr<Value> value = inst->m_params[i]->getValue();
     int sp_offs = (i - 4) * 4;
     std::shared_ptr<Operand> offs;
-    if (0 <= sp_offs && sp_offs < 4096) {
+    if (Operand::addrOffsCheck(sp_offs, value->m_type.IsBasicFloat())) {
       offs = std::make_shared<Operand>(sp_offs);
     } else {
       offs = std::make_shared<Operand>(OperandType::VREG);
@@ -242,9 +233,8 @@ std::shared_ptr<Operand> GenerateCallInstruction(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateBranchInstruction(
-    std::shared_ptr<BranchInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateBranch(std::shared_ptr<BranchInstruction> inst,
+                                        std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<ASM_BasicBlock> true_block, false_block;
   std::shared_ptr<BinaryInstruction> inst_cond;
   true_block = builder->getBlock(inst->m_true_block);
@@ -260,9 +250,8 @@ std::shared_ptr<Operand> GenerateBranchInstruction(
   return nullptr;
 }
 
-std::shared_ptr<Operand> GenerateJumpInstruction(
-    std::shared_ptr<JumpInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateJump(std::shared_ptr<JumpInstruction> inst,
+                                      std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<ASM_BasicBlock> target_block
       = builder->getBlock(inst->m_target_block);
   builder->appendB(target_block, CondType::NONE);
@@ -270,9 +259,8 @@ std::shared_ptr<Operand> GenerateJumpInstruction(
   return nullptr;
 }
 
-std::shared_ptr<Operand> GenerateReturnInstruction(
-    std::shared_ptr<ReturnInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateReturn(std::shared_ptr<ReturnInstruction> inst,
+                                        std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<Value> ret_val;
   if (inst->m_ret && inst->m_ret->getValue()) {
     ret_val = inst->m_ret->getValue();
@@ -296,7 +284,7 @@ std::shared_ptr<Operand> getAddr(std::shared_ptr<Value> value,
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateGepInstruction(
+std::shared_ptr<Operand> GenerateGetElementPtr(
     std::shared_ptr<GetElementPtrInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
   auto base_addr = inst->m_addr->getValue();         // the base address
@@ -384,9 +372,8 @@ std::shared_ptr<Operand> GenerateGepInstruction(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateLoadInstruction(
-    std::shared_ptr<LoadInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateLoad(std::shared_ptr<LoadInstruction> inst,
+                                      std::shared_ptr<ASM_Builder> builder) {
   auto src_value = inst->m_addr->getValue();
   auto ret = builder->getOperand(inst);
   builder->appendLDR(ret, getAddr(src_value, builder),
@@ -394,9 +381,8 @@ std::shared_ptr<Operand> GenerateLoadInstruction(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateStoreInstruction(
-    std::shared_ptr<StoreInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateStore(std::shared_ptr<StoreInstruction> inst,
+                                       std::shared_ptr<ASM_Builder> builder) {
   auto addr = inst->m_addr->getValue();
   auto val = inst->m_val->getValue();
   auto src = builder->getOperand(val);
@@ -404,9 +390,8 @@ std::shared_ptr<Operand> GenerateStoreInstruction(
   return nullptr;
 }
 
-std::shared_ptr<Operand> GenerateAllocaInstruction(
-    std::shared_ptr<AllocaInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GenerateAlloca(std::shared_ptr<AllocaInstruction> inst,
+                                        std::shared_ptr<ASM_Builder> builder) {
   int alloc_size = 4;
   for (int i : inst->m_type.m_dimensions) {
     alloc_size *= i;
@@ -426,9 +411,8 @@ std::shared_ptr<Operand> GenerateAllocaInstruction(
   return ret;
 }
 
-std::shared_ptr<Operand> GeneratePhiInstruction(
-    std::shared_ptr<PhiInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
+std::shared_ptr<Operand> GeneratePhi(std::shared_ptr<PhiInstruction> inst,
+                                     std::shared_ptr<ASM_Builder> builder) {
   // we need to store the temp result to make sure all PHI instruction execute
   // in parallel
   auto tmp = std::make_shared<Operand>(OperandType::VREG);
@@ -444,7 +428,7 @@ std::shared_ptr<Operand> GeneratePhiInstruction(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateBitCastInstruction(
+std::shared_ptr<Operand> GenerateBitCast(
     std::shared_ptr<BitCastInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
   auto val = inst->m_val->getValue();
@@ -454,13 +438,37 @@ std::shared_ptr<Operand> GenerateBitCastInstruction(
   return ret;
 }
 
-std::shared_ptr<Operand> GenerateZExtInstruction(
-    std::shared_ptr<ZExtInstruction> inst,
-    std::shared_ptr<ASM_Builder> builder) {
-  auto val = inst->m_val->getValue();
-  auto src = builder->getOperand(val);
+std::shared_ptr<Operand> GenerateZExt(std::shared_ptr<ZExtInstruction> inst,
+                                      std::shared_ptr<ASM_Builder> builder) {
+  auto src_val = inst->m_val->getValue();
+  auto src = builder->getOperand(src_val);
   auto ret = builder->getOperand(inst);
   builder->appendMOV(ret, src);
+  return ret;
+}
+
+std::shared_ptr<Operand> GenerateSIToFP(std::shared_ptr<SIToFPInstruction> inst,
+                                        std::shared_ptr<ASM_Builder> builder) {
+  auto src_val = inst->m_val->getValue();
+  auto src = builder->getOperand(src_val);
+  auto ret = builder->getOperand(inst);
+  ret->m_is_float = true;
+
+  builder->appendMOV(Operand::getRReg(RReg::R0), src);
+  builder->appendCALL(VarType::FLOAT, "__aeabi_i2f", 1);
+  builder->appendMOV(ret, Operand::getRReg(RReg::R0));
+  return ret;
+}
+
+std::shared_ptr<Operand> GenerateFPToSI(std::shared_ptr<FPToSIInstruction> inst,
+                                        std::shared_ptr<ASM_Builder> builder) {
+  auto src_val = inst->m_val->getValue();
+  auto src = builder->getOperand(src_val);
+  auto ret = builder->getOperand(inst);
+
+  builder->appendMOV(Operand::getRReg(RReg::R0), src);
+  builder->appendCALL(VarType::FLOAT, "__aeabi_f2iz", 1);
+  builder->appendMOV(ret, Operand::getRReg(RReg::R0));
   return ret;
 }
 
@@ -470,37 +478,37 @@ void GenerateInstruction(std::shared_ptr<Value> ir_value,
     builder->GenerateConstant(value, true, true);
   } else if (auto inst
              = std::dynamic_pointer_cast<BinaryInstruction>(ir_value)) {
-    GenerateBinaryInstruction(inst, builder);
+    GenerateBinary(inst, builder);
   } else if (auto inst = std::dynamic_pointer_cast<FNegInstruction>(ir_value)) {
-    GenerateFNegInstrcution(inst, builder);
+    GenerateFNeg(inst, builder);
   } else if (auto inst = std::dynamic_pointer_cast<CallInstruction>(ir_value)) {
-    GenerateCallInstruction(inst, builder);
+    GenerateCall(inst, builder);
   } else if (auto inst
              = std::dynamic_pointer_cast<BranchInstruction>(ir_value)) {
-    GenerateBranchInstruction(inst, builder);
+    GenerateBranch(inst, builder);
   } else if (auto inst = std::dynamic_pointer_cast<JumpInstruction>(ir_value)) {
-    GenerateJumpInstruction(inst, builder);
+    GenerateJump(inst, builder);
   } else if (auto inst
              = std::dynamic_pointer_cast<ReturnInstruction>(ir_value)) {
-    GenerateReturnInstruction(inst, builder);
+    GenerateReturn(inst, builder);
   } else if (auto inst
              = std::dynamic_pointer_cast<GetElementPtrInstruction>(ir_value)) {
-    GenerateGepInstruction(inst, builder);
+    GenerateGetElementPtr(inst, builder);
   } else if (auto inst = std::dynamic_pointer_cast<LoadInstruction>(ir_value)) {
-    GenerateLoadInstruction(inst, builder);
+    GenerateLoad(inst, builder);
   } else if (auto inst
              = std::dynamic_pointer_cast<StoreInstruction>(ir_value)) {
-    GenerateStoreInstruction(inst, builder);
+    GenerateStore(inst, builder);
   } else if (auto inst
              = std::dynamic_pointer_cast<AllocaInstruction>(ir_value)) {
-    GenerateAllocaInstruction(inst, builder);
+    GenerateAlloca(inst, builder);
   } else if (auto inst = std::dynamic_pointer_cast<PhiInstruction>(ir_value)) {
-    GeneratePhiInstruction(inst, builder);
+    GeneratePhi(inst, builder);
   } else if (auto inst
              = std::dynamic_pointer_cast<BitCastInstruction>(ir_value)) {
-    GenerateBitCastInstruction(inst, builder);
+    GenerateBitCast(inst, builder);
   } else if (auto inst = std::dynamic_pointer_cast<ZExtInstruction>(ir_value)) {
-    GenerateZExtInstruction(inst, builder);
+    GenerateZExt(inst, builder);
   }
 }
 

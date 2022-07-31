@@ -143,6 +143,19 @@ bool Operand::immCheck(float imm) {
   return false;
 }
 
+// check if the offset value is valid
+bool Operand::addrOffsCheck(int offs, bool is_float) {
+  if (is_float) {
+    // VLDR and VSTR
+    // Values are multiples of 4 in the range 0-1020.(+/-)
+    return -1020 <= offs && offs <= 1020 && offs % 4 == 0;
+  } else {
+    // LDR and STR
+    // Any value in the range 0-4095 is permitted.(+/-)
+    return -4095 <= offs && offs <= 4095;
+  }
+}
+
 std::string Operand::getName() {
   switch (m_op_type) {
     case OperandType::IMM:
@@ -351,7 +364,10 @@ std::string ASM_Instruction::getCondName() {
 }
 
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
-  m_op = InstOp::LDR;
+  if (dest->m_is_float)
+    m_op = InstOp::VLDR;
+  else
+    m_op = InstOp::LDR;
   m_cond = CondType::NONE;
   m_type = Type::LABEL;
   m_dest = dest;
@@ -362,7 +378,10 @@ LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
 
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
                  std::shared_ptr<Operand> offs) {
-  m_op = InstOp::LDR;
+  if (dest->m_is_float)
+    m_op = InstOp::VLDR;
+  else
+    m_op = InstOp::LDR;
   m_cond = CondType::NONE;
   m_type = Type::REG;
   m_dest = dest;
@@ -376,7 +395,10 @@ LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
 
 STRInst::STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
                  std::shared_ptr<Operand> offs) {
-  m_op = InstOp::STR;
+  if (src->m_is_float)
+    m_op = InstOp::VSTR;
+  else
+    m_op = InstOp::STR;
   m_cond = CondType::NONE;
   m_dest = dest;
   m_src = src;
