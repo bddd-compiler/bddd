@@ -20,8 +20,8 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    // filename = "../testSource/buaa/part8/test2.c";
-    filename = "../testSource/functional/59_sort_test5.c";
+    filename = "../testSource/buaa/part13/test4.c";
+    // filename = "../testSource/functional/59_sort_test5.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
   ofs2.close();
   pass_manager->GVNPass();
   pass_manager->GCMPass();
-  // pass_manager->FunctionInliningPass();
+  pass_manager->FunctionInliningPass();
   // pass_manager->GVNPass();
   // pass_manager->GCMPass();
 
