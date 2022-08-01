@@ -651,9 +651,8 @@ void IRPassManager::GCMPass() {
     RunGCM(func, m_builder);
     ReplaceTrivialBranchByJump(func);
     RemoveUnusedBasicBlocks(func);
-
     RemoveTrivialPhis(func);
     RemoveTrivialBasicBlocks(func);
   }
-  RemoveUnusedFunctions(m_builder->m_module);
+  // RemoveUnusedFunctions(m_builder->m_module);
 }

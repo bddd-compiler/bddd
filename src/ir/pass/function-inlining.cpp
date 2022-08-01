@@ -248,7 +248,7 @@ bool FunctionInlining(std::shared_ptr<Function> inline_func) {
       call->ReplaceUseBy(new_phi);
     }
     for (auto &s : return_bb->Successors()) {
-      s->ReplacePredecessorBy(original_bb, return_bb);
+      s->ReplacePredecessorsBy(original_bb, {return_bb});
     }
 
     // at last, remember to remove the call instruction itself from m_instr_list
@@ -270,16 +270,12 @@ void IRPassManager::FunctionInliningPass() {
     return a->m_called_depth < b->m_called_depth;
   });
   for (auto &func : funcs) {
-    FunctionInlining(func);
-    // bool inlined = FunctionInlining(func);
+    bool inlined = FunctionInlining(func);
     // if (inlined) {
-    //   // opportunities for optimizations
-    //   for (auto [call_instr, caller_func] : func->m_calls) {
+    //   for (auto &[call_instr, caller_func] : func->m_calls) {
+    //     RemoveTrivialPhis(caller_func);
     //     RemoveTrivialBasicBlocks(caller_func);
     //   }
     // }
   }
-  // for (auto &func : m_builder->m_module->m_function_list) {
-  //   RemoveTrivialBasicBlocks(func);
-  // }
 }

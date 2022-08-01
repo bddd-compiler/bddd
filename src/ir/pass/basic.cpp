@@ -6,6 +6,7 @@
 
 #include "ir/ir-pass-manager.h"
 
+// predecessors info is unavailable
 void RemoveUnusedBasicBlocks(std::shared_ptr<Function> func) {
   int cnt = 0;
   std::vector<std::shared_ptr<BasicBlock>> unused_bbs;
@@ -37,9 +38,7 @@ void RemoveUnusedBasicBlocks(std::shared_ptr<Function> func) {
         for (auto &s : bb->Successors()) {
           s->RemovePredecessor(bb);
         }
-        auto del = it;
-        ++it;
-        func->m_bb_list.erase(del);
+        it = func->m_bb_list.erase(it);
         // FORGET removing ALL USES from the use_list of their VALUES???????
         unused_bbs.push_back(bb);
         // for (auto it = bb->m_instr_list.rbegin(); it !=
@@ -74,13 +73,14 @@ void RemoveUnusedBasicBlocks(std::shared_ptr<Function> func) {
       assert(unused_bb->m_instr_list.empty());
     }
     std::cerr << "[debug] "
-              << "removed " << unused_bbs.size() << "unused blocks"
+              << "removed " << unused_bbs.size() << " unused blocks"
               << std::endl;
     unused_bbs.clear();
   }
 }
 
 // empty phi instructions may appear after GVN
+// phi instructions with all undef is not "empty", but should be empty
 void RemoveTrivialPhis(std::shared_ptr<Function> func) {
   // should not be a loop
   int cnt = 0;
@@ -99,11 +99,12 @@ void RemoveTrivialPhis(std::shared_ptr<Function> func) {
       // remove meaningless phis
       for (auto &phi : phis) {
         // check if all uses are the same
-        std::shared_ptr<Value> val = nullptr;  // initially undef
+        std::shared_ptr<Value> val = nullptr;
         bool flag = true;
         for (auto [from_bb, use] : phi->m_contents) {
           if (use == nullptr) {
-            continue;  // undef
+            flag = false;  // temp solution: if undef appears, just keep it
+            break;
           }
           if (val == nullptr) {
             if (use->getValue() != phi) val = use->getValue();
@@ -121,6 +122,14 @@ void RemoveTrivialPhis(std::shared_ptr<Function> func) {
           continue;
         }
         changed = true;
+        if (val == nullptr) {
+          // all undef
+          assert(phi->m_use_list.empty());
+          for (auto [incoming_bb, use] : phi->m_contents) {
+            assert(use == nullptr);
+          }
+          phi->m_contents.clear();
+        }
         if (!phi->m_contents.empty()) {
           assert(val != nullptr);  // phi operands cannot be all undef
           // otherwise, can be replaced by its one-and-only val
@@ -200,11 +209,13 @@ void RemoveTrivialBasicBlocks(std::shared_ptr<Function> func) {
           auto predecessors = bb->Predecessors();
 
           // check if it can be removed
-          if (predecessors.empty() && it != func->m_bb_list.begin()) {
-            it = nxt;
-            continue;
-          }
           bool flag = true;
+          if (predecessors.empty()) {
+            auto successors = bb->Successors();
+            if (successors.size() != 1 || successors.front() != bb) {
+              flag = false;
+            }
+          }
           for (auto &pred : predecessors) {
             for (auto &instr2 : target_block->m_instr_list) {
               if (auto phi
@@ -220,9 +231,7 @@ void RemoveTrivialBasicBlocks(std::shared_ptr<Function> func) {
                 break;
               }
             }
-            if (!flag) {
-              break;
-            }
+            if (!flag) break;
           }
           if (flag) {
             // can be removed
@@ -238,8 +247,8 @@ void RemoveTrivialBasicBlocks(std::shared_ptr<Function> func) {
                 // try removing bb, construct pred_block -> target_block
                 // 记得一定要更新这两个bb的predecessors和successors
                 pred->ReplaceSuccessorBy(bb, target_block);
-                target_block->ReplacePredecessorBy(bb, pred);
               }
+              target_block->ReplacePredecessorsBy(bb, predecessors);
             }
             bb->RemoveInstruction(terminator);
             nxt = func->m_bb_list.erase(it);

@@ -790,7 +790,7 @@ public:
     auto it = std::find_if(
         m_contents.begin(), m_contents.end(),
         [=](const auto &x) { return x.first.get() == bb.get(); });
-    if (it == m_contents.end())
+    if (it == m_contents.end() || it->second == nullptr)
       return nullptr;
     else
       return it->second->m_value.lock();
@@ -798,9 +798,7 @@ public:
 
   void AddPhiOperand(std::shared_ptr<BasicBlock> bb,
                      std::shared_ptr<Value> val) {
-    auto it = std::find_if(
-        m_contents.begin(), m_contents.end(),
-        [=](const auto &x) { return x.first.get() == bb.get(); });
+    auto it = m_contents.find(bb);
     if (it == m_contents.end()) {
       if (val == nullptr)
         m_contents[bb] = nullptr;
@@ -815,8 +813,10 @@ public:
                          std::shared_ptr<BasicBlock> new_block) {
     auto it = m_contents.find(old_block);
     if (it != m_contents.end()) {
-      AddPhiOperand(new_block, it->second->m_value.lock());
-      m_contents.erase(it);
+      auto val = it->second->m_value.lock();
+      RemoveByBasicBlock(old_block);
+      AddPhiOperand(new_block, val);
+      // m_contents.erase(it);
     }
   }
 
@@ -831,12 +831,13 @@ public:
   //   }
   // }
   void RemoveByBasicBlock(std::shared_ptr<BasicBlock> bb) {
-    for (auto it = m_contents.begin(); it != m_contents.end(); ++it) {
-      if (it->first == bb) {
-        m_contents.erase(it);
-        return;
-      }
+    auto it = m_contents.find(bb);
+    assert(it != m_contents.end());
+    auto [incoming_bb, use] = *it;
+    if (use != nullptr) {
+      use->getValue()->KillUse(use);
     }
+    m_contents.erase(it);
   }
 
   // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
@@ -1011,8 +1012,10 @@ public:
   void AddPredecessor(std::shared_ptr<BasicBlock> bb);
   void RemovePredecessor(std::shared_ptr<BasicBlock> bb);
 
-  void ReplacePredecessorBy(std::shared_ptr<BasicBlock> old_block,
-                            std::shared_ptr<BasicBlock> new_block);
+  void ReplacePredecessorsBy(
+      std::shared_ptr<BasicBlock> old_block,
+      std::unordered_set<std::shared_ptr<BasicBlock>> new_blocks);
+
   void ReplaceSuccessorBy(std::shared_ptr<BasicBlock> old_block,
                           std::shared_ptr<BasicBlock> new_block);
 

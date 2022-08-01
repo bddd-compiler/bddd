@@ -20,16 +20,16 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    filename = "../testSource/buaa/inline/test2.c";
-    // filename = "../testSource/functional/09_func_defn.c";
+    // filename = "../testSource/buaa/part8/test2.c";
+    filename = "../testSource/functional/59_sort_test5.c";
   } else {
     std::cerr << "???";
     return 1;
   }
   Driver driver;
 
-  std::cout << "compiling: " << filename << std::endl;
-  std::cout << "parsing..." << std::endl;
+  // std::cout << "compiling: " << filename << std::endl;
+  // std::cout << "parsing..." << std::endl;
   /**
    * parse the source code into AST
    * ASTs can be accessed via driver.comp_unit
@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  std::cout << "generating ir..." << std::endl;
+  // std::cout << "generating ir..." << std::endl;
   auto module = std::make_unique<Module>();
   for (auto &builtin_func : g_builtin_funcs) {
     auto func_decl = std::make_shared<Function>(builtin_func);
@@ -75,14 +75,12 @@ int main(int argc, char **argv) {
                      + "_ir_example.out");
   builder->m_module->ExportIR(ofs2, 0);
   ofs2.close();
-
-  pass_manager->GVNPass();  // global value numbering
-  // but IR after GVN may not be executable since the position is incorrect
-  // (some virtual registers do not dominate all of its uses)
-  // we should hoist these VRs to a proper place, so use GCM
+  pass_manager->GVNPass();
   pass_manager->GCMPass();
+  // pass_manager->FunctionInliningPass();
+  // pass_manager->GVNPass();
+  // pass_manager->GCMPass();
 
-  pass_manager->FunctionInliningPass();
   // pass_manager->GVNPass();
   // pass_manager->GCMPass();
 
@@ -91,24 +89,24 @@ int main(int argc, char **argv) {
   ofs3.close();
 
   // asm debug
-  std::cout << "generating asm..." << std::endl;
-  auto asm_module = std::make_shared<ASM_Module>();
-  auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
-  GenerateModule(std::move(builder->m_module), asm_builder);
-  std::ofstream ofs4(filename.substr(0, filename.rfind('.')) + "_tmp_asm.s");
-  asm_module->exportASM(ofs4);
-  ofs4.close();
-
-  std::cout << "allocating..." << std::endl;
-  RegisterAllocator(asm_module, RegType::R).Allocate();
-  RegisterAllocator(asm_module, RegType::S).Allocate();
-
-  std::cout << "optimizing..." << std::endl;
-  optimize(asm_module);
-  generateLiteralPool(asm_module);
-  std::ofstream ofs5(filename.substr(0, filename.rfind('.')) + "_asm.s");
-  asm_module->exportASM(ofs5);
-  ofs5.close();
+  // std::cout << "generating asm..." << std::endl;
+  // auto asm_module = std::make_shared<ASM_Module>();
+  // auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
+  // GenerateModule(std::move(builder->m_module), asm_builder);
+  // std::ofstream ofs4(filename.substr(0, filename.rfind('.')) + "_tmp_asm.s");
+  // asm_module->exportASM(ofs4);
+  // ofs4.close();
+  //
+  // std::cout << "allocating..." << std::endl;
+  // RegisterAllocator(asm_module, RegType::R).Allocate();
+  // RegisterAllocator(asm_module, RegType::S).Allocate();
+  //
+  // std::cout << "optimizing..." << std::endl;
+  // optimize(asm_module);
+  // generateLiteralPool(asm_module);
+  // std::ofstream ofs5(filename.substr(0, filename.rfind('.')) + "_asm.s");
+  // asm_module->exportASM(ofs5);
+  // ofs5.close();
 
   return 0;
 }

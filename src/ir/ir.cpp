@@ -197,21 +197,28 @@ void BasicBlock::RemovePredecessor(std::shared_ptr<BasicBlock> bb) {
   }
   m_predecessors.erase(bb);
 }
-void BasicBlock::ReplacePredecessorBy(std::shared_ptr<BasicBlock> old_block,
-                                      std::shared_ptr<BasicBlock> new_block) {
+void BasicBlock::ReplacePredecessorsBy(
+    std::shared_ptr<BasicBlock> old_block,
+    std::unordered_set<std::shared_ptr<BasicBlock>> new_blocks) {
   // only phi instructions matter the predecessor
   for (auto& instr : m_instr_list) {
     if (auto phi_instr = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
-      phi_instr->ReplacePhiOperand(old_block, new_block);
+      auto it = phi_instr->m_contents.find(old_block);
+      assert(it != phi_instr->m_contents.end());
+      auto val = (it->second != nullptr ? it->second->getValue() : nullptr);
+      for (auto& new_block : new_blocks) {
+        phi_instr->AddPhiOperand(new_block, val);
+      }
+      phi_instr->RemoveByBasicBlock(old_block);
+      // phi_instr->ReplacePhiOperand(old_block, new_block);
     } else {
       break;
     }
   }
   auto it = m_predecessors.find(old_block);
-  if (it != m_predecessors.end()) {
-    m_predecessors.erase(it);
-    m_predecessors.insert(new_block);
-  }
+  assert(it != m_predecessors.end());
+  m_predecessors.erase(it);
+  m_predecessors.insert(new_blocks.begin(), new_blocks.end());
 }
 
 void BasicBlock::ReplaceSuccessorBy(std::shared_ptr<BasicBlock> old_block,
@@ -242,8 +249,8 @@ void BasicBlock::ReplaceSuccessorBy(std::shared_ptr<BasicBlock> old_block,
       m_instr_list.pop_back();
       m_instr_list.push_back(new_jump_instr);
     }
-    old_block->m_predecessors.erase(jump_instr->m_bb);
-    new_block->m_predecessors.insert(jump_instr->m_bb);
+    old_block->m_predecessors.erase(br_instr->m_bb);
+    new_block->m_predecessors.insert(br_instr->m_bb);
   } else {
     assert(false);  // cannot be return instruction
   }
