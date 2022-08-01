@@ -85,10 +85,10 @@ void RegisterAllocator::initialColors() {
     }
     K = rreg_avaliable.size();
   } else {
-    for (int i = 0; i < 32; i++) {
+    for (int i = 1; i < 32; i++) {
       sreg_avaliable.insert((SReg)i);
     }
-    K = 32;
+    K = 31;
   }
 }
 
@@ -198,10 +198,10 @@ void RegisterAllocator::Build() {
         defs = inst->m_f_def;
         uses = inst->m_f_use;
       }
+      cnt++;
       if (auto I = std::dynamic_pointer_cast<MOVInst>(inst)) {
-        cnt++;
-        if (I->m_type != MOVType::IMM
-            && !(I->m_dest->m_is_float ^ I->m_src->m_is_float)) {
+        if (I->m_type != MOVType::IMM && I->m_dest->getRegType() == m_reg_type
+            && I->m_src->getRegType() == m_reg_type) {
           for (auto& use : uses) {
             live.erase(use);
           }
@@ -604,32 +604,6 @@ void RegisterAllocator::RewriteProgram() {
           defs = i->m_f_def;
           uses = i->m_f_use;
         }
-        if (uses.find(v) != uses.end()) {
-          // replace use
-          OpPtr newOp
-              = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
-          i->replaceUse(newOp, v);
-          // insert a load instruction before use of newOp
-          OpPtr offs;
-          std::shared_ptr<MOVInst> mov = nullptr;
-          if (Operand::addrOffsCheck(sp_offs, newOp->m_is_float)) {
-            offs = std::make_shared<Operand>(sp_offs);
-          } else {
-            offs = std::make_shared<Operand>(OperandType::VREG);
-            mov = std::make_shared<MOVInst>(offs, sp_offs);
-            newTemps.insert(offs);
-            updateDepth(b, offs);
-          }
-          auto ldr = std::make_shared<LDRInst>(
-              newOp, Operand::getRReg(RReg::SP), offs);
-          if (mov) {
-            b->insertSpillLDR(iter, ldr, mov);
-          } else {
-            b->insertSpillLDR(iter, ldr);
-          }
-          newTemps.insert(newOp);
-          updateDepth(b, newOp);
-        }
         if (defs.find(v) != defs.end()) {
           // replace def
           OpPtr newOp
@@ -653,6 +627,33 @@ void RegisterAllocator::RewriteProgram() {
           } else {
             b->insertSpillSTR(iter, str);
           };
+          newTemps.insert(newOp);
+          updateDepth(b, newOp);
+        }
+        if (uses.find(v) != uses.end()) {
+          // replace use
+          OpPtr newOp
+              = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
+          i->replaceUse(newOp, v);
+          // insert a load instruction before use of newOp
+          OpPtr offs;
+          std::shared_ptr<MOVInst> mov = nullptr;
+          int sum_offs = sp_offs + i->m_params_offset;
+          if (Operand::addrOffsCheck(sum_offs, newOp->m_is_float)) {
+            offs = std::make_shared<Operand>(sum_offs);
+          } else {
+            offs = std::make_shared<Operand>(OperandType::VREG);
+            mov = std::make_shared<MOVInst>(offs, sum_offs);
+            newTemps.insert(offs);
+            updateDepth(b, offs);
+          }
+          auto ldr = std::make_shared<LDRInst>(
+              newOp, Operand::getRReg(RReg::SP), offs);
+          if (mov) {
+            b->insertSpillLDR(iter, ldr, mov);
+          } else {
+            b->insertSpillLDR(iter, ldr);
+          }
           newTemps.insert(newOp);
           updateDepth(b, newOp);
         }

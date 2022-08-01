@@ -7,7 +7,7 @@ std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
   std::shared_ptr<Operand> ret;
   if (value->m_type.IsBasicFloat()) {
     ret = std::make_shared<Operand>(OperandType::VREG, true);
-    appendMOV(ret, std::make_shared<Operand>(value->m_float_val));
+    appendMOV(ret, value->m_float_val);
   } else {
     int imm = value->m_int_val;
     if (genimm && (!checkimm || Operand::immCheck(imm))) {
@@ -24,7 +24,6 @@ std::shared_ptr<Operand> GenerateAdd(std::shared_ptr<BinaryInstruction> inst,
   std::shared_ptr<Operand> operand1, operand2;
   std::shared_ptr<Value> val1 = inst->m_lhs_val_use->getValue();
   std::shared_ptr<Value> val2 = inst->m_rhs_val_use->getValue();
-
   bool is_int = inst->m_op == IROp::ADD;
   InstOp op = is_int ? InstOp::ADD : InstOp::VADD;
   if (std::dynamic_pointer_cast<Constant>(val1)) {
@@ -186,9 +185,16 @@ std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
     return nullptr;
   }
 
+  if (inst->m_func_name == "putfloat") {
+    builder->appendMOV(Operand::getSReg(SReg::S0),
+                       builder->getOperand(inst->m_params[0]->getValue()));
+    builder->appendCALL(VarType::VOID, "putfloat", 1);
+    return nullptr;
+  }
+
   int n = inst->m_params.size();
   // calculate the stack move size
-  unsigned int stack_move_size = std::max(n - 4, 0) * 4;
+  int stack_move_size = std::max(n - 4, 0) * 4;
   if (stack_move_size) {
     builder->allocSP(stack_move_size);
   }
@@ -198,9 +204,11 @@ std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
   while (i < 4 && i < n) {
     std::shared_ptr<Value> value = inst->m_params[i]->getValue();
     std::shared_ptr<Operand> reg = Operand::getRReg((RReg)i);
-    builder->appendMOV(reg, builder->getOperand(value, true, false));
+    auto mov = builder->appendMOV(reg, builder->getOperand(value, true, false));
+    mov->m_params_offset = stack_move_size;
     i++;
   }
+
   // save params to stack
   while (i < n) {
     std::shared_ptr<Value> value = inst->m_params[i]->getValue();
@@ -210,26 +218,33 @@ std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
       offs = std::make_shared<Operand>(sp_offs);
     } else {
       offs = std::make_shared<Operand>(OperandType::VREG);
-      builder->appendMOV(offs, sp_offs);
+      auto mov = builder->appendMOV(offs, sp_offs);
+      mov->m_params_offset = stack_move_size;
     }
-    builder->appendSTR(builder->getOperand(value), Operand::getRReg(RReg::SP),
-                       offs);
+    auto str = builder->appendSTR(builder->getOperand(value),
+                                  Operand::getRReg(RReg::SP), offs);
+    str->m_params_offset = stack_move_size;
     i++;
   }
 
   VarType return_type = (VarType)inst->m_type.m_base_type;
   builder->appendCALL(return_type, inst->m_func_name, n);
-  // if the function has return value, save to r0
-  std::shared_ptr<Operand> ret;
-  if (return_type == VarType::INT || return_type == VarType::FLOAT) {
-    ret = builder->getOperand(inst);
-    builder->appendMOV(ret, Operand::getRReg(RReg::R0));
-  }
 
   // reclaim sp
   if (stack_move_size) {
     builder->reclaimSP();
   }
+
+  // if the function has return value, save to r0
+  std::shared_ptr<Operand> ret;
+  if (return_type == VarType::INT || return_type == VarType::FLOAT) {
+    ret = builder->getOperand(inst);
+    if (inst->m_func_name == "getfloat")
+      builder->appendMOV(ret, Operand::getRReg(RReg::R3));
+    else
+      builder->appendMOV(ret, Operand::getRReg(RReg::R0));
+  }
+
   return ret;
 }
 
@@ -416,6 +431,7 @@ std::shared_ptr<Operand> GeneratePhi(std::shared_ptr<PhiInstruction> inst,
   // we need to store the temp result to make sure all PHI instruction execute
   // in parallel
   auto tmp = std::make_shared<Operand>(OperandType::VREG);
+  tmp->m_is_float = inst->m_type.IsBasicFloat();
   auto ret = builder->getOperand(inst);
   builder->appendMOV(ret, tmp);
   for (auto &[ir_block, value] : inst->m_contents) {
@@ -509,6 +525,12 @@ void GenerateInstruction(std::shared_ptr<Value> ir_value,
     GenerateBitCast(inst, builder);
   } else if (auto inst = std::dynamic_pointer_cast<ZExtInstruction>(ir_value)) {
     GenerateZExt(inst, builder);
+  } else if (auto inst
+             = std::dynamic_pointer_cast<SIToFPInstruction>(ir_value)) {
+    GenerateSIToFP(inst, builder);
+  } else if (auto inst
+             = std::dynamic_pointer_cast<FPToSIInstruction>(ir_value)) {
+    GenerateFPToSI(inst, builder);
   }
 }
 

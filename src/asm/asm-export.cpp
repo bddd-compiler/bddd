@@ -227,26 +227,27 @@ void STRInst::exportASM(std::ofstream& ofs) {
 }
 
 void MOVInst::exportASM(std::ofstream& ofs) {
-  if (m_src->m_op_type == OperandType::IMM) {
-    if (m_src->m_is_float) {
-      // TODO(Huang): export vmov(imm);
+  if (m_src->m_op_type == OperandType::IMM && !m_src->m_is_float) {
+    int imm = m_src->m_int_val;
+    if (Operand::immCheck(imm)) {
+      ofs << "\tMOV" << getCondName() << " " << m_dest->getName() << ", #"
+          << std::to_string(imm) << std::endl;
+    } else if (Operand::immCheck(~imm)) {
+      ofs << "\tMVN" << getCondName() << " " << m_dest->getName() << ", #"
+          << std::to_string(~imm) << std::endl;
     } else {
-      int imm = m_src->m_int_val;
-      if (Operand::immCheck(imm)) {
-        ofs << "\tMOV" << getCondName() << " " << m_dest->getName() << ", #"
-            << std::to_string(imm) << std::endl;
-      } else if (Operand::immCheck(~imm)) {
-        ofs << "\tMVN" << getCondName() << " " << m_dest->getName() << ", #"
-            << std::to_string(~imm) << std::endl;
-      } else {
-        ofs << "\tMOVW" << getCondName() << " " << m_dest->getName() << ", #"
-            << std::to_string(imm & 65535) << std::endl;
-        ofs << "\tMOVT" << getCondName() << " " << m_dest->getName() << ", #"
-            << std::to_string((unsigned int)imm >> 16) << std::endl;
-      }
+      ofs << "\tMOVW" << getCondName() << " " << m_dest->getName() << ", #"
+          << std::to_string(imm & 65535) << std::endl;
+      ofs << "\tMOVT" << getCondName() << " " << m_dest->getName() << ", #"
+          << std::to_string((unsigned int)imm >> 16) << std::endl;
     }
     return;
   }
+  exportInstHead(ofs);
+  ofs << m_dest->getName() << ", " << m_src->getName() << std::endl;
+}
+
+void MRSInst::exportASM(std::ofstream& ofs) {
   exportInstHead(ofs);
   ofs << m_dest->getName() << ", " << m_src->getName() << std::endl;
 }

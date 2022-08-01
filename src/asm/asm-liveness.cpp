@@ -163,9 +163,26 @@ void MOVInst::replaceDef(std::shared_ptr<Operand> newOp,
 void MOVInst::replaceUse(std::shared_ptr<Operand> newOp,
                          std::shared_ptr<Operand> oldOp) {
   assert(m_type == MOVType::REG);
-  assert(m_dest == oldOp || m_src == oldOp);
-  if (m_dest == oldOp) m_dest = newOp;
-  if (m_src == oldOp) m_src = newOp;
+  assert(m_src == oldOp);
+  m_src = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
+}
+
+void MRSInst::replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) {
+  assert(m_dest == oldOp);
+  m_dest = newOp;
+  m_def.erase(oldOp);
+  m_f_def.erase(oldOp);
+  addDef(newOp);
+}
+
+void MRSInst::replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) {
+  assert(m_src == oldOp);
+  m_src = newOp;
   m_use.erase(oldOp);
   m_f_use.erase(oldOp);
   addUse(newOp);

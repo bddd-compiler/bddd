@@ -35,6 +35,7 @@ enum class RReg {
 };
 
 enum class SReg {
+  S0,
   S1,
   S2,
   S3,
@@ -74,6 +75,8 @@ enum class InstOp {
   STR,
   ADR,
   MOV,
+  MSR,
+  MRS,
   PUSH,
   POP,
   // branch instructions
@@ -112,6 +115,8 @@ enum class InstOp {
   VDIV,
   VNEG,
   VCMP,
+  VMSR,
+  VMRS,
   VLDR,
   VSTR,
 };
@@ -141,27 +146,42 @@ public:
   std::string m_name;
   RReg m_rreg;
   SReg m_sreg;
+  RegType m_reg_type;
   bool m_is_float;
   int m_int_val;
   float m_float_val;
+  bool m_is_special;
+  std::string m_special_reg;
 
   //
   int lifespan = 0;
   bool rejected = false;
 
-  Operand(OperandType t, bool f = false) : m_op_type(t), m_is_float(f) {}
+  Operand(OperandType t, bool f = false)
+      : m_op_type(t), m_is_float(f), m_is_special(false) {}
 
   Operand(int val)
-      : m_op_type(OperandType::IMM), m_int_val(val), m_is_float(false) {}
+      : m_op_type(OperandType::IMM),
+        m_int_val(val),
+        m_is_float(false),
+        m_is_special(false) {}
 
   Operand(float val)
-      : m_op_type(OperandType::IMM), m_float_val(val), m_is_float(true) {}
+      : m_op_type(OperandType::IMM),
+        m_float_val(val),
+        m_is_float(true),
+        m_is_special(false) {}
+
+  Operand(std::string reg)
+      : m_op_type(OperandType::REG), m_is_special(true), m_special_reg(reg) {}
 
   std::string getName();
 
   std::string getRegName();
 
   std::string getVRegName();
+
+  RegType getRegType();
 
   static std::shared_ptr<Operand> getRReg(RReg r);
 
@@ -292,11 +312,15 @@ public:
   InstOp m_op;
   CondType m_cond;
 
+  int m_params_offset;
+
   std::shared_ptr<ASM_BasicBlock> m_block;
   std::unordered_set<std::shared_ptr<Operand>> m_def;
   std::unordered_set<std::shared_ptr<Operand>> m_use;
   std::unordered_set<std::shared_ptr<Operand>> m_f_def;
   std::unordered_set<std::shared_ptr<Operand>> m_f_use;
+
+  ASM_Instruction() : m_params_offset(0) {}
 
   std::string getOpName();
 
@@ -374,6 +398,25 @@ public:
   MOVInst(std::shared_ptr<Operand> dest, float imm);
 
   MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src);
+
+  void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+};
+
+// MRS MSR VMRS VMSR
+class MRSInst : public ASM_Instruction {
+public:
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_src;
+
+  MRSInst(std::string reg, std::shared_ptr<Operand> src);
+
+  MRSInst(std::shared_ptr<Operand> dest, std::string reg);
 
   void exportASM(std::ofstream& ofs) override;
 
