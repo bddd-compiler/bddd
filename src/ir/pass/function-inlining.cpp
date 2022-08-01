@@ -63,7 +63,9 @@ bool FunctionInlining(std::shared_ptr<Function> inline_func) {
     new_entry->AddPredecessor(original_bb);
 
     std::map<std::shared_ptr<Value>, std::shared_ptr<Value>> new_vals;
-    auto GetNewVal = [&new_vals](std::shared_ptr<Value> old_val) {
+    auto GetNewVal =
+        [&new_vals](std::shared_ptr<Value> old_val) -> std::shared_ptr<Value> {
+      if (old_val == nullptr) return nullptr;
       if (std::dynamic_pointer_cast<Constant>(old_val)
           || std::dynamic_pointer_cast<GlobalVariable>(old_val)) {
         return old_val;
@@ -223,8 +225,8 @@ bool FunctionInlining(std::shared_ptr<Function> inline_func) {
       auto new_phi
           = std::dynamic_pointer_cast<PhiInstruction>(new_vals[old_phi]);
       for (auto [incoming_bb, use] : old_phi->m_contents) {
-        new_phi->AddPhiOperand(new_bbs[incoming_bb],
-                               GetNewVal(use->getValue()));
+        auto val = use != nullptr ? use->getValue() : nullptr;
+        new_phi->AddPhiOperand(new_bbs[incoming_bb], GetNewVal(val));
       }
     }
     // add phi node for return value if return type is int or float
@@ -262,8 +264,6 @@ void IRPassManager::FunctionInliningPass() {
   SideEffectPass();
   std::vector<std::shared_ptr<Function>> funcs;
   for (auto &func : m_builder->m_module->m_function_list) {
-    RemoveTrivialPhis(func);
-    RemoveTrivialBasicBlocks(func);
     funcs.push_back(func);
   }
   std::sort(funcs.begin(), funcs.end(), [](const auto &a, const auto &b) {
