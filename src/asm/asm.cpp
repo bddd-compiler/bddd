@@ -30,9 +30,9 @@ std::unordered_map<std::shared_ptr<Operand>, std::string> Operand::vreg_map;
 std::unordered_map<RReg, std::shared_ptr<Operand>> Operand::rreg_map;
 std::unordered_map<SReg, std::shared_ptr<Operand>> Operand::sreg_map;
 
-unsigned int ASM_Function::getStackSize() { return m_local_alloc; }
+int ASM_Function::getStackSize() { return m_local_alloc; }
 
-void ASM_Function::allocateStack(unsigned int size) { m_local_alloc += size; }
+void ASM_Function::allocateStack(int size) { m_local_alloc += size; }
 
 void ASM_Function::appendPush(std::shared_ptr<Operand> reg) {
   if (m_push->m_regs.find(reg) == m_push->m_regs.end())
@@ -486,7 +486,7 @@ MRSInst::MRSInst(std::shared_ptr<Operand> dest, std::string reg) {
     m_src = std::make_shared<Operand>("FPSCR");
   } else
     assert(false);
-  
+
   m_cond = CondType::NONE;
   m_dest = dest;
 
@@ -518,9 +518,16 @@ CALLInst::CALLInst(VarType type, std::string label, int n) {
   m_label = label;
   m_params = n;
 
+  // BL instruction will change LR and R12
+  addDef(Operand::getRReg(RReg::R0));
+  addDef(Operand::getRReg(RReg::R1));
+  addDef(Operand::getRReg(RReg::R2));
+  addDef(Operand::getRReg(RReg::R3));
+  addDef(Operand::getRReg(RReg::R12));
+  addDef(Operand::getRReg(RReg::LR));
+
   if (label == "putfloat") {
     addUse(Operand::getSReg(SReg::S0));
-    addDef(Operand::getRReg(RReg::LR));
     return;
   }
 
@@ -529,11 +536,6 @@ CALLInst::CALLInst(VarType type, std::string label, int n) {
     addUse(Operand::getRReg((RReg)i));
     i++;
   }
-  if (type != VarType::VOID) {
-    addDef(Operand::getRReg(RReg::R0));
-  }
-  // BL instruction will change LR, which means LR will be define
-  addDef(Operand::getRReg(RReg::LR));
 }
 
 ShiftInst::ShiftInst(InstOp op, std::shared_ptr<Operand> dest,

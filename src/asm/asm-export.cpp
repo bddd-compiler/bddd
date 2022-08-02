@@ -135,16 +135,6 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
   ofs << m_name << ":" << std::endl;
   m_push->exportASM(ofs);
 
-#ifndef SP_FOR_PARAM
-  if (m_params > 4) {
-    int sp_offs = (m_push->m_regs.size()) * 4;
-    if (sp_offs)
-      ofs << "\tADD R11, SP, #" << std::to_string(sp_offs) << std::endl;
-    else
-      ofs << "\tMOV R11, SP" << std::endl;
-  }
-#endif
-
   // allocate stack
   int size = m_local_alloc;
   if (size) {

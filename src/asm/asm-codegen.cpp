@@ -198,6 +198,10 @@ std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
   if (stack_move_size) {
     builder->allocSP(stack_move_size);
   }
+  if (stack_move_size & 7) {
+    stack_move_size &= ~(unsigned int)7;
+    stack_move_size += 8;
+  }
 
   int i = 0;
   // save params to r0 ~ r3
@@ -315,27 +319,30 @@ std::shared_ptr<Operand> GenerateGetElementPtr(
   bool first = true;
 
   // maybe redundant??
-  if (indices.size() == 1) {
-    if (auto val
-        = std::dynamic_pointer_cast<Constant>(indices[0]->getValue())) {
-      assert(val->m_type.IsBasicInt());
-      const_offs = val->m_int_val * 4;
-    } else {
-      var_offs_op = builder->getOperand(indices[0]->getValue());
-    }
-  }
-  //
-  for (int i = dimensions.size() - 1; i >= 0; i--) {
-    if (i + 1 >= indices.size()) {
-      attribute *= dimensions[i];
+  // ↑↑↑ seems to be ture
+  // if (indices.size() == 1) {
+  //   if (auto val
+  //       = std::dynamic_pointer_cast<Constant>(indices[0]->getValue())) {
+  //     assert(val->m_type.IsBasicInt());
+  //     const_offs = val->m_int_val * 4;
+  //   } else {
+  //     var_offs_op = builder->getOperand(indices[0]->getValue());
+  //   }
+  // }
+
+  // there is a special case when passing a param, the first index is ommited
+  // so i = dimensions.size() and check
+  for (int i = dimensions.size(); i >= 0; i--) {
+    if (i >= indices.size()) {
+      attribute *= dimensions[i - 1];
       continue;
     }
     if (auto val
-        = std::dynamic_pointer_cast<Constant>(indices[i + 1]->getValue())) {
+        = std::dynamic_pointer_cast<Constant>(indices[i]->getValue())) {
       assert(val->m_type.IsBasicInt());
       const_offs += val->m_int_val * attribute * 4;
     } else {
-      var_offs = builder->getOperand(indices[i + 1]->getValue());
+      var_offs = builder->getOperand(indices[i]->getValue());
       if (first) {
         first = false;
         var_offs_op = std::make_shared<Operand>(OperandType::VREG);
@@ -349,7 +356,8 @@ std::shared_ptr<Operand> GenerateGetElementPtr(
                            var_offs_op);
       }
     }
-    attribute *= dimensions[i];
+    if (i > 0)
+    attribute *= dimensions[i - 1];
   }
 
   // const part offset obtained in ir phase
@@ -447,19 +455,17 @@ std::shared_ptr<Operand> GeneratePhi(std::shared_ptr<PhiInstruction> inst,
 std::shared_ptr<Operand> GenerateBitCast(
     std::shared_ptr<BitCastInstruction> inst,
     std::shared_ptr<ASM_Builder> builder) {
-  auto val = inst->m_val->getValue();
-  auto src = builder->getOperand(val);
-  auto ret = builder->getOperand(inst);
-  builder->appendMOV(ret, src);
+  auto src_val = inst->m_val->getValue();
+  auto ret = builder->getOperand(src_val);
+  builder->m_value_map.insert(std::make_pair(inst, ret));
   return ret;
 }
 
 std::shared_ptr<Operand> GenerateZExt(std::shared_ptr<ZExtInstruction> inst,
                                       std::shared_ptr<ASM_Builder> builder) {
   auto src_val = inst->m_val->getValue();
-  auto src = builder->getOperand(src_val);
-  auto ret = builder->getOperand(inst);
-  builder->appendMOV(ret, src);
+  auto ret = builder->getOperand(src_val);
+  builder->m_value_map.insert(std::make_pair(inst, ret));
   return ret;
 }
 
@@ -565,9 +571,10 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
   // insert mov instruction in the entry block for loading params
   auto first_block = func->m_blocks.front();
   auto iter = first_block->m_insts.begin();
-  for (auto &mov : func->m_params_set_list) {
-    first_block->m_insts.insert(iter, mov);
-    mov->m_block = first_block;
+  for (auto &inst : func->m_params_set_list) {
+    first_block->m_insts.insert(iter, inst);
+    func->m_params_pos_map[inst] = std::prev(iter);
+    inst->m_block = first_block;
   }
 }
 

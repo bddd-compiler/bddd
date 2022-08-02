@@ -1,8 +1,35 @@
 #include "asm/asm-fixed.h"
 
-void storeRegisters(std::shared_ptr<ASM_Function> function, std::shared_ptr<Operand> reg) {
+void storeRegisters(std::shared_ptr<ASM_Function> function,
+                    std::shared_ptr<Operand> reg) {
   function->appendPush(reg);
   function->appendPop(reg);
+}
+
+void fixedParamsOffs(std::shared_ptr<ASM_Module> module) {
+  for (auto& func : module->m_funcs) {
+    int stack_size = func->getStackSize();
+    if (stack_size & 7) {
+      stack_size &= ~(unsigned int)7;
+      stack_size += 8;
+    }
+    stack_size += func->m_push->m_regs.size() * 4;
+    auto block = func->m_blocks.front();
+    for (auto& inst : func->m_params_set_list) {
+      auto iter = block->m_insts.begin();
+      auto ldr = std::dynamic_pointer_cast<LDRInst>(inst);
+      if (!ldr) continue;
+      int offs = ldr->m_offs->m_int_val + stack_size;
+      if (Operand::addrOffsCheck(offs, ldr->m_dest->m_is_float))
+        ldr->m_offs->m_int_val = offs;
+      else {
+        auto mov_temp = std::make_shared<Operand>(OperandType::VREG);
+        auto mov = std::make_shared<MOVInst>(mov_temp, offs);
+        block->m_insts.insert(func->m_params_pos_map[inst], mov);
+        ldr->m_offs = mov_temp;
+      }
+    }
+  }
 }
 
 void generateLiteralPool(std::shared_ptr<ASM_Module> module) {
@@ -26,4 +53,4 @@ void generateLiteralPool(std::shared_ptr<ASM_Module> module) {
       }
     }
   }
-} 
+}

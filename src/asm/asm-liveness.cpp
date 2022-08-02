@@ -32,9 +32,7 @@ void RegisterAllocator::LivenessAnalysis() {
         uses = i->m_f_use;
       }
       for (auto& def : defs) {
-        if (b->m_use.find(def) == b->m_use.end()) {
-          b->m_def.insert(def);
-        }
+        b->m_def.insert(def);
       }
       for (auto& use : uses) {
         if (b->m_def.find(use) == b->m_def.end()) {
@@ -54,6 +52,7 @@ void RegisterAllocator::LivenessAnalysis() {
     for (auto iter = m_cur_func->m_blocks.rbegin();
          iter != m_cur_func->m_blocks.rend(); iter++) {
       auto b = *iter;
+
       // record in'[b] and out'[b]
       auto temp_in = b->m_livein;
       auto temp_out = b->m_liveout;
@@ -171,7 +170,7 @@ void MOVInst::replaceUse(std::shared_ptr<Operand> newOp,
 }
 
 void MRSInst::replaceDef(std::shared_ptr<Operand> newOp,
-                  std::shared_ptr<Operand> oldOp) {
+                         std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);
   m_dest = newOp;
   m_def.erase(oldOp);
@@ -180,7 +179,7 @@ void MRSInst::replaceDef(std::shared_ptr<Operand> newOp,
 }
 
 void MRSInst::replaceUse(std::shared_ptr<Operand> newOp,
-                  std::shared_ptr<Operand> oldOp) {
+                         std::shared_ptr<Operand> oldOp) {
   assert(m_src == oldOp);
   m_src = newOp;
   m_use.erase(oldOp);

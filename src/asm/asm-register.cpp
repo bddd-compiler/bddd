@@ -22,11 +22,9 @@ void RegisterAllocator::Allocate() {
       for (auto& node : coloredNodes) {
         RReg rreg = color_r[node];
         if (node->m_op_type == OperandType::VREG) {
-          // std::cout << node->getName() << "->";
           node->m_op_type = OperandType::REG;
           node->m_is_float = false;
           node->m_rreg = rreg;
-          // std::cout << node->getName() << std::endl;
         }
         if (4 <= (int)rreg && (int)rreg <= 11) {
           storeRegisters(func, Operand::getRReg(rreg));
@@ -78,17 +76,15 @@ void RegisterAllocator::init() {
 
 void RegisterAllocator::initialColors() {
   if (m_reg_type == RegType::R) {
-    rreg_avaliable = {RReg::R4, RReg::R5,  RReg::R6,  RReg::R7, RReg::R8,
-                      RReg::R9, RReg::R10, RReg::R12, RReg::LR};
-    if (m_cur_func->m_params <= 4) {
-      rreg_avaliable.insert(RReg::R11);
-    }
+    rreg_avaliable = {RReg::R0,  RReg::R1,  RReg::R2,  RReg::R3, RReg::R4,
+                      RReg::R5,  RReg::R6,  RReg::R7,  RReg::R8, RReg::R9,
+                      RReg::R10, RReg::R11, RReg::R12, RReg::LR};
     K = rreg_avaliable.size();
   } else {
     for (int i = 1; i < 32; i++) {
       sreg_avaliable.insert((SReg)i);
     }
-    K = 31;
+    K = sreg_avaliable.size();
   }
 }
 
@@ -185,11 +181,12 @@ void RegisterAllocator::Build() {
   debug("Build");
 #endif
   for (auto& b : m_cur_func->m_blocks) {
-    std::unordered_set<OpPtr>& live = b->m_liveout;
-    std::map<OpPtr, int> lifespan_map;
+    std::unordered_set<OpPtr> live = b->m_liveout;
+    std::unordered_map<OpPtr, int> lifespan_map;
     int cnt = 0;
     for (auto iter = b->m_insts.rbegin(); iter != b->m_insts.rend(); iter++) {
       std::shared_ptr<ASM_Instruction>& inst = *iter;
+      cnt++;
       std::unordered_set<OpPtr> defs, uses;
       if (m_reg_type == RegType::R) {
         defs = inst->m_def;
@@ -198,7 +195,6 @@ void RegisterAllocator::Build() {
         defs = inst->m_f_def;
         uses = inst->m_f_use;
       }
-      cnt++;
       if (auto I = std::dynamic_pointer_cast<MOVInst>(inst)) {
         if (I->m_type != MOVType::IMM && I->m_dest->getRegType() == m_reg_type
             && I->m_src->getRegType() == m_reg_type) {
@@ -296,13 +292,10 @@ void RegisterAllocator::MkWorklist() {
 #endif
   for (auto& n : initial) {
     if (degree[n] >= K) {
-      // std::cout << "spill: " << n->getName() << std::endl;
       spillWorklist.insert(n);
     } else if (MoveRelated(n)) {
-      // std::cout << "freeze: " << n->getName() << std::endl;
       freezeWorklist.insert(n);
     } else {
-      // std::cout << "simplify: " << n->getName() << std::endl;
       simplifyWorklist.insert(n);
     }
   }
@@ -326,7 +319,8 @@ void RegisterAllocator::DecrementDegree(OpPtr m) {
 #ifdef REG_ALLOC_DEBUG
   debug("DecrementDegree");
 #endif
-  int d = degree[m]--;
+  int d = degree[m];
+  degree[m] = d - 1;
   if (d == K) {
     auto adj = Adjacent(m);
     adj.insert(m);
@@ -474,25 +468,25 @@ void RegisterAllocator::SelectSpill() {
   // Note: avoid choosing nodes that are the tiny live ranges
   // resulting from the fetches of previously spilled registers
 
-  if (!isSelectSpill) {
-    coalescedRecord.insert(coalescedNodes.begin(), coalescedNodes.end());
-    isSelectSpill = true;
-  }
-
+  // if (!isSelectSpill) {
+  //   coalescedRecord.insert(coalescedNodes.begin(), coalescedNodes.end());
+  //   isSelectSpill = true;
+  // }
   OpPtr m = *std::max_element(
       spillWorklist.cbegin(), spillWorklist.cend(), [this](OpPtr a, OpPtr b) {
         if (a->lifespan && b->lifespan) {
           // still compare degree if lifespan is equal!
           if (a->lifespan != b->lifespan) return a->lifespan < b->lifespan;
         } else if (a->lifespan)
-          return true;
-        else if (b->lifespan)
           return false;
+        else if (b->lifespan)
+          return true;
         assert(m_depth_map.find(a) != m_depth_map.cend()
                && m_depth_map.find(b) != m_depth_map.cend());
         return degree[a] / pow(2, m_depth_map[a])
                < degree[b] / pow(2, m_depth_map[b]);
       });
+
   spillWorklist.erase(m);
   simplifyWorklist.insert(m);
   FreezeMoves(m);
@@ -518,10 +512,10 @@ void RegisterAllocator::AssignColorsR() {
     }
     for (auto& w : adjList[n]) {
       OpPtr a = GetAlias(w);
-      if (coloredNodes.find(a) != coloredNodes.end()) {
-        okColors.erase(color_r[GetAlias(w)]);
-      } else if (a->m_op_type == OperandType::REG) {
+      if (a->m_op_type == OperandType::REG) {
         okColors.erase(a->m_rreg);
+      } else if (coloredNodes.find(a) != coloredNodes.end()) {
+        okColors.erase(color_r[GetAlias(w)]);
       }
     }
     if (okColors.empty()) {
@@ -552,10 +546,10 @@ void RegisterAllocator::AssignColorsS() {
     }
     for (auto& w : adjList[n]) {
       OpPtr a = GetAlias(w);
-      if (coloredNodes.find(a) != coloredNodes.end()) {
-        okColors.erase(color_s[GetAlias(w)]);
-      } else if (a->m_op_type == OperandType::REG) {
+      if (a->m_op_type == OperandType::REG) {
         okColors.erase(a->m_sreg);
+      } else if (coloredNodes.find(a) != coloredNodes.end()) {
+        okColors.erase(color_s[GetAlias(w)]);
       }
     }
     if (okColors.empty()) {
@@ -666,10 +660,10 @@ void RegisterAllocator::RewriteProgram() {
   for (auto& n : coloredNodes) initial.insert(n);
   for (auto& n : coalescedNodes) initial.insert(n);
   for (auto& n : newTemps) initial.insert(n);
-  for (auto& n : coalescedRecord) initial.erase(n);
+  // for (auto& n : coalescedRecord) initial.erase(n);
   coloredNodes.clear();
   coalescedNodes.clear();
-  std::swap(coloredNodes, coalescedRecord);
+  // std::swap(coloredNodes, coalescedRecord);
 }
 
 bool RegisterAllocator::AllOK(OpPtr u, OpPtr v) {

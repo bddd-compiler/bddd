@@ -221,9 +221,12 @@ public:
   std::shared_ptr<ASM_BasicBlock> m_rblock;
   std::unique_ptr<PInst> m_push, m_pop;
   std::list<std::shared_ptr<ASM_Instruction>> m_params_set_list;
+  std::unordered_map<std::shared_ptr<ASM_Instruction>,
+                     std::list<std::shared_ptr<ASM_Instruction>>::iterator>
+      m_params_pos_map;
   int m_params;
-  unsigned int m_local_alloc;
-  std::stack<std::shared_ptr<Operand>> m_sp_alloc_size;
+  int m_local_alloc;
+  std::stack<int> m_sp_alloc_size;
 
   ASM_Function(std::shared_ptr<Function> ir_func)
       : m_ir_func(ir_func),
@@ -233,9 +236,9 @@ public:
         m_push(std::make_unique<PInst>(InstOp::PUSH)),
         m_pop(std::make_unique<PInst>(InstOp::POP)) {}
 
-  unsigned int getStackSize();
+  int getStackSize();
 
-  void allocateStack(unsigned int size);
+  void allocateStack(int size);
 
   void appendPush(std::shared_ptr<Operand> reg);
 

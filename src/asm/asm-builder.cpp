@@ -27,11 +27,10 @@ void ASM_Builder::setParams() {
   int i = 0;
   int n = m_cur_func->m_ir_func->m_args.size();
   m_cur_func->m_params = n;
-  std::shared_ptr<Value> value;
 
   // set params in r0 ~ r3
   while (i < 4 && i < n) {
-    value = m_cur_func->m_ir_func->m_args[i];
+    auto value = m_cur_func->m_ir_func->m_args[i];
     bool is_float = value->m_type.IsBasicFloat();
     auto ret = std::make_shared<Operand>(OperandType::VREG, is_float);
     auto mov = std::make_shared<MOVInst>(ret, Operand::getRReg((RReg)i));
@@ -41,40 +40,17 @@ void ASM_Builder::setParams() {
   }
 
   // set params in stack
-#ifndef SP_FOR_PARAM
-  // use r11 as the frame pointer register
   while (i < n) {
-    value = m_cur_func->m_ir_func->m_args[i];
+    auto value = m_cur_func->m_ir_func->m_args[i];
+    bool is_float = value->m_type.IsBasicFloat();
     int fp_offs = (i - 4) * 4;
-    m_addr_map.insert({value, {Operand::getRReg(RReg::R11), fp_offs}});
-
-    // std::shared_ptr<Operand> offs;
-    // int fp_offs = (i - 4) * 4;
-    // if (0 <= fp_offs && fp_offs < 4096) {
-    //   offs = std::make_shared<Operand>(fp_offs);
-    // } else {
-    //   auto mov = std::make_shared<MOVInst>(
-    //       std::make_shared<Operand>(OperandType::VREG), fp_offs);
-    //   offs = mov->m_dest;
-    //   m_cur_func->m_params_set_list.push_back(mov);
-    // }
-    // auto ldr = std::make_shared<LDRInst>(getOperand(value),
-    //                                      Operand::getRReg(RReg::R11), offs);
-    // m_cur_func->m_params_set_list.push_back(ldr);
-    i++;
-  }
-  if (n > 4) {
-    m_cur_func->m_push->m_regs.insert(Operand::getRReg(RReg::R11));
-    m_cur_func->m_pop->m_regs.insert(Operand::getRReg(RReg::R11));
-  }
-#else
-  while (i < n) {
-    value = m_cur_func->m_ir_func->m_args[i];
-    auto ret = std::make_shared<Operand>(OperandType::VREG);
+    auto ret = std::make_shared<Operand>(OperandType::VREG, is_float);
+    auto ldr = std::make_shared<LDRInst>(ret, Operand::getRReg(RReg::SP),
+                                         std::make_shared<Operand>(fp_offs));
+    m_cur_func->m_params_set_list.push_back(ldr);
     m_value_map.insert(std::make_pair(value, ret));
     i++;
   }
-#endif
 }
 
 #ifdef SP_FOR_PARAM
@@ -121,18 +97,26 @@ void ASM_Builder::allocSP(int size) {
   if (Operand::immCheck(size)) {
     offs = std::make_shared<Operand>(size);
   } else {
-    offs
-        = appendMOV(std::make_shared<Operand>(OperandType::VREG), size)->m_dest;
+    offs = std::make_shared<Operand>(OperandType::VREG);
+    appendMOV(offs, size);
   }
   auto sp = Operand::getRReg(RReg::SP);
   appendAS(InstOp::SUB, sp, sp, offs);
-  m_cur_func->m_sp_alloc_size.push(offs);
+  m_cur_func->m_sp_alloc_size.push(size);
 }
 
 void ASM_Builder::reclaimSP() {
-  auto sp = Operand::getRReg(RReg::SP);
-  appendAS(InstOp::ADD, sp, sp, m_cur_func->m_sp_alloc_size.top());
+  int size = m_cur_func->m_sp_alloc_size.top();
   m_cur_func->m_sp_alloc_size.pop();
+  std::shared_ptr<Operand> offs;
+  if (Operand::immCheck(size)) {
+    offs = std::make_shared<Operand>(size);
+  } else {
+    offs = std::make_shared<Operand>(OperandType::VREG);
+    appendMOV(offs, size);
+  }
+  auto sp = Operand::getRReg(RReg::SP);
+  appendAS(InstOp::ADD, sp, sp, offs);
 }
 
 std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value,
@@ -142,20 +126,6 @@ std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value,
   }
   if (auto val = std::dynamic_pointer_cast<Constant>(value)) {
     return GenerateConstant(val, genimm, checkimm);
-  }
-  if (m_addr_map.find(value) != m_addr_map.end()) {
-    auto& [op, offs] = m_addr_map[value];
-    auto is_float = value->m_type.IsBasicFloat();
-    auto ret = std::make_shared<Operand>(OperandType::VREG, is_float);
-    if (Operand::addrOffsCheck(offs, is_float)) {
-      appendLDR(ret, op, std::make_shared<Operand>(offs));
-    } else {
-      auto temp = std::make_shared<Operand>(OperandType::VREG);
-      appendMOV(temp, offs);
-      appendLDR(ret, op, temp);
-    }
-    m_value_map.insert({value, ret});
-    return ret;
   }
   return createOperand(value);
 }

@@ -100,7 +100,8 @@ int main(int argc, char **argv) {
   RegisterAllocator(asm_module, RegType::S).Allocate();
 
   std::cout << "optimizing..." << std::endl;
-  optimize(asm_module);
+  fixedParamsOffs(asm_module);
+  // optimize(asm_module);
   generateLiteralPool(asm_module);
   std::ofstream ofs5(filename.substr(0, filename.rfind('.')) + "_asm.s");
   asm_module->exportASM(ofs5);
