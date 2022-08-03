@@ -82,6 +82,7 @@ void ASM_Builder::fixedStackParams() {
 void ASM_Builder::appendBlock(std::shared_ptr<ASM_BasicBlock> block) {
   m_cur_func->m_blocks.push_back(block);
   setCurBlock(block);
+  m_memory_map.clear();
 }
 
 void ASM_Builder::setCurBlock(std::shared_ptr<ASM_BasicBlock> block) {

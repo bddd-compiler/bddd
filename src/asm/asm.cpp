@@ -165,12 +165,13 @@ std::string Operand::getName() {
       return getRegName();
     case OperandType::VREG:
       return getVRegName();
+    case OperandType::SPECIAL_REG:
+      return m_special_reg;
   }
   return "";  // unreachable, just write to avoid warning
 }
 
 std::string Operand::getRegName() {
-  if (m_is_special) return m_special_reg;
   // rreg
   if (!m_is_float) {
     switch (m_rreg) {
@@ -380,6 +381,24 @@ std::string ASM_Instruction::getCondName() {
   return "";
 }
 
+CondType ASM_Instruction::getOppositeCond() {
+  switch (m_cond) {
+    case CondType::EQ:
+      return CondType::NE;
+    case CondType::NE:
+      return CondType::EQ;
+    case CondType::LT:
+      return CondType::GE;
+    case CondType::LE:
+      return CondType::GT;
+    case CondType::GT:
+      return CondType::LE;
+    case CondType::GE:
+      return CondType::LT;
+  }
+  return CondType::NONE;
+}
+
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
   if (dest->m_is_float)
     m_op = InstOp::VLDR;
@@ -456,6 +475,8 @@ MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
   m_dest = dest;
   m_src = src;
 
+  if (m_type == MOVType::REG) m_is_mov = true;
+
   addDef(dest);
   addUse(src);
 }
@@ -473,7 +494,6 @@ MRSInst::MRSInst(std::string reg, std::shared_ptr<Operand> src) {
   m_cond = CondType::NONE;
   m_src = src;
 
-  addDef(m_dest);
   addUse(m_src);
 }
 
@@ -491,7 +511,6 @@ MRSInst::MRSInst(std::shared_ptr<Operand> dest, std::string reg) {
   m_dest = dest;
 
   addDef(m_dest);
-  addUse(m_src);
 }
 
 PInst::PInst(InstOp op) {

@@ -121,7 +121,7 @@ enum class InstOp {
   VSTR,
 };
 
-enum class OperandType { REG, VREG, IMM };
+enum class OperandType { SPECIAL_REG, REG, VREG, IMM };
 
 enum class CondType { NONE, NE, LT, LE, GT, GE, EQ };
 
@@ -147,33 +147,26 @@ public:
   RReg m_rreg;
   SReg m_sreg;
   RegType m_reg_type;
+  std::string m_special_reg;
+
   bool m_is_float;
   int m_int_val;
   float m_float_val;
-  bool m_is_special;
-  std::string m_special_reg;
 
-  //
+  // taken from tinbaccc
   int lifespan = 0;
   bool rejected = false;
 
-  Operand(OperandType t, bool f = false)
-      : m_op_type(t), m_is_float(f), m_is_special(false) {}
+  Operand(OperandType t, bool f = false) : m_op_type(t), m_is_float(f) {}
 
   Operand(int val)
-      : m_op_type(OperandType::IMM),
-        m_int_val(val),
-        m_is_float(false),
-        m_is_special(false) {}
+      : m_op_type(OperandType::IMM), m_int_val(val), m_is_float(false) {}
 
   Operand(float val)
-      : m_op_type(OperandType::IMM),
-        m_float_val(val),
-        m_is_float(true),
-        m_is_special(false) {}
+      : m_op_type(OperandType::IMM), m_float_val(val), m_is_float(true) {}
 
   Operand(std::string reg)
-      : m_op_type(OperandType::REG), m_is_special(true), m_special_reg(reg) {}
+      : m_op_type(OperandType::SPECIAL_REG), m_special_reg(reg) {}
 
   std::string getName();
 
@@ -316,6 +309,7 @@ public:
   CondType m_cond;
 
   int m_params_offset;
+  bool m_is_mov;  // for register allocation
 
   std::shared_ptr<ASM_BasicBlock> m_block;
   std::unordered_set<std::shared_ptr<Operand>> m_def;
@@ -323,13 +317,15 @@ public:
   std::unordered_set<std::shared_ptr<Operand>> m_f_def;
   std::unordered_set<std::shared_ptr<Operand>> m_f_use;
 
-  ASM_Instruction() : m_params_offset(0) {}
+  ASM_Instruction() : m_params_offset(0), m_is_mov(false) {}
 
   std::string getOpName();
 
   std::string getOpSuffixName();
 
   std::string getCondName();
+
+  CondType getOppositeCond();
 
   void exportInstHead(std::ofstream& ofs);
 

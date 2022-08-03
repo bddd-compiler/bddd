@@ -20,6 +20,8 @@ public:
   std::unordered_map<std::shared_ptr<BasicBlock>,
                      std::shared_ptr<ASM_BasicBlock>>
       m_block_map;
+  std::unordered_map<std::shared_ptr<Value>, std::shared_ptr<Operand>>
+      m_memory_map;
 
   ASM_Builder(std::shared_ptr<ASM_Module> m);
 
@@ -75,9 +77,11 @@ public:
                                      std::shared_ptr<Operand> src);
 
   // appendMRS
-  std::shared_ptr<MRSInst> appendMRS(std::string reg, std::shared_ptr<Operand> src);
+  std::shared_ptr<MRSInst> appendMRS(std::string reg,
+                                     std::shared_ptr<Operand> src);
 
-  std::shared_ptr<MRSInst> appendMRS(std::shared_ptr<Operand> dest, std::string reg);
+  std::shared_ptr<MRSInst> appendMRS(std::shared_ptr<Operand> dest,
+                                     std::string reg);
 
   // appendB
   std::shared_ptr<BInst> appendB(std::shared_ptr<ASM_BasicBlock> block,
@@ -93,9 +97,10 @@ public:
                                          std::shared_ptr<Operand> sval);
 
   // appendAS
-  std::shared_ptr<ASInst> appendAS(InstOp op, std::shared_ptr<Operand> dest,
-                                   std::shared_ptr<Operand> operand1,
-                                   std::shared_ptr<Operand> operand2);
+  std::shared_ptr<ASInst> appendAS(InstOp op,
+                                            std::shared_ptr<Operand> dest,
+                                            std::shared_ptr<Operand> operand1,
+                                            std::shared_ptr<Operand> operand2);
 
   // appendMUL
   std::shared_ptr<MULInst> appendMUL(InstOp op, std::shared_ptr<Operand> dest,

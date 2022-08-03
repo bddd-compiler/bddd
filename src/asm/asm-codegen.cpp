@@ -21,56 +21,76 @@ std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
 
 std::shared_ptr<Operand> GenerateAdd(std::shared_ptr<BinaryInstruction> inst,
                                      std::shared_ptr<ASM_Builder> builder) {
-  std::shared_ptr<Operand> operand1, operand2;
   std::shared_ptr<Value> val1 = inst->m_lhs_val_use->getValue();
   std::shared_ptr<Value> val2 = inst->m_rhs_val_use->getValue();
   bool is_int = inst->m_op == IROp::ADD;
   InstOp op = is_int ? InstOp::ADD : InstOp::VADD;
-  if (std::dynamic_pointer_cast<Constant>(val1)) {
+  auto ret = builder->getOperand(inst);
+
+  if (val1->m_type.IsConst()) {
     std::swap(val1, val2);
   }
-  operand1 = builder->getOperand(val1);
-  operand2 = builder->getOperand(val2, is_int);
+  auto operand1 = builder->getOperand(val1);
+  auto operand2 = builder->getOperand(val2, is_int);
 
-  auto ret = builder->getOperand(inst);
   if (!is_int) ret->m_is_float = true;
+
   builder->appendAS(op, ret, operand1, operand2);
   return ret;
 }
 
 std::shared_ptr<Operand> GenerateSub(std::shared_ptr<BinaryInstruction> inst,
                                      std::shared_ptr<ASM_Builder> builder) {
-  std::shared_ptr<Operand> operand1, operand2;
   std::shared_ptr<Value> val1 = inst->m_lhs_val_use->getValue();
   std::shared_ptr<Value> val2 = inst->m_rhs_val_use->getValue();
-  bool is_const1 = (std::dynamic_pointer_cast<Constant>(val1) != nullptr);
-  bool is_const2 = (std::dynamic_pointer_cast<Constant>(val2) != nullptr);
-
-  // not finished yet
   bool is_int = inst->m_op == IROp::SUB;
   InstOp op = is_int ? InstOp::SUB : InstOp::VSUB;
-  if (op == InstOp::SUB && is_const1) {
+  auto ret = builder->getOperand(inst);
+
+  if (op == InstOp::SUB && val1->m_type.IsConst()) {
     op = InstOp::RSB;
     std::swap(val1, val2);
   }
+  auto operand1 = builder->getOperand(val1);
+  auto operand2 = builder->getOperand(val2, is_int);
 
-  operand1 = builder->getOperand(val1);
-  operand2 = builder->getOperand(val2, is_int);
-
-  auto ret = builder->getOperand(inst);
   if (!is_int) ret->m_is_float = true;
+
   builder->appendAS(op, ret, operand1, operand2);
   return ret;
 }
 
 std::shared_ptr<Operand> GenerateMul(std::shared_ptr<BinaryInstruction> inst,
                                      std::shared_ptr<ASM_Builder> builder) {
-  auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
-  auto operand2 = builder->getOperand(inst->m_rhs_val_use->getValue());
-
+  std::shared_ptr<Value> val1 = inst->m_lhs_val_use->getValue();
+  std::shared_ptr<Value> val2 = inst->m_rhs_val_use->getValue();
+  bool is_const1 = val1->m_type.IsConst();
   bool is_int = inst->m_op == IROp::MUL;
   InstOp op = is_int ? InstOp::MUL : InstOp::VMUL;
   auto ret = builder->getOperand(inst);
+
+  // if (val1->m_type.IsConst()) {
+  //   std::swap(val1, val2);
+  // }
+  // if (val2->m_type.IsConst()) {
+  //   auto const_val = std::dynamic_pointer_cast<Constant>(val2);
+  //   if (const_val->m_int_val == 1 || const_val->m_float_val == 1) {
+  //     builder->appendMOV(ret, builder->getOperand(val1));
+  //   } else if (val2->m_type.IsBasicInt()) {
+  //     int temp = 2;
+  //     for (int i = 1; i < 32; i++) {
+  //       if (temp == const_val->m_int_val) {
+  //         builder->appendShift(InstOp::LSL, ret, builder->getOperand(val1),
+  //                              std::make_shared<Operand>(i));
+  //       }
+  //     }
+  //   }
+  //   return ret;
+  // }
+
+  auto operand1 = builder->getOperand(val1);
+  auto operand2 = builder->getOperand(val2);
+
   if (!is_int) ret->m_is_float = true;
   builder->appendMUL(op, ret, operand1, operand2);
   return ret;
@@ -78,12 +98,31 @@ std::shared_ptr<Operand> GenerateMul(std::shared_ptr<BinaryInstruction> inst,
 
 std::shared_ptr<Operand> GenerateDiv(std::shared_ptr<BinaryInstruction> inst,
                                      std::shared_ptr<ASM_Builder> builder) {
-  auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
-  auto operand2 = builder->getOperand(inst->m_rhs_val_use->getValue());
-
+  std::shared_ptr<Value> val1 = inst->m_lhs_val_use->getValue();
+  std::shared_ptr<Value> val2 = inst->m_rhs_val_use->getValue();
   bool is_int = inst->m_op == IROp::SDIV;
   InstOp op = is_int ? InstOp::SDIV : InstOp::VDIV;
   auto ret = builder->getOperand(inst);
+
+  // if (val2->m_type.IsConst()) {
+  //   auto const_val = std::dynamic_pointer_cast<Constant>(val2);
+  //   if (const_val->m_int_val == 1 || const_val->m_float_val == 1) {
+  //     builder->appendMOV(ret, builder->getOperand(val1));
+  //   } else if (val2->m_type.IsBasicInt()) {
+  //     int temp = 2;
+  //     for (int i = 1; i < 32; i++) {
+  //       if (temp == const_val->m_int_val) {
+  //         builder->appendShift(InstOp::ASR, ret, builder->getOperand(val1),
+  //                              std::make_shared<Operand>(i));
+  //       }
+  //     }
+  //   }
+  //   return ret;
+  // }
+
+  auto operand1 = builder->getOperand(val1);
+  auto operand2 = builder->getOperand(val2);
+
   if (!is_int) ret->m_is_float = true;
   builder->appendMUL(op, ret, operand1, operand2);
   return ret;
@@ -318,20 +357,6 @@ std::shared_ptr<Operand> GenerateGetElementPtr(
   int attribute = 1;
   bool first = true;
 
-  // maybe redundant??
-  // ↑↑↑ seems to be ture
-  // if (indices.size() == 1) {
-  //   if (auto val
-  //       = std::dynamic_pointer_cast<Constant>(indices[0]->getValue())) {
-  //     assert(val->m_type.IsBasicInt());
-  //     const_offs = val->m_int_val * 4;
-  //   } else {
-  //     var_offs_op = builder->getOperand(indices[0]->getValue());
-  //   }
-  // }
-
-  // there is a special case when passing a param, the first index is ommited
-  // so i = dimensions.size() and check
   for (int i = dimensions.size(); i >= 0; i--) {
     if (i >= indices.size()) {
       attribute *= dimensions[i - 1];
@@ -356,8 +381,7 @@ std::shared_ptr<Operand> GenerateGetElementPtr(
                            var_offs_op);
       }
     }
-    if (i > 0)
-    attribute *= dimensions[i - 1];
+    if (i > 0) attribute *= dimensions[i - 1];
   }
 
   // const part offset obtained in ir phase
@@ -397,10 +421,21 @@ std::shared_ptr<Operand> GenerateGetElementPtr(
 
 std::shared_ptr<Operand> GenerateLoad(std::shared_ptr<LoadInstruction> inst,
                                       std::shared_ptr<ASM_Builder> builder) {
-  auto src_value = inst->m_addr->getValue();
-  auto ret = builder->getOperand(inst);
-  builder->appendLDR(ret, getAddr(src_value, builder),
-                     std::make_shared<Operand>(0));
+  auto addr = inst->m_addr->getValue();
+  std::shared_ptr<Operand> ret;
+
+  // check if addr is in the memory map
+  // but we have to check value map in case the ret is already used
+  // in a phi instruction before the cur block
+  if (builder->m_memory_map.find(addr) != builder->m_memory_map.end()
+      && builder->m_value_map.find(inst) == builder->m_value_map.end()) {
+    ret = builder->m_memory_map[addr];
+    builder->m_value_map.insert({inst, ret});
+    return ret;
+  }
+
+  ret = builder->getOperand(inst);
+  builder->appendLDR(ret, getAddr(addr, builder), std::make_shared<Operand>(0));
   return ret;
 }
 
@@ -410,6 +445,13 @@ std::shared_ptr<Operand> GenerateStore(std::shared_ptr<StoreInstruction> inst,
   auto val = inst->m_val->getValue();
   auto src = builder->getOperand(val);
   builder->appendSTR(src, getAddr(addr, builder), std::make_shared<Operand>(0));
+
+  // record the last constant
+  if (val->m_type.IsConst())
+    builder->m_memory_map[addr] = src;
+  else
+    builder->m_memory_map.erase(addr);
+
   return nullptr;
 }
 

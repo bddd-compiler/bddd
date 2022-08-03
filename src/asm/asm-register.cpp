@@ -12,10 +12,10 @@ RegisterAllocator::RegisterAllocator(std::shared_ptr<ASM_Module> module,
 
 void RegisterAllocator::Allocate() {
   assert(m_module);
+  initialColors();
   for (auto& func : m_module->m_funcs) {
     setCurFunction(func);
     init();
-    initialColors();
     getInitial();
     AllocateCurFunc();
     if (m_reg_type == RegType::R) {
@@ -236,7 +236,7 @@ void RegisterAllocator::Build() {
         if (use->m_op_type == OperandType::IMM) {
           continue;
         }
-        use->lifespan = 0;
+        use->lifespan = b->m_insts.size() - cnt;
         auto ret = live.insert(use);
         if (ret.second) {
           lifespan_map[use] = cnt;
@@ -474,13 +474,14 @@ void RegisterAllocator::SelectSpill() {
   // }
   OpPtr m = *std::max_element(
       spillWorklist.cbegin(), spillWorklist.cend(), [this](OpPtr a, OpPtr b) {
+        //return a->lifespan < b->lifespan;
         if (a->lifespan && b->lifespan) {
           // still compare degree if lifespan is equal!
           if (a->lifespan != b->lifespan) return a->lifespan < b->lifespan;
         } else if (a->lifespan)
-          return false;
-        else if (b->lifespan)
           return true;
+        else if (b->lifespan)
+          return false;
         assert(m_depth_map.find(a) != m_depth_map.cend()
                && m_depth_map.find(b) != m_depth_map.cend());
         return degree[a] / pow(2, m_depth_map[a])
@@ -571,6 +572,14 @@ void RegisterAllocator::RewriteProgram() {
 #ifdef REG_ALLOC_DEBUG
   debug("RewriteProgram");
 #endif
+  // std::cout << "rewrite program" << std::endl;
+  // for (auto& n : spilledNodes) std::cout << n->getName() << ", ";
+  // std::cout << std::endl;
+  // std::ofstream ofs("temp.s");
+  // m_module->exportASM(ofs);
+  // ofs.close();
+  // std::cin.get();
+
   // Allocate memory locations for each v ∈ spilledNodes,
   // Create a new temporary vi for each definition and each use,
   // In the program (instructions), insert a store after each
@@ -579,7 +588,7 @@ void RegisterAllocator::RewriteProgram() {
 
   std::unordered_set<OpPtr> newTemps;
   for (auto& v : spilledNodes) {
-    if (v->lifespan == 1 && !v->rejected) {
+    if (v->lifespan <= 1 && !v->rejected) {
       v->rejected = true;
       newTemps.insert(v);
       continue;
@@ -590,6 +599,7 @@ void RegisterAllocator::RewriteProgram() {
     for (auto& b : m_cur_func->m_blocks) {
       for (auto iter = b->m_insts.begin(); iter != b->m_insts.end(); iter++) {
         auto& i = *iter;
+        int fixed_offs = sp_offs + i->m_params_offset;
         std::unordered_set<OpPtr> defs, uses;
         if (m_reg_type == RegType::R) {
           defs = i->m_def;
@@ -599,18 +609,27 @@ void RegisterAllocator::RewriteProgram() {
           uses = i->m_f_use;
         }
         if (defs.find(v) != defs.end()) {
-          // replace def
-          OpPtr newOp
-              = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
-          i->replaceDef(newOp, v);
+          OpPtr newOp;
+
+          if (i->m_is_mov) {
+            newOp = std::dynamic_pointer_cast<MOVInst>(i)->m_src;
+            iter = std::prev(b->m_insts.erase(iter));
+          } else {
+            // replace def
+            newOp = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
+            i->replaceDef(newOp, v);
+            newTemps.insert(newOp);
+            updateDepth(b, newOp);
+          }
+
           // insert a store instruction after defination of newOp
           OpPtr offs;
           std::shared_ptr<MOVInst> mov = nullptr;
-          if (Operand::addrOffsCheck(sp_offs, newOp->m_is_float)) {
-            offs = std::make_shared<Operand>(sp_offs);
+          if (Operand::addrOffsCheck(fixed_offs, newOp->m_is_float)) {
+            offs = std::make_shared<Operand>(fixed_offs);
           } else {
             offs = std::make_shared<Operand>(OperandType::VREG);
-            mov = std::make_shared<MOVInst>(offs, sp_offs);
+            mov = std::make_shared<MOVInst>(offs, fixed_offs);
             newTemps.insert(offs);
             updateDepth(b, offs);
           }
@@ -621,23 +640,29 @@ void RegisterAllocator::RewriteProgram() {
           } else {
             b->insertSpillSTR(iter, str);
           };
-          newTemps.insert(newOp);
-          updateDepth(b, newOp);
         }
         if (uses.find(v) != uses.end()) {
-          // replace use
-          OpPtr newOp
-              = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
-          i->replaceUse(newOp, v);
+          OpPtr newOp;
+
+          if (i->m_is_mov) {
+            newOp = std::dynamic_pointer_cast<MOVInst>(i)->m_dest;
+            iter = b->m_insts.erase(iter);
+          } else {
+            // replace use
+            newOp = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
+            i->replaceUse(newOp, v);
+            newTemps.insert(newOp);
+            updateDepth(b, newOp);
+          }
+          
           // insert a load instruction before use of newOp
           OpPtr offs;
           std::shared_ptr<MOVInst> mov = nullptr;
-          int sum_offs = sp_offs + i->m_params_offset;
-          if (Operand::addrOffsCheck(sum_offs, newOp->m_is_float)) {
-            offs = std::make_shared<Operand>(sum_offs);
+          if (Operand::addrOffsCheck(fixed_offs, newOp->m_is_float)) {
+            offs = std::make_shared<Operand>(fixed_offs);
           } else {
             offs = std::make_shared<Operand>(OperandType::VREG);
-            mov = std::make_shared<MOVInst>(offs, sum_offs);
+            mov = std::make_shared<MOVInst>(offs, fixed_offs);
             newTemps.insert(offs);
             updateDepth(b, offs);
           }
@@ -648,8 +673,6 @@ void RegisterAllocator::RewriteProgram() {
           } else {
             b->insertSpillLDR(iter, ldr);
           }
-          newTemps.insert(newOp);
-          updateDepth(b, newOp);
         }
       }
     }
