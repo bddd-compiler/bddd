@@ -69,24 +69,26 @@ std::shared_ptr<Operand> GenerateMul(std::shared_ptr<BinaryInstruction> inst,
   InstOp op = is_int ? InstOp::MUL : InstOp::VMUL;
   auto ret = builder->getOperand(inst);
 
-  // if (val1->m_type.IsConst()) {
-  //   std::swap(val1, val2);
-  // }
-  // if (val2->m_type.IsConst()) {
-  //   auto const_val = std::dynamic_pointer_cast<Constant>(val2);
-  //   if (const_val->m_int_val == 1 || const_val->m_float_val == 1) {
-  //     builder->appendMOV(ret, builder->getOperand(val1));
-  //   } else if (val2->m_type.IsBasicInt()) {
-  //     int temp = 2;
-  //     for (int i = 1; i < 32; i++) {
-  //       if (temp == const_val->m_int_val) {
-  //         builder->appendShift(InstOp::LSL, ret, builder->getOperand(val1),
-  //                              std::make_shared<Operand>(i));
-  //       }
-  //     }
-  //   }
-  //   return ret;
-  // }
+  if (val1->m_type.IsConst()) {
+    std::swap(val1, val2);
+  }
+  if (val2->m_type.IsConst()) {
+    auto const_val = std::dynamic_pointer_cast<Constant>(val2);
+    if (const_val->m_int_val == 1 || const_val->m_float_val == 1) {
+      builder->appendMOV(ret, builder->getOperand(val1));
+      return ret;
+    } else if (val2->m_type.IsBasicInt()) {
+      int temp = 2;
+      for (int i = 1; i < 32; i++) {
+        if (temp == const_val->m_int_val) {
+          builder->appendShift(InstOp::LSL, ret, builder->getOperand(val1),
+                               std::make_shared<Operand>(i));
+          temp <<= 1;
+          return ret;
+        }
+      }
+    }
+  }
 
   auto operand1 = builder->getOperand(val1);
   auto operand2 = builder->getOperand(val2);
@@ -104,21 +106,22 @@ std::shared_ptr<Operand> GenerateDiv(std::shared_ptr<BinaryInstruction> inst,
   InstOp op = is_int ? InstOp::SDIV : InstOp::VDIV;
   auto ret = builder->getOperand(inst);
 
-  // if (val2->m_type.IsConst()) {
-  //   auto const_val = std::dynamic_pointer_cast<Constant>(val2);
-  //   if (const_val->m_int_val == 1 || const_val->m_float_val == 1) {
-  //     builder->appendMOV(ret, builder->getOperand(val1));
-  //   } else if (val2->m_type.IsBasicInt()) {
-  //     int temp = 2;
-  //     for (int i = 1; i < 32; i++) {
-  //       if (temp == const_val->m_int_val) {
-  //         builder->appendShift(InstOp::ASR, ret, builder->getOperand(val1),
-  //                              std::make_shared<Operand>(i));
-  //       }
-  //     }
-  //   }
-  //   return ret;
-  // }
+  if (val2->m_type.IsConst()) {
+    auto const_val = std::dynamic_pointer_cast<Constant>(val2);
+    if (const_val->m_int_val == 1 || const_val->m_float_val == 1) {
+      builder->appendMOV(ret, builder->getOperand(val1));
+    } else if (val2->m_type.IsBasicInt()) {
+      int temp = 2;
+      for (int i = 1; i < 32; i++) {
+        if (temp == const_val->m_int_val) {
+          builder->appendShift(InstOp::ASR, ret, builder->getOperand(val1),
+                               std::make_shared<Operand>(i));
+          temp <<= 1;
+          return ret;
+        }
+      }
+    }
+  }
 
   auto operand1 = builder->getOperand(val1);
   auto operand2 = builder->getOperand(val2);
@@ -479,17 +482,15 @@ std::shared_ptr<Operand> GenerateAlloca(std::shared_ptr<AllocaInstruction> inst,
 std::shared_ptr<Operand> GeneratePhi(std::shared_ptr<PhiInstruction> inst,
                                      std::shared_ptr<ASM_Builder> builder) {
   // we need to store the temp result to make sure all PHI instruction execute
-  // in parallel
-  auto tmp = std::make_shared<Operand>(OperandType::VREG);
-  tmp->m_is_float = inst->m_type.IsBasicFloat();
+  // in parallel  (XXX)
+  // actually we don't have to store the temp result because of SSA form
   auto ret = builder->getOperand(inst);
-  builder->appendMOV(ret, tmp);
   for (auto &[ir_block, value] : inst->m_contents) {
     std::shared_ptr<ASM_BasicBlock> block = builder->getBlock(ir_block);
     assert(block);
     if (!value) continue;
     auto src = builder->getOperand(value->getValue(), true, false);
-    block->appendFilledMOV(std::make_shared<MOVInst>(tmp, src));
+    block->appendFilledMOV(std::make_shared<MOVInst>(ret, src));
   }
   return ret;
 }
