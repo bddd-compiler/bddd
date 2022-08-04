@@ -96,9 +96,9 @@ int main(int argc, char **argv) {
   ofs4.close();
   
   std::cout << "allocating..." << std::endl;
+
   RegisterAllocator(asm_module, RegType::R).Allocate();
   RegisterAllocator(asm_module, RegType::S).Allocate();
-
   std::cout << "optimizing..." << std::endl;
   fixedParamsOffs(asm_module);
   optimize(asm_module);

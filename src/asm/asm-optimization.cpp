@@ -34,23 +34,22 @@ void reduceAdjacentJump(std::shared_ptr<ASM_Module> module) {
       if (block->m_branch_pos == block->m_insts.end()) {
         continue;
       }
-      if (std::dynamic_pointer_cast<BInst>(*(block->m_branch_pos))) {
-        auto inst = std::dynamic_pointer_cast<BInst>(*(block->m_branch_pos));
-        if (inst->m_target == *std::next(b_iter)) {
-          block->m_insts.erase(block->m_branch_pos);
+
+      auto iter = block->m_branch_pos;
+      auto inst = std::dynamic_pointer_cast<BInst>(*iter);
+      if (inst->m_target == *std::next(b_iter)) {
+        CondType cond = inst->getOppositeCond();
+        iter = block->m_insts.erase(iter);
+        if (iter != block->m_insts.end()) {
+          (*iter)->m_cond = cond;
         }
-      }   
-      else {
-        auto iter1 = std::next(block->m_branch_pos);
-        auto iter2 = std::next(std::next(block->m_branch_pos));
-        auto inst1 = std::dynamic_pointer_cast<BInst>(*iter1);
-        auto inst2 = std::dynamic_pointer_cast<BInst>(*iter2);
-        if (inst2->m_target == *std::next(b_iter)) {
-          block->m_insts.erase(iter2);
-        }
-        else if (inst1->m_target == *std::next(b_iter)) {
-          inst2->m_cond = inst1->getOppositeCond();
-          block->m_insts.erase(iter1);
+      } else {
+        iter = std::next(iter);
+        if (iter != block->m_insts.end()) {
+          inst = std::dynamic_pointer_cast<BInst>(*iter);
+          if (inst->m_target == *std::next(b_iter)) {
+            iter = block->m_insts.erase(iter);
+          }
         }
       }
     }

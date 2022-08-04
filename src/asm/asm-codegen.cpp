@@ -83,9 +83,9 @@ std::shared_ptr<Operand> GenerateMul(std::shared_ptr<BinaryInstruction> inst,
         if (temp == const_val->m_int_val) {
           builder->appendShift(InstOp::LSL, ret, builder->getOperand(val1),
                                std::make_shared<Operand>(i));
-          temp <<= 1;
           return ret;
         }
+        temp <<= 1;
       }
     }
   }
@@ -140,11 +140,44 @@ std::shared_ptr<Operand> GenerateDiv(std::shared_ptr<BinaryInstruction> inst,
 
 std::shared_ptr<Operand> GenerateMod(std::shared_ptr<BinaryInstruction> inst,
                                      std::shared_ptr<ASM_Builder> builder) {
-  auto devidend = builder->getOperand(inst->m_lhs_val_use->getValue());
-  auto devisor = builder->getOperand(inst->m_rhs_val_use->getValue());
+  std::shared_ptr<Value> val1 = inst->m_lhs_val_use->getValue();
+  std::shared_ptr<Value> val2 = inst->m_rhs_val_use->getValue();
+  auto ret = builder->getOperand(inst);
+  auto devidend = builder->getOperand(val1);
+
+  if (val2->m_type.IsConst()) {
+    assert(val2->m_type.IsBasicInt());
+    auto const_val = std::dynamic_pointer_cast<Constant>(val2);
+    if (const_val->m_int_val == 1) {
+      builder->appendMOV(ret, 0);
+      return ret;
+    }
+    int temp = 2;
+    for (int i = 1; i < 32; i++) {
+      if (temp == const_val->m_int_val) {
+        int and_val = temp - 1;
+        if (Operand::immCheck(and_val)) {
+          builder->appendBIT(InstOp::AND, ret, devidend,
+                             std::make_shared<Operand>(and_val));
+        } else {
+          auto mov_temp = std::make_shared<Operand>(OperandType::VREG);
+          builder->appendMOV(mov_temp, and_val);
+          builder->appendBIT(InstOp::AND, ret, devidend, mov_temp);
+        }
+        // check if val1 is negative
+        builder->appendCT(InstOp::CMP, devidend, std::make_shared<Operand>(0));
+        auto sub = builder->appendAS(InstOp::SUB, ret, ret,
+                                     std::make_shared<Operand>(temp));
+        sub->m_cond = CondType::LT;
+        return ret;
+      }
+      temp <<= 1;
+    }
+  }
+
+  auto devisor = builder->getOperand(val2);
 
   auto div_ret = std::make_shared<Operand>(OperandType::VREG);
-  auto ret = builder->getOperand(inst);
   builder->appendSDIV(div_ret, devidend, devisor);
   builder->appendMUL(InstOp::MLS, ret, div_ret, devisor, devidend);
   return ret;
@@ -312,8 +345,9 @@ std::shared_ptr<Operand> GenerateBranch(std::shared_ptr<BranchInstruction> inst,
       = std::dynamic_pointer_cast<BinaryInstruction>(inst->m_cond->getValue());
   CondType cond = GetCondFromIR(inst_cond->m_op);
   assert(cond != CondType::NONE);
-  builder->m_cur_block->m_branch_pos = --builder->m_cur_block->m_insts.end();
   builder->appendB(true_block, cond);
+  builder->m_cur_block->m_branch_pos
+      = std::prev(builder->m_cur_block->m_insts.end());
   builder->appendB(false_block, CondType::NONE);
   return nullptr;
 }
@@ -323,7 +357,8 @@ std::shared_ptr<Operand> GenerateJump(std::shared_ptr<JumpInstruction> inst,
   std::shared_ptr<ASM_BasicBlock> target_block
       = builder->getBlock(inst->m_target_block);
   builder->appendB(target_block, CondType::NONE);
-  builder->m_cur_block->m_branch_pos = --builder->m_cur_block->m_insts.end();
+  builder->m_cur_block->m_branch_pos
+      = std::prev(builder->m_cur_block->m_insts.end());
   return nullptr;
 }
 
@@ -490,6 +525,20 @@ std::shared_ptr<Operand> GeneratePhi(std::shared_ptr<PhiInstruction> inst,
                                      std::shared_ptr<ASM_Builder> builder) {
   // we need to store the temp result to make sure all PHI instruction execute
   // in parallel  (XXX)
+#if 0
+  auto tmp = std::make_shared<Operand>(OperandType::VREG);
+  tmp->m_is_float = inst->m_type.IsBasicFloat();
+  auto ret = builder->getOperand(inst);
+  builder->appendMOV(ret, tmp);
+  for (auto &[ir_block, value] : inst->m_contents) {
+    std::shared_ptr<ASM_BasicBlock> block = builder->getBlock(ir_block);
+    assert(block);
+    if (!value) continue;
+    auto src = builder->getOperand(value->getValue(), true, false);
+    block->appendFilledMOV(std::make_shared<MOVInst>(tmp, src));
+  }
+  return ret;
+#else
   // actually we don't have to store the temp result because of SSA form
   auto ret = builder->getOperand(inst);
   for (auto &[ir_block, value] : inst->m_contents) {
@@ -500,6 +549,7 @@ std::shared_ptr<Operand> GeneratePhi(std::shared_ptr<PhiInstruction> inst,
     block->appendFilledMOV(std::make_shared<MOVInst>(ret, src));
   }
   return ret;
+#endif
 }
 
 std::shared_ptr<Operand> GenerateBitCast(
