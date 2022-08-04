@@ -43,8 +43,6 @@ void ASM_Function::appendPop(std::shared_ptr<Operand> reg) {
   if (m_pop->m_regs.find(reg) == m_pop->m_regs.end()) m_pop->m_regs.insert(reg);
 }
 
-int ASM_BasicBlock::block_cnt = 0;
-
 void ASM_BasicBlock::insert(std::shared_ptr<ASM_Instruction> inst) {
   m_insts.push_back(inst);
   inst->m_block = shared_from_this();

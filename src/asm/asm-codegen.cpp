@@ -110,15 +110,22 @@ std::shared_ptr<Operand> GenerateDiv(std::shared_ptr<BinaryInstruction> inst,
     auto const_val = std::dynamic_pointer_cast<Constant>(val2);
     if (const_val->m_int_val == 1 || const_val->m_float_val == 1) {
       builder->appendMOV(ret, builder->getOperand(val1));
-    } else if (val2->m_type.IsBasicInt()) {
+      return ret;
+    } else if (is_int) {
       int temp = 2;
       for (int i = 1; i < 32; i++) {
         if (temp == const_val->m_int_val) {
-          builder->appendShift(InstOp::ASR, ret, builder->getOperand(val1),
+          auto ret_temp = std::make_shared<Operand>(OperandType::VREG);
+          builder->appendShift(InstOp::ASR, ret_temp, builder->getOperand(val1),
+                               std::make_shared<Operand>(i - 1));
+          auto add = builder->appendAS(InstOp::ADD, ret_temp,
+                                       builder->getOperand(val1), ret_temp);
+          add->m_shift = std::make_unique<Shift>(Shift::ShiftType::LSR, 32 - i);
+          builder->appendShift(InstOp::ASR, ret, ret_temp,
                                std::make_shared<Operand>(i));
-          temp <<= 1;
           return ret;
         }
+        temp <<= 1;
       }
     }
   }
@@ -606,6 +613,8 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
 #endif
 
   builder->m_cur_func->m_blocks.push_back(builder->m_cur_func->m_rblock);
+  builder->m_cur_func->m_rblock->m_label
+      = "." + builder->m_cur_func->m_name + "_L0";
   // insert MOV instruction(from PHI)
   for (auto &b : func->m_blocks) {
     b->fillMOV();
