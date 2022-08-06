@@ -178,6 +178,7 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
 void ASM_BasicBlock::exportASM(std::ofstream& ofs) {
   ofs << m_label << ":" << std::endl;
   for (auto& i : m_insts) {
+    if (i->m_is_deleted) continue;
     i->exportASM(ofs);
   }
 }

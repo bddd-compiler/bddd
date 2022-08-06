@@ -23,6 +23,7 @@ void RegisterAllocator::LivenessAnalysis() {
     b->m_def.clear();
     b->m_use.clear();
     for (auto& i : b->m_insts) {
+      if (i->m_is_deleted) continue;
       std::unordered_set<OpPtr> defs, uses;
       if (m_reg_type == RegType::R) {
         defs = i->m_def;
@@ -31,13 +32,13 @@ void RegisterAllocator::LivenessAnalysis() {
         defs = i->m_f_def;
         uses = i->m_f_use;
       }
-      for (auto& def : defs) {
-        b->m_def.insert(def);
-      }
       for (auto& use : uses) {
         if (b->m_def.find(use) == b->m_def.end()) {
           b->m_use.insert(use);
         }
+      }
+      for (auto& def : defs) {
+        b->m_def.insert(def);
       }
     }
     b->m_livein.clear();

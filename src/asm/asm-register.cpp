@@ -92,6 +92,7 @@ void RegisterAllocator::getInitial() {
   bool flag = m_reg_type == RegType::R;
   for (auto& b : m_cur_func->m_blocks) {
     for (auto& i : b->m_insts) {
+      if (i->m_is_deleted) continue;
       std::unordered_set<OpPtr> defs, uses;
       if (flag) {
         defs = i->m_def;
@@ -186,6 +187,7 @@ void RegisterAllocator::Build() {
     int cnt = 0;
     for (auto iter = b->m_insts.rbegin(); iter != b->m_insts.rend(); iter++) {
       std::shared_ptr<ASM_Instruction>& inst = *iter;
+      if (inst->m_is_deleted) continue;
       cnt++;
       std::unordered_set<OpPtr> defs, uses;
       if (m_reg_type == RegType::R) {
@@ -474,7 +476,7 @@ void RegisterAllocator::SelectSpill() {
   // }
   OpPtr m = *std::max_element(
       spillWorklist.cbegin(), spillWorklist.cend(), [this](OpPtr a, OpPtr b) {
-        //return a->lifespan < b->lifespan;
+        // return a->lifespan < b->lifespan;
         if (a->lifespan && b->lifespan) {
           // still compare degree if lifespan is equal!
           if (a->lifespan != b->lifespan) return a->lifespan < b->lifespan;
@@ -535,9 +537,6 @@ void RegisterAllocator::AssignColorsR() {
 }
 
 void RegisterAllocator::AssignColorsS() {
-#ifdef REG_ALLOC_DEBUG
-  debug("AssignColors");
-#endif
   while (!selectStack.empty()) {
     OpPtr n = selectStack.back();
     selectStack.pop_back();
@@ -599,6 +598,9 @@ void RegisterAllocator::RewriteProgram() {
     for (auto& b : m_cur_func->m_blocks) {
       for (auto iter = b->m_insts.begin(); iter != b->m_insts.end(); iter++) {
         auto& i = *iter;
+        if (i->m_is_deleted) {
+          continue;
+        }
         int fixed_offs = sp_offs + i->m_params_offset;
         std::unordered_set<OpPtr> defs, uses;
         if (m_reg_type == RegType::R) {
@@ -608,18 +610,52 @@ void RegisterAllocator::RewriteProgram() {
           defs = i->m_f_def;
           uses = i->m_f_use;
         }
+        if (uses.find(v) != uses.end()) {
+          OpPtr newOp;
+          if (i->m_is_mov) {
+            newOp = std::dynamic_pointer_cast<MOVInst>(i)->m_dest;
+            i->m_is_deleted = true;
+          } else {
+            // replace use
+            newOp = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
+            i->replaceUse(newOp, v);
+          }
+
+          // insert a load instruction before use of newOp
+          OpPtr offs;
+          std::shared_ptr<MOVInst> mov = nullptr;
+          if (Operand::addrOffsCheck(fixed_offs, newOp->m_is_float)) {
+            offs = std::make_shared<Operand>(fixed_offs);
+          } else {
+            offs = std::make_shared<Operand>(OperandType::VREG);
+            mov = std::make_shared<MOVInst>(offs, fixed_offs);
+            mov->m_params_offset = i->m_params_offset;
+            newTemps.insert(offs);
+            updateDepth(b, offs);
+          }
+          auto ldr = std::make_shared<LDRInst>(
+              newOp, Operand::getRReg(RReg::SP), offs);
+          ldr->m_params_offset = i->m_params_offset;
+          if (mov) {
+            b->insertSpillLDR(iter, ldr, mov);
+          } else {
+            b->insertSpillLDR(iter, ldr);
+          }
+          if (newOp->m_op_type == OperandType::VREG) {
+            newTemps.insert(newOp);
+            updateDepth(b, newOp);
+          }
+        }
         if (defs.find(v) != defs.end()) {
           OpPtr newOp;
-
+          auto next = std::next(iter);
           if (i->m_is_mov) {
             newOp = std::dynamic_pointer_cast<MOVInst>(i)->m_src;
-            iter = std::prev(b->m_insts.erase(iter));
+            i->m_is_deleted = true;
           } else {
             // replace def
             newOp = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
             i->replaceDef(newOp, v);
-            newTemps.insert(newOp);
-            updateDepth(b, newOp);
           }
 
           // insert a store instruction after defination of newOp
@@ -630,48 +666,41 @@ void RegisterAllocator::RewriteProgram() {
           } else {
             offs = std::make_shared<Operand>(OperandType::VREG);
             mov = std::make_shared<MOVInst>(offs, fixed_offs);
+            mov->m_params_offset = i->m_params_offset;
             newTemps.insert(offs);
             updateDepth(b, offs);
           }
           auto str = std::make_shared<STRInst>(
               newOp, Operand::getRReg(RReg::SP), offs);
+          str->m_params_offset = i->m_params_offset;
           if (mov) {
             b->insertSpillSTR(iter, str, mov);
           } else {
             b->insertSpillSTR(iter, str);
-          };
-        }
-        if (uses.find(v) != uses.end()) {
-          OpPtr newOp;
-
-          if (i->m_is_mov) {
-            newOp = std::dynamic_pointer_cast<MOVInst>(i)->m_dest;
-            iter = b->m_insts.erase(iter);
-          } else {
-            // replace use
-            newOp = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
-            i->replaceUse(newOp, v);
+          }
+          if (newOp->m_op_type == OperandType::VREG) {
             newTemps.insert(newOp);
             updateDepth(b, newOp);
           }
-          
-          // insert a load instruction before use of newOp
-          OpPtr offs;
-          std::shared_ptr<MOVInst> mov = nullptr;
-          if (Operand::addrOffsCheck(fixed_offs, newOp->m_is_float)) {
-            offs = std::make_shared<Operand>(fixed_offs);
-          } else {
-            offs = std::make_shared<Operand>(OperandType::VREG);
-            mov = std::make_shared<MOVInst>(offs, fixed_offs);
-            newTemps.insert(offs);
-            updateDepth(b, offs);
-          }
-          auto ldr = std::make_shared<LDRInst>(
-              newOp, Operand::getRReg(RReg::SP), offs);
-          if (mov) {
-            b->insertSpillLDR(iter, ldr, mov);
-          } else {
-            b->insertSpillLDR(iter, ldr);
+          while (next != b->m_insts.end()) {
+            auto inst = *next;
+            if (!inst->m_is_deleted) {
+              if (m_reg_type == RegType::R) {
+                if (inst->m_def.find(v) == inst->m_def.end()
+                    && inst->m_use.find(v) != inst->m_use.end()) {
+                  inst->replaceUse(newOp, v);
+                } else
+                  break;
+              } else {
+                if (inst->m_f_def.find(v) == inst->m_f_def.end()
+                    && inst->m_f_use.find(v) != inst->m_f_use.end()) {
+                  inst->replaceUse(newOp, v);
+                } else
+                  break;
+              }
+            }
+            next++;
+            iter++;
           }
         }
       }

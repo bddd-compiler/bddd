@@ -16,6 +16,7 @@ void fixedParamsOffs(std::shared_ptr<ASM_Module> module) {
     stack_size += func->m_push->m_regs.size() * 4;
     auto block = func->m_blocks.front();
     for (auto& inst : func->m_params_set_list) {
+      if (inst->m_is_deleted) continue;
       auto iter = block->m_insts.begin();
       auto ldr = std::dynamic_pointer_cast<LDRInst>(inst);
       if (!ldr) continue;
@@ -39,6 +40,7 @@ void generateLiteralPool(std::shared_ptr<ASM_Module> module) {
     int inst_pos = 0;
     for (auto b = func->m_blocks.rbegin(); b != func->m_blocks.rend(); b++) {
       for (auto i = (*b)->m_insts.rbegin(); i != (*b)->m_insts.rend(); i++) {
+        if ((*i)->m_is_deleted) continue;
         inst_pos++;
         auto inst = std::dynamic_pointer_cast<LDRInst>(*i);
         // LDR Rd, =label, need pool

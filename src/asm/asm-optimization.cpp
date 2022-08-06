@@ -5,6 +5,10 @@ void reduceRedundantMOV(std::shared_ptr<ASM_Module> module) {
     for (auto& block : func->m_blocks) {
       auto iter = block->m_insts.begin();
       while (iter != block->m_insts.end()) {
+        if ((*iter)->m_is_deleted) {
+          iter++;
+          continue;
+        }
         auto inst = std::dynamic_pointer_cast<MOVInst>(*iter);
         if (!inst || inst->m_src->m_op_type != OperandType::REG
             || inst->m_dest->getRegType() != inst->m_src->getRegType()) {
@@ -34,7 +38,6 @@ void reduceAdjacentJump(std::shared_ptr<ASM_Module> module) {
       if (block->m_branch_pos == block->m_insts.end()) {
         continue;
       }
-
       auto iter = block->m_branch_pos;
       auto inst = std::dynamic_pointer_cast<BInst>(*iter);
       if (inst->m_target == *std::next(b_iter)) {

@@ -307,6 +307,7 @@ public:
 
   int m_params_offset;
   bool m_is_mov;  // for register allocation
+  bool m_is_deleted;
 
   std::shared_ptr<ASM_BasicBlock> m_block;
   std::unordered_set<std::shared_ptr<Operand>> m_def;
@@ -314,7 +315,7 @@ public:
   std::unordered_set<std::shared_ptr<Operand>> m_f_def;
   std::unordered_set<std::shared_ptr<Operand>> m_f_use;
 
-  ASM_Instruction() : m_params_offset(0), m_is_mov(false) {}
+  ASM_Instruction() : m_params_offset(0), m_is_mov(false), m_is_deleted(false) {}
 
   std::string getOpName();
 

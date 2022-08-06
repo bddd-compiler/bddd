@@ -145,35 +145,35 @@ std::shared_ptr<Operand> GenerateMod(std::shared_ptr<BinaryInstruction> inst,
   auto ret = builder->getOperand(inst);
   auto devidend = builder->getOperand(val1);
 
-  if (val2->m_type.IsConst()) {
-    assert(val2->m_type.IsBasicInt());
-    auto const_val = std::dynamic_pointer_cast<Constant>(val2);
-    if (const_val->m_int_val == 1) {
-      builder->appendMOV(ret, 0);
-      return ret;
-    }
-    int temp = 2;
-    for (int i = 1; i < 32; i++) {
-      if (temp == const_val->m_int_val) {
-        int and_val = temp - 1;
-        if (Operand::immCheck(and_val)) {
-          builder->appendBIT(InstOp::AND, ret, devidend,
-                             std::make_shared<Operand>(and_val));
-        } else {
-          auto mov_temp = std::make_shared<Operand>(OperandType::VREG);
-          builder->appendMOV(mov_temp, and_val);
-          builder->appendBIT(InstOp::AND, ret, devidend, mov_temp);
-        }
-        // check if val1 is negative
-        builder->appendCT(InstOp::CMP, devidend, std::make_shared<Operand>(0));
-        auto sub = builder->appendAS(InstOp::SUB, ret, ret,
-                                     std::make_shared<Operand>(temp));
-        sub->m_cond = CondType::LT;
-        return ret;
-      }
-      temp <<= 1;
-    }
-  }
+  // if (val2->m_type.IsConst()) {
+  //   assert(val2->m_type.IsBasicInt());
+  //   auto const_val = std::dynamic_pointer_cast<Constant>(val2);
+  //   if (const_val->m_int_val == 1) {
+  //     builder->appendMOV(ret, 0);
+  //     return ret;
+  //   }
+  //   int temp = 2;
+  //   for (int i = 1; i < 32; i++) {
+  //     if (temp == const_val->m_int_val) {
+  //       int and_val = temp - 1;
+  //       if (Operand::immCheck(and_val)) {
+  //         builder->appendBIT(InstOp::AND, ret, devidend,
+  //                            std::make_shared<Operand>(and_val));
+  //       } else {
+  //         auto mov_temp = std::make_shared<Operand>(OperandType::VREG);
+  //         builder->appendMOV(mov_temp, and_val);
+  //         builder->appendBIT(InstOp::AND, ret, devidend, mov_temp);
+  //       }
+  //       // check if val1 is negative
+  //       builder->appendCT(InstOp::CMP, devidend, std::make_shared<Operand>(0));
+  //       auto sub = builder->appendAS(InstOp::SUB, ret, ret,
+  //                                    std::make_shared<Operand>(temp));
+  //       sub->m_cond = CondType::LT;
+  //       return ret;
+  //     }
+  //     temp <<= 1;
+  //   }
+  // }
 
   auto devisor = builder->getOperand(val2);
 
@@ -674,6 +674,7 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
   auto first_block = func->m_blocks.front();
   auto iter = first_block->m_insts.begin();
   for (auto &inst : func->m_params_set_list) {
+    if (inst->m_is_deleted) continue;
     first_block->m_insts.insert(iter, inst);
     func->m_params_pos_map[inst] = std::prev(iter);
     inst->m_block = first_block;
