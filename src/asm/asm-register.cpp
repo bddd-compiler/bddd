@@ -571,14 +571,6 @@ void RegisterAllocator::RewriteProgram() {
 #ifdef REG_ALLOC_DEBUG
   debug("RewriteProgram");
 #endif
-  // std::cout << "rewrite program" << std::endl;
-  // for (auto& n : spilledNodes) std::cout << n->getName() << ", ";
-  // std::cout << std::endl;
-  // std::ofstream ofs("temp.s");
-  // m_module->exportASM(ofs);
-  // ofs.close();
-  // std::cin.get();
-
   // Allocate memory locations for each v ∈ spilledNodes,
   // Create a new temporary vi for each definition and each use,
   // In the program (instructions), insert a store after each
@@ -641,10 +633,8 @@ void RegisterAllocator::RewriteProgram() {
           } else {
             b->insertSpillLDR(iter, ldr);
           }
-          if (newOp->m_op_type == OperandType::VREG) {
-            newTemps.insert(newOp);
-            updateDepth(b, newOp);
-          }
+          newTemps.insert(newOp);
+          updateDepth(b, newOp);
         }
         if (defs.find(v) != defs.end()) {
           OpPtr newOp;
@@ -678,30 +668,28 @@ void RegisterAllocator::RewriteProgram() {
           } else {
             b->insertSpillSTR(iter, str);
           }
-          if (newOp->m_op_type == OperandType::VREG) {
-            newTemps.insert(newOp);
-            updateDepth(b, newOp);
-          }
-          while (next != b->m_insts.end()) {
-            auto inst = *next;
-            if (!inst->m_is_deleted) {
-              if (m_reg_type == RegType::R) {
-                if (inst->m_def.find(v) == inst->m_def.end()
-                    && inst->m_use.find(v) != inst->m_use.end()) {
-                  inst->replaceUse(newOp, v);
-                } else
-                  break;
-              } else {
-                if (inst->m_f_def.find(v) == inst->m_f_def.end()
-                    && inst->m_f_use.find(v) != inst->m_f_use.end()) {
-                  inst->replaceUse(newOp, v);
-                } else
-                  break;
-              }
-            }
-            next++;
-            iter++;
-          }
+          newTemps.insert(newOp);
+          updateDepth(b, newOp);
+          // while (next != b->m_insts.end()) {
+          //   auto inst = *next;
+          //   if (!inst->m_is_deleted) {
+          //     if (m_reg_type == RegType::R) {
+          //       if (inst->m_def.find(v) == inst->m_def.end()
+          //           && inst->m_use.find(v) != inst->m_use.end()) {
+          //         inst->replaceUse(newOp, v);
+          //       } else
+          //         break;
+          //     } else {
+          //       if (inst->m_f_def.find(v) == inst->m_f_def.end()
+          //           && inst->m_f_use.find(v) != inst->m_f_use.end()) {
+          //         inst->replaceUse(newOp, v);
+          //       } else
+          //         break;
+          //     }
+          //   }
+          //   next++;
+          //   iter++;
+          // }
         }
       }
     }

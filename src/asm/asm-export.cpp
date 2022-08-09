@@ -251,7 +251,6 @@ void PInst::exportASM(std::ofstream& ofs) {
        [=](std::shared_ptr<Operand> a, std::shared_ptr<Operand> b) {
          return a->m_rreg < b->m_rreg;
        });
-
   bool first = true;
   for (auto& reg : regs) {
     if (first) {
