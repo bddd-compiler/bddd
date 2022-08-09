@@ -5,6 +5,7 @@
 #include <stack>
 
 #include "ir/ir-pass-manager.h"
+#include "ir/loop.h"
 
 std::vector<std::pair<std::shared_ptr<BasicBlock>, std::shared_ptr<BasicBlock>>>
     g_back_edges;
@@ -28,6 +29,20 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
     // std::cerr << "back edge: " << tail->m_id << "->" << head->m_id <<
     // std::endl;
     auto loop = std::make_shared<Loop>(head);
+    auto preds = head->Predecessors();
+    assert(preds.size() == 2);
+    int temp = 0;
+    for (auto &pred : preds) {
+      if (pred->m_id < head->m_id) {
+        loop->m_preheader = pred;
+        ++temp;
+      } else {
+        loop->m_end = pred;
+        --temp;
+      }
+    }
+    assert(temp == 0);
+
     // populate nodes using predecessors
     std::stack<std::shared_ptr<BasicBlock>> stack;
     stack.push(tail);
@@ -44,6 +59,7 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
         }
       }
     }
+    assert(loop->m_bbs.find(head) != loop->m_bbs.end());
     // std::cerr << std::endl;
 
     for (auto &bb : loop->m_bbs) {
@@ -75,6 +91,12 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
   }
   for (auto &loop : func->m_loops) {
     loop->m_loop_depth = 1;
+    if (loop->m_sub_loops.empty()) {
+      func->m_deepest_loops.push_back(loop);
+      for (auto &bb : loop->m_bbs) {
+        bb->m_deepest_loop = loop;
+      }
+    }
   }
   for (auto &loop : func->m_loops) {
     for (auto &inner : loop->m_sub_loops) {
@@ -97,9 +119,7 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
     for (auto it = loop->m_sub_loops.begin(); it != loop->m_sub_loops.end();) {
       // manually ++it
       if ((*it)->m_loop_depth != loop->m_loop_depth + 1) {
-        auto del = it;
-        ++it;
-        loop->m_sub_loops.erase(del);
+        it = loop->m_sub_loops.erase(it);
       } else {
         ++it;
       }
@@ -108,6 +128,7 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
 }
 
 void ComputeLoopRelationship(std::shared_ptr<Function> func) {
+  func->m_deepest_loops.clear();
   for (auto &bb : func->m_bb_list) {
     bb->m_loops.clear();
     bb->m_loop_depth = 0;
@@ -117,14 +138,16 @@ void ComputeLoopRelationship(std::shared_ptr<Function> func) {
   GetBackEdges(func);
   DetectNaturalLoops(func);
 
-  // for (auto &loop : func->m_loops) {
-  //   std::cerr << "header: " << loop->m_header->m_id << std::endl;
-  //   std::cerr << "bbs: ";
-  //   for (auto &bb : loop->m_bbs) {
-  //     std::cerr << bb->m_id << " ";
-  //   }
-  //   std::cerr << std::endl;
-  //   std::cerr << "depth: " << loop->m_loop_depth << std::endl;
-  //   std::cerr << std::endl;
-  // }
+  for (auto &loop : func->m_loops) {
+    std::cerr << "preheader: " << loop->m_preheader->m_id << std::endl;
+    std::cerr << "header: " << loop->m_header->m_id << std::endl;
+    std::cerr << "end: " << loop->m_end->m_id << std::endl;
+    std::cerr << "bbs: ";
+    for (auto &bb : loop->m_bbs) {
+      std::cerr << bb->m_id << " ";
+    }
+    std::cerr << std::endl;
+    std::cerr << "depth: " << loop->m_loop_depth << std::endl;
+    std::cerr << std::endl;
+  }
 }

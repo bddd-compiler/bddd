@@ -245,9 +245,7 @@ void BasicBlock::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::endl;
   for (auto& instr : m_instr_list) {
     instr->ExportIR(ofs, depth);
-    if (instr->m_placed) {
-      ofs << "; (pinned)";
-    }
+    // if (instr->m_placed) ofs << "; (pinned)";
     ofs << std::endl;
   }
 }

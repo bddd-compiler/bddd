@@ -13,6 +13,7 @@ void RemoveTrivialBasicBlocks(std::shared_ptr<Function> func);
 void ComputeLoopRelationship(std::shared_ptr<Function> func);
 void DeadCodeElimination(std::shared_ptr<Function> function);
 void RemoveUnusedFunctions(std::unique_ptr<Module> &module);
+void UpdatePredecessors(std::shared_ptr<Function> func);
 
 class IRPassManager {
 public:
@@ -31,7 +32,11 @@ public:
 
   void SideEffectPass();
 
-private:
+  void StrengthReductionPass();
+
+  void TailRecursionPass();
+
+  void LoopUnrollingPass();
 };
 
 #endif  // BDDD_IR_PASS_MANAGER_H

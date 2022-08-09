@@ -6,6 +6,17 @@
 
 #include "ir/ir-pass-manager.h"
 
+void UpdatePredecessors(std::shared_ptr<Function> func) {
+  for (auto &bb : func->m_bb_list) {
+    bb->m_predecessors.clear();
+  }
+  for (auto &bb : func->m_bb_list) {
+    for (const std::shared_ptr<BasicBlock> &v_block : bb->Successors()) {
+      v_block->m_predecessors.insert(bb);
+    }
+  }
+}
+
 // predecessors info is unavailable
 void RemoveUnusedBasicBlocks(std::shared_ptr<Function> func) {
   int cnt = 0;

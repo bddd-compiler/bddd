@@ -575,10 +575,11 @@ public:
   }
 
   explicit CallInstruction(BasicType return_type, std::string func_name,
+                           std::shared_ptr<Function> function,
                            std::shared_ptr<BasicBlock> bb)
       : Instruction(IROp::CALL, std::move(bb)),
         m_func_name(std::move(func_name)),
-        m_function(nullptr),
+        m_function(std::move(function)),
         m_params() {
     switch (return_type) {
       case BasicType::INT:
@@ -799,25 +800,29 @@ public:
   void AddPhiOperand(std::shared_ptr<BasicBlock> bb,
                      std::shared_ptr<Value> val) {
     auto it = m_contents.find(bb);
-    if (it == m_contents.end()) {
-      if (val == nullptr)
-        m_contents[bb] = nullptr;
-      else
-        m_contents[bb] = val->AddUse(shared_from_this());
-    } else {
-      // na mei shi le
-    }
+    assert(it == m_contents.end());  // 想替换就用Replace那个，不要用这个
+    if (val == nullptr)
+      m_contents[bb] = nullptr;
+    else
+      m_contents[bb] = val->AddUse(shared_from_this());
   }
 
   void ReplacePhiOperand(std::shared_ptr<BasicBlock> old_block,
                          std::shared_ptr<BasicBlock> new_block) {
     auto it = m_contents.find(old_block);
-    if (it != m_contents.end()) {
-      auto val = it->second->m_value.lock();
-      RemoveByBasicBlock(old_block);
-      AddPhiOperand(new_block, val);
-      // m_contents.erase(it);
-    }
+    assert(it != m_contents.end());  // must exist, otherwise should add
+    auto val = it->second->m_value.lock();
+    RemoveByBasicBlock(old_block);
+    AddPhiOperand(new_block, val);
+    // m_contents.erase(it);
+  }
+
+  void ReplacePhiValue(std::shared_ptr<BasicBlock> bb,
+                       std::shared_ptr<Value> new_val) {
+    auto it = m_contents.find(bb);
+    assert(it != m_contents.end());
+    RemoveByBasicBlock(bb);
+    AddPhiOperand(bb, new_val);
   }
 
   bool IsValid();
@@ -943,18 +948,7 @@ public:
   }
 };
 
-class Loop {
-public:
-  std::shared_ptr<BasicBlock> m_preheader;
-  std::shared_ptr<BasicBlock> m_header;
-  std::set<std::shared_ptr<BasicBlock>> m_bbs;
-  std::set<std::shared_ptr<Loop>> m_sub_loops;
-  std::shared_ptr<Loop> m_fa_loop;
-  int m_loop_depth;
-
-  explicit Loop(std::shared_ptr<BasicBlock> header)
-      : m_header(std::move(header)), m_loop_depth(-1) {}
-};
+class Loop;
 
 class BasicBlock : public Value {
 private:
@@ -979,6 +973,7 @@ public:
   std::unordered_set<std::shared_ptr<BasicBlock>> m_predecessors;
 
   std::set<std::shared_ptr<Loop>> m_loops;
+  std::shared_ptr<Loop> m_deepest_loop;
 
   // methods
 
@@ -1088,14 +1083,13 @@ public:
   std::vector<std::shared_ptr<FunctionArg>> m_args;
   std::list<std::shared_ptr<BasicBlock>> m_bb_list;
 
-  std::list<std::shared_ptr<BasicBlock>> m_rpo_bb_list;
-
   std::vector<
       std::pair<std::shared_ptr<CallInstruction>, std::shared_ptr<Function>>>
       m_calls;  // who call me?
   int m_called_depth;
 
   std::set<std::shared_ptr<Loop>> m_loops;
+  std::vector<std::shared_ptr<Loop>> m_deepest_loops;
 
   bool m_visited;      // first used in ComputeSideEffect
   bool m_side_effect;  // whether the function has side effect

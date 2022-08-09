@@ -59,7 +59,7 @@ void Value::KillAllUses() {
 // move from val's m_use_list to new_val's m_use_list
 void Value::ReplaceUseBy(const std::shared_ptr<Value>& new_val) {
   for (auto it = m_use_list.begin(); it != m_use_list.end();) {
-    auto use = (*it).get();
+    auto use = it->get();
     ++it;
     assert(use->getValue() == shared_from_this());
     // SOMETHING NONTRIVIAL HERE: we just
@@ -133,7 +133,6 @@ void BasicBlock::InsertBackInstruction(const std::shared_ptr<Instruction>& elem,
   auto it = std::find(m_instr_list.begin(), m_instr_list.end(), elem);
   assert(it != m_instr_list.end());
   ++it;
-  assert(it != m_instr_list.end());
   instr->m_bb = shared_from_base<BasicBlock>();
   m_instr_list.insert(it, std::move(instr));
 }

@@ -154,10 +154,10 @@ bool FunctionInlining(std::shared_ptr<Function> inline_func) {
         } else if (auto call_instr
                    = std::dynamic_pointer_cast<CallInstruction>(instr)) {
           auto new_call_instr = std::make_shared<CallInstruction>(
-              call_instr->m_type.m_base_type, call_instr->m_func_name, new_bb);
-          new_call_instr->m_function = call_instr->m_function;
+              call_instr->m_type.m_base_type, call_instr->m_func_name,
+              call_instr->m_function, new_bb);
           std::vector<Use *> new_params_uses;
-          for (auto &use : call_instr->m_params) {
+          for (auto use : call_instr->m_params) {
             new_params_uses.push_back(
                 GetNewVal(use->getValue())->AddUse(new_call_instr));
           }
@@ -270,7 +270,9 @@ void IRPassManager::FunctionInliningPass() {
     return a->m_called_depth < b->m_called_depth;
   });
   for (auto &func : funcs) {
-    bool inlined = FunctionInlining(func);
+    FunctionInlining(func);
+    ComputeDominanceRelationship(func);
+    // bool inlined = FunctionInlining(func);
     // if (inlined) {
     //   for (auto &[call_instr, caller_func] : func->m_calls) {
     //     RemoveTrivialPhis(caller_func);
@@ -278,4 +280,5 @@ void IRPassManager::FunctionInliningPass() {
     //   }
     // }
   }
+  RemoveUnusedFunctions(m_builder->m_module);
 }

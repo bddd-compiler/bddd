@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
   } else if (argc == 1) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
-    filename = "../testSource/buaa/part13/test4.c";
+    filename = "../testSource/custom_test/loop_unroll2.sy";
     // filename = "../testSource/functional/59_sort_test5.c";
   } else {
     std::cerr << "???";
@@ -75,9 +75,17 @@ int main(int argc, char **argv) {
                      + "_ir_example.out");
   builder->m_module->ExportIR(ofs2, 0);
   ofs2.close();
+
+  pass_manager->FunctionInliningPass();
+  pass_manager->LoopUnrollingPass();
+
   pass_manager->GVNPass();
   pass_manager->GCMPass();
-  pass_manager->FunctionInliningPass();
+  // pass_manager->FunctionInliningPass();
+
+  // pass_manager->TailRecursionPass();
+  // pass_manager->StrengthReductionPass();
+
   // pass_manager->GVNPass();
   // pass_manager->GCMPass();
 
