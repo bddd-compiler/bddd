@@ -1,5 +1,6 @@
 //
 // Created by garen on 8/1/22.
+// TODO: untested
 //
 
 #include <stack>
@@ -19,26 +20,28 @@ void StrengthReduction(std::shared_ptr<Loop> loop,
 
   for (auto &instr : loop->m_header->m_instr_list) {
     if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
-      auto updated_val = phi->GetValue(loop->m_end);
-      if (auto binary
-          = std::dynamic_pointer_cast<BinaryInstruction>(updated_val)) {
-        if (binary->m_op == IROp::ADD) {
-          if (binary->m_lhs_val_use->getValue()->m_type.IsConst()
-              && binary->m_rhs_val_use->getValue() == phi) {
-            auto c = std::dynamic_pointer_cast<Constant>(
-                binary->m_lhs_val_use->getValue());
-            ivs[phi] = std::make_tuple(phi, 1, 0);
-            iv_init_vals[phi] = phi->GetValue(loop->m_preheader);
-            strides[phi] = c->Evaluate().IntVal();
-          } else if (binary->m_rhs_val_use->getValue()->m_type.IsConst()
-                     && binary->m_lhs_val_use->getValue() == phi) {
-            auto c = std::dynamic_pointer_cast<Constant>(
-                binary->m_rhs_val_use->getValue());
-            ivs[phi] = std::make_tuple(phi, 1, 0);
-            iv_init_vals[phi] = phi->GetValue(loop->m_preheader);
-            strides[phi] = c->Evaluate().IntVal();
-          } else {
-            std::cerr << "[debug] not basic induction variable" << std::endl;
+      for (auto &end : loop->m_ends) {
+        auto updated_val = phi->GetValue(end);
+        if (auto binary
+            = std::dynamic_pointer_cast<BinaryInstruction>(updated_val)) {
+          if (binary->m_op == IROp::ADD) {
+            if (binary->m_lhs_val_use->getValue()->m_type.IsConst()
+                && binary->m_rhs_val_use->getValue() == phi) {
+              auto c = std::dynamic_pointer_cast<Constant>(
+                  binary->m_lhs_val_use->getValue());
+              ivs[phi] = std::make_tuple(phi, 1, 0);
+              iv_init_vals[phi] = phi->GetValue(loop->m_preheader);
+              strides[phi] = c->Evaluate().IntVal();
+            } else if (binary->m_rhs_val_use->getValue()->m_type.IsConst()
+                       && binary->m_lhs_val_use->getValue() == phi) {
+              auto c = std::dynamic_pointer_cast<Constant>(
+                  binary->m_rhs_val_use->getValue());
+              ivs[phi] = std::make_tuple(phi, 1, 0);
+              iv_init_vals[phi] = phi->GetValue(loop->m_preheader);
+              strides[phi] = c->Evaluate().IntVal();
+            } else {
+              std::cerr << "[debug] not basic induction variable" << std::endl;
+            }
           }
         }
       }
@@ -143,16 +146,16 @@ void StrengthReduction(std::shared_ptr<Loop> loop,
     assert(strides.find(i) != strides.end());
     strides[j] = strides[i] * a + b;
     std::cerr << "stride of " << j << " is " << strides[j] << std::endl;
-    auto add_instr
-        = std::make_shared<BinaryInstruction>(IROp::ADD, loop->m_end);
-    add_instr->m_lhs_val_use = phi->AddUse(add_instr);
-    add_instr->m_rhs_val_use
-        = builder->GetIntConstant(strides[j])->AddUse(add_instr);
-    loop->m_end->InsertFrontInstruction(loop->m_end->LastInstruction(),
-                                        add_instr);
-    phi->AddPhiOperand(loop->m_end, add_instr);
+    for (auto &end : loop->m_ends) {
+      auto add_instr = std::make_shared<BinaryInstruction>(IROp::ADD, end);
+      add_instr->m_lhs_val_use = phi->AddUse(add_instr);
+      add_instr->m_rhs_val_use
+          = builder->GetIntConstant(strides[j])->AddUse(add_instr);
+      end->InsertFrontInstruction(end->LastInstruction(), add_instr);
+      phi->AddPhiOperand(end, add_instr);
 
-    j->ReplaceUseBy(phi);
+      j->ReplaceUseBy(phi);
+    }
   }
 }
 

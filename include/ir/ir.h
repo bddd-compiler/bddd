@@ -351,6 +351,7 @@ public:
         m_is_array(decl->IsArray()) {}
 
   // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  virtual EvalValue GetFlattenVal(int offset) = 0;
 };
 
 class IntGlobalVariable : public GlobalVariable {
@@ -375,6 +376,8 @@ public:
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
+
+  EvalValue GetFlattenVal(int offset) override;
 };
 
 class FloatGlobalVariable : public GlobalVariable {
@@ -399,6 +402,8 @@ public:
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
+
+  EvalValue GetFlattenVal(int offset) override;
 };
 
 class BasicBlock;

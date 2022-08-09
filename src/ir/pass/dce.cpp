@@ -3,7 +3,7 @@
 
 #include "ir/ir-pass-manager.h"
 
-void AggressiveDCE(std::shared_ptr<Function> func) {
+void DeadCodeElimination(std::shared_ptr<Function> func) {
   std::set<std::shared_ptr<Instruction>> alive;
   std::vector<std::shared_ptr<Instruction>> worklist;
   // Collect the set of "root" instructions that are known live.
@@ -34,12 +34,14 @@ void AggressiveDCE(std::shared_ptr<Function> func) {
     for (auto &instr : bb->m_instr_list) {
       if (alive.find(instr) == alive.end()) {
         worklist.push_back(instr);
-        instr->KillAllMyUses();
+        // instr->KillAllMyUses();
       }
     }
   }
-
-  for (auto &instr : worklist) {
-    instr->m_bb->RemoveInstruction(instr);
+  for (auto it = worklist.rbegin(); it != worklist.rend(); ++it) {
+    // manually ++it
+    auto instr = *it;
+    auto bb = instr->m_bb;
+    bb->RemoveInstruction(instr);
   }
 }

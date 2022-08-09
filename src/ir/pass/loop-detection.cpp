@@ -30,18 +30,17 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
     // std::endl;
     auto loop = std::make_shared<Loop>(head);
     auto preds = head->Predecessors();
-    assert(preds.size() == 2);
     int temp = 0;
     for (auto &pred : preds) {
       if (pred->m_id < head->m_id) {
         loop->m_preheader = pred;
         ++temp;
       } else {
-        loop->m_end = pred;
+        loop->m_ends.push_back(pred);
         --temp;
       }
     }
-    assert(temp == 0);
+    assert(temp <= 0);
 
     // populate nodes using predecessors
     std::stack<std::shared_ptr<BasicBlock>> stack;
@@ -141,7 +140,11 @@ void ComputeLoopRelationship(std::shared_ptr<Function> func) {
   for (auto &loop : func->m_loops) {
     std::cerr << "preheader: " << loop->m_preheader->m_id << std::endl;
     std::cerr << "header: " << loop->m_header->m_id << std::endl;
-    std::cerr << "end: " << loop->m_end->m_id << std::endl;
+    std::cerr << "end: ";
+    for (auto &end : loop->m_ends) {
+      std::cerr << end->m_id << " ";
+    }
+    std::cerr << std::endl;
     std::cerr << "bbs: ";
     for (auto &bb : loop->m_bbs) {
       std::cerr << bb->m_id << " ";

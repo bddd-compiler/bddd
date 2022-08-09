@@ -452,11 +452,11 @@ void RunGVN(std::shared_ptr<Function> function,
 
 void IRPassManager::GVNPass() {
   SideEffectPass();
-  g_vns.clear();
-  g_idx.clear();
   for (auto &func : m_builder->m_module->m_function_list) {
     if (func->m_bb_list.empty()) continue;
     ComputeDominanceRelationship(func);
+    g_vns.clear();
+    g_idx.clear();
     RunGVN(func, m_builder);
   }
 }

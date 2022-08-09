@@ -14,7 +14,8 @@ public:
   std::set<std::shared_ptr<BasicBlock>> m_bbs;
   std::set<std::shared_ptr<Loop>> m_sub_loops;
   std::shared_ptr<Loop> m_fa_loop;
-  std::shared_ptr<BasicBlock> m_end;  // it seems a non-natural loop have many
+  std::vector<std::shared_ptr<BasicBlock>>
+      m_ends;  // it seems a non-natural loop have many ends
   int m_loop_depth;
 
   explicit Loop() : m_loop_depth(-1) {}

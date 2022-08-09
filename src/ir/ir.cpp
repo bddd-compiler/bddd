@@ -331,10 +331,18 @@ std::ostream& operator<<(std::ostream& out, ValueType value_type) {
 }
 
 bool PhiInstruction::IsValid() {
-  for (auto pred : m_bb->Predecessors()) {
+  for (auto& pred : m_bb->Predecessors()) {
     if (m_contents.find(pred) == m_contents.end()) {
       return false;
     }
   }
   return true;
+}
+EvalValue IntGlobalVariable::GetFlattenVal(int offset) {
+  assert(offset < m_flatten_vals.size());
+  return EvalValue(m_flatten_vals[offset]);
+}
+EvalValue FloatGlobalVariable::GetFlattenVal(int offset) {
+  assert(offset < m_flatten_vals.size());
+  return EvalValue(m_flatten_vals[offset]);
 }
