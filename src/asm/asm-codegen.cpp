@@ -663,8 +663,6 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
 #endif
 
   builder->m_cur_func->m_blocks.push_back(builder->m_cur_func->m_rblock);
-  builder->m_cur_func->m_rblock->m_label
-      = "." + builder->m_cur_func->m_name + "_L0";
   // insert MOV instruction(from PHI)
   for (auto &b : func->m_blocks) {
     b->fillMOV();

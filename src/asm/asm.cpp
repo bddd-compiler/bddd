@@ -24,6 +24,8 @@ CondType GetCondFromIR(IROp op) {
   return CondType::NONE;
 }
 
+int ASM_BasicBlock::block_id = 0;
+
 int Operand::vrreg_cnt = 0;
 int Operand::vsreg_cnt = 0;
 std::unordered_map<std::shared_ptr<Operand>, std::string> Operand::vreg_map;

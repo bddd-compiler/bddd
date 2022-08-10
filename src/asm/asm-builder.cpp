@@ -146,8 +146,6 @@ std::shared_ptr<ASM_BasicBlock> ASM_Builder::getBlock(
                  : nullptr;
   if (!ret) {
     ret = std::make_shared<ASM_BasicBlock>(ir_block->m_loop_depth);
-    ret->m_label
-        = "." + m_cur_func->m_name + "_L" + std::to_string(ir_block->m_id);
     m_block_map.insert(std::make_pair(ir_block, ret));
   }
   return ret;

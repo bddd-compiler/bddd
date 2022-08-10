@@ -242,6 +242,7 @@ public:
 
 class ASM_BasicBlock : public std::enable_shared_from_this<ASM_BasicBlock> {
 public:
+  static int block_id;
   std::string m_label;
   std::list<std::shared_ptr<ASM_Instruction>> m_insts;
   std::list<std::shared_ptr<ASM_Instruction>>::iterator m_branch_pos;
@@ -257,7 +258,7 @@ public:
   std::vector<std::shared_ptr<ASM_BasicBlock>> m_successors;
 
   ASM_BasicBlock(int depth = 0)
-      : m_loop_depth(depth), m_branch_pos(m_insts.end()) {}
+      : m_loop_depth(depth), m_branch_pos(m_insts.end()), m_label(".L" + std::to_string(block_id++)) {}
 
   void insert(std::shared_ptr<ASM_Instruction> inst);
 
