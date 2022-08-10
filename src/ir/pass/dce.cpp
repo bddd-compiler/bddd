@@ -21,6 +21,7 @@ void DeadCodeElimination(std::shared_ptr<Function> func) {
     auto instr = worklist.back();
     worklist.pop_back();
     for (auto op : instr->Operands()) {
+      if (op == nullptr) continue;  // phi instruction is possible
       if (auto op_instr
           = std::dynamic_pointer_cast<Instruction>(op->getValue())) {
         if (alive.insert(op_instr).second) {

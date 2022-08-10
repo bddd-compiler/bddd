@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
     // std::cin >> filename;
     // filename = "../testSource/custom_test/loop_unroll2.c";
     // filename = "../testSource/buaa/part11/test2.c";
-    filename = "../testSource/performance/01_mm1.c";
+    filename = "../testSource/functional/64_calculator.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -80,8 +80,7 @@ int main(int argc, char **argv) {
   pass_manager->EliminateGlobalConstArrayAccess();
   pass_manager->TailRecursionPass();
   pass_manager->FunctionInliningPass();
-  // pass_manager->LoopUnrollingPass();
-
+  pass_manager->LoopUnrollingPass();
   pass_manager->GVNPass();
   pass_manager->GCMPass();
 

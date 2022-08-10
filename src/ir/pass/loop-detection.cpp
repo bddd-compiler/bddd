@@ -137,20 +137,20 @@ void ComputeLoopRelationship(std::shared_ptr<Function> func) {
   GetBackEdges(func);
   DetectNaturalLoops(func);
 
-  for (auto &loop : func->m_loops) {
-    std::cerr << "preheader: " << loop->m_preheader->m_id << std::endl;
-    std::cerr << "header: " << loop->m_header->m_id << std::endl;
-    std::cerr << "end: ";
-    for (auto &end : loop->m_ends) {
-      std::cerr << end->m_id << " ";
-    }
-    std::cerr << std::endl;
-    std::cerr << "bbs: ";
-    for (auto &bb : loop->m_bbs) {
-      std::cerr << bb->m_id << " ";
-    }
-    std::cerr << std::endl;
-    std::cerr << "depth: " << loop->m_loop_depth << std::endl;
-    std::cerr << std::endl;
-  }
+  // for (auto &loop : func->m_loops) {
+  //   std::cerr << "preheader: " << loop->m_preheader->m_id << std::endl;
+  //   std::cerr << "header: " << loop->m_header->m_id << std::endl;
+  //   std::cerr << "end: ";
+  //   for (auto &end : loop->m_ends) {
+  //     std::cerr << end->m_id << " ";
+  //   }
+  //   std::cerr << std::endl;
+  //   std::cerr << "bbs: ";
+  //   for (auto &bb : loop->m_bbs) {
+  //     std::cerr << bb->m_id << " ";
+  //   }
+  //   std::cerr << std::endl;
+  //   std::cerr << "depth: " << loop->m_loop_depth << std::endl;
+  //   std::cerr << std::endl;
+  // }
 }

@@ -18,7 +18,8 @@ bool CanBeConstArray(std::shared_ptr<Value> var) {
   for (auto &use : var->m_use_list) {
     auto user = use->getUser();
     if (auto gep = std::dynamic_pointer_cast<GetElementPtrInstruction>(user)) {
-      return CanBeConstArray(gep);
+      bool temp = CanBeConstArray(gep);
+      if (!temp) return false;
     } else if (auto call = std::dynamic_pointer_cast<CallInstruction>(user)) {
       if (call->HasSideEffect() && call->m_func_name != "putint"
           && call->m_func_name != "putch" && call->m_func_name != "putfloat"

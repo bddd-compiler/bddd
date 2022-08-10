@@ -1,10 +1,8 @@
 %skeleton "lalr1.cc"
-%require "3.0.4"
 %defines
 %define api.parser.class {parser}
 %define api.token.constructor
 %define api.value.type variant
-%define parse.assert
 %code requires
 {
 #include "ast/ast.h"

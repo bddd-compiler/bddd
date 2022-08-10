@@ -5,7 +5,7 @@
 #include "ir/ir-pass-manager.h"
 #include "ir/loop.h"
 
-const int K = 2;
+const int K = 4;
 
 void CopyInstructions(
     const std::vector<std::shared_ptr<Instruction>> &original_instrs,
@@ -353,35 +353,58 @@ void FixUnrollLoopCond(std::shared_ptr<EasyLoop> easy_loop, int stride,
     }
   }
   // non-const
-  // i < n
-  // K * stride < n - i
+
   std::shared_ptr<Value> i = nullptr, n = nullptr;
   if (lhs_val == easy_loop->m_cond_var->m_def_instr) {
     i = lhs_val;
     n = rhs_val;
+    assert(i->m_type.IsBasicInt());
+    assert(n->m_type.IsBasicInt());
+    // i < n
+    // K * stride < n - i
+    auto sub_instr
+        = std::make_shared<BinaryInstruction>(IROp::SUB, easy_loop->m_cond_bb);
+    sub_instr->m_lhs_val_use = n->AddUse(sub_instr);
+    sub_instr->m_rhs_val_use = i->AddUse(sub_instr);
+    auto it = std::find(easy_loop->m_cond_bb->m_instr_list.begin(),
+                        easy_loop->m_cond_bb->m_instr_list.end(),
+                        easy_loop->m_cmp_instr);
+    easy_loop->m_cond_bb->m_instr_list.insert(it, sub_instr);
+
+    easy_loop->m_cmp_instr->m_lhs_val_use->getValue()->KillUse(
+        easy_loop->m_cmp_instr->m_lhs_val_use);
+    easy_loop->m_cmp_instr->m_lhs_val_use
+        = builder->GetIntConstant(K * stride)->AddUse(easy_loop->m_cmp_instr);
+    easy_loop->m_cmp_instr->m_rhs_val_use->getValue()->KillUse(
+        easy_loop->m_cmp_instr->m_rhs_val_use);
+    easy_loop->m_cmp_instr->m_rhs_val_use
+        = sub_instr->AddUse(easy_loop->m_cmp_instr);
   } else {
     assert(rhs_val == easy_loop->m_cond_var->m_def_instr);
     i = rhs_val;
     n = lhs_val;
+    assert(i->m_type.IsBasicInt());
+    assert(n->m_type.IsBasicInt());
+    // x[1] > i
+    // x[1] - i > K * stride
+    auto sub_instr
+        = std::make_shared<BinaryInstruction>(IROp::SUB, easy_loop->m_cond_bb);
+    sub_instr->m_lhs_val_use = n->AddUse(sub_instr);
+    sub_instr->m_rhs_val_use = i->AddUse(sub_instr);
+    auto it = std::find(easy_loop->m_cond_bb->m_instr_list.begin(),
+                        easy_loop->m_cond_bb->m_instr_list.end(),
+                        easy_loop->m_cmp_instr);
+    easy_loop->m_cond_bb->m_instr_list.insert(it, sub_instr);
+
+    easy_loop->m_cmp_instr->m_lhs_val_use->getValue()->KillUse(
+        easy_loop->m_cmp_instr->m_lhs_val_use);
+    easy_loop->m_cmp_instr->m_lhs_val_use
+        = sub_instr->AddUse(easy_loop->m_cmp_instr);
+    easy_loop->m_cmp_instr->m_rhs_val_use->getValue()->KillUse(
+        easy_loop->m_cmp_instr->m_rhs_val_use);
+    easy_loop->m_cmp_instr->m_rhs_val_use
+        = builder->GetIntConstant(K * stride)->AddUse(easy_loop->m_cmp_instr);
   }
-  assert(i->m_type.IsBasicInt());
-  assert(n->m_type.IsBasicInt());
-  auto sub_instr
-      = std::make_shared<BinaryInstruction>(IROp::SUB, easy_loop->m_cond_bb);
-  sub_instr->m_lhs_val_use = n->AddUse(sub_instr);
-  sub_instr->m_rhs_val_use = i->AddUse(sub_instr);
-  auto it = std::find(easy_loop->m_cond_bb->m_instr_list.begin(),
-                      easy_loop->m_cond_bb->m_instr_list.end(),
-                      easy_loop->m_cmp_instr);
-  easy_loop->m_cond_bb->m_instr_list.insert(it, sub_instr);
-  easy_loop->m_cmp_instr->m_lhs_val_use->getValue()->KillUse(
-      easy_loop->m_cmp_instr->m_lhs_val_use);
-  easy_loop->m_cmp_instr->m_lhs_val_use
-      = builder->GetIntConstant(K * stride)->AddUse(easy_loop->m_cmp_instr);
-  easy_loop->m_cmp_instr->m_rhs_val_use->getValue()->KillUse(
-      easy_loop->m_cmp_instr->m_rhs_val_use);
-  easy_loop->m_cmp_instr->m_rhs_val_use
-      = sub_instr->AddUse(easy_loop->m_cmp_instr);
 }
 
 bool unroll(std::shared_ptr<Function> func, std::shared_ptr<Loop> loop,
@@ -486,6 +509,7 @@ bool CanBeUnrolled(std::shared_ptr<Loop> loop) {
 }
 
 void IRPassManager::LoopUnrollingPass() {
+  RemoveUnusedFunctions(m_builder->m_module);
   for (auto &func : m_builder->m_module->m_function_list) {
     ComputeLoopRelationship(func);
     auto deepest_loops = func->m_deepest_loops;
@@ -494,6 +518,6 @@ void IRPassManager::LoopUnrollingPass() {
         unroll(func, loop, m_builder);
       }
     }
-    // DeadCodeElimination(func);
+    DeadCodeElimination(func);
   }
 }
