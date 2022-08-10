@@ -53,10 +53,9 @@ set(IR_PASSES
   src/ir/pass/tail-recursion.cpp
   src/ir/pass/loop-detection.cpp
   src/ir/pass/strength-reduction.cpp
-  src/ir/pass/lcssa.cpp
   src/ir/pass/loop-unrolling.cpp
   src/ir/pass/loop-analysis.cpp
-  src/ir/pass/global-const-array.cpp)
+  src/ir/pass/global-const.cpp)
 
 set(ASM_SOURCE
   src/asm/asm.cpp

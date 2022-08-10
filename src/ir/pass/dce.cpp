@@ -42,6 +42,10 @@ void DeadCodeElimination(std::shared_ptr<Function> func) {
     // manually ++it
     auto instr = *it;
     auto bb = instr->m_bb;
-    bb->RemoveInstruction(instr);
+    auto it2
+        = std::find(bb->m_instr_list.begin(), bb->m_instr_list.end(), instr);
+    bb->m_instr_list.erase(it2);
+    // bb->RemoveInstruction(instr);
+    std::cerr << "[debug] dce" << std::endl;
   }
 }

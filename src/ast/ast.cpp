@@ -123,7 +123,17 @@ void InitBuiltinFunctions() {
   g_builtin_funcs.push_back(std::make_shared<FuncDefAST>(
       VarType::VOID, "llvm.memset.p0i8.i32", std::move(temp8), nullptr, true));
 
-  // TODO: memset for float array?
+  // _sysy_starttime(i32 lineno)
+  std::vector<std::unique_ptr<FuncFParamAST>> temp9;
+  temp9.push_back(std::make_unique<FuncFParamAST>(VarType::INT, ""));
+  g_builtin_funcs.push_back(std::make_shared<FuncDefAST>(
+      VarType::VOID, "_sysy_starttime", std::move(temp9), nullptr, true));
 
-  assert(g_builtin_funcs.size() == 11);
+  // _sysy_stoptime(i32 lineno)
+  std::vector<std::unique_ptr<FuncFParamAST>> temp10;
+  temp10.push_back(std::make_unique<FuncFParamAST>(VarType::INT, ""));
+  g_builtin_funcs.push_back(std::make_shared<FuncDefAST>(
+      VarType::VOID, "_sysy_stoptime", std::move(temp10), nullptr, true));
+
+  assert(g_builtin_funcs.size() == 13);
 }

@@ -4,7 +4,15 @@
 
 #include "ir/ir-pass-manager.h"
 
-bool CanBeConstSingle(std::shared_ptr<Value> var) { return false; }
+bool CanBeConstSingle(std::shared_ptr<Value> var) {
+  for (auto &use : var->m_use_list) {
+    auto user = use->getUser();
+    if (auto store = std::dynamic_pointer_cast<StoreInstruction>(user)) {
+      return false;
+    }
+  }
+  return true;
+}
 
 bool CanBeConstArray(std::shared_ptr<Value> var) {
   for (auto &use : var->m_use_list) {
@@ -32,6 +40,7 @@ bool CanBeConstArray(std::shared_ptr<Value> var) {
 void IRPassManager::EliminateGlobalConstArrayAccess() {
   SideEffectPass();
   std::vector<std::shared_ptr<GlobalVariable>> const_gvs;
+  std::vector<std::shared_ptr<GlobalVariable>> const_singles;
   for (auto &var : m_builder->m_module->m_global_variable_list) {
     if (var->m_is_array) {
       // check if it can be a const array
@@ -43,6 +52,33 @@ void IRPassManager::EliminateGlobalConstArrayAccess() {
       }
       if (var->m_is_const) {
         const_gvs.push_back(var);
+      }
+    } else {
+      if (!var->m_is_const) {
+        bool flag = CanBeConstSingle(var);
+        if (flag) {
+          var->m_is_const = true;
+        }
+      }
+      if (var->m_is_const) {
+        const_singles.push_back(var);
+      }
+    }
+  }
+
+  for (auto &var : const_singles) {
+    for (auto it = var->m_use_list.begin(); it != var->m_use_list.end(); ++it) {
+      auto user = it->get()->getUser();
+      auto val = var->GetFlattenVal(0);
+      if (auto load = std::dynamic_pointer_cast<LoadInstruction>(user)) {
+        assert(val.IsConstInt() || val.IsConstFloat());
+        std::shared_ptr<Value> new_val;
+        if (val.IsConstInt()) {
+          new_val = m_builder->GetIntConstant(val.IntVal());
+        } else {
+          new_val = m_builder->GetFloatConstant(val.FloatVal());
+        }
+        load->ReplaceUseBy(new_val);
       }
     }
   }

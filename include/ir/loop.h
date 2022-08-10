@@ -98,6 +98,7 @@ public:
         = std::find(easy_loop->m_phis.begin(), easy_loop->m_phis.end(), phi);
     if (it == easy_loop->m_phis.end()) return nullptr;
     auto dis = std::distance(easy_loop->m_phis.begin(), it);
+    assert(dis < m_phis.size());
     return m_phis[dis];
   }
 };

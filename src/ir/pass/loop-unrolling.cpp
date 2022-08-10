@@ -35,7 +35,13 @@ void CopyInstructions(
   };
   std::vector<std::shared_ptr<Instruction>> new_instrs;
   for (auto &instr : original_instrs) {
-    if (auto binary = std::dynamic_pointer_cast<BinaryInstruction>(instr)) {
+    if (auto alloca = std::dynamic_pointer_cast<AllocaInstruction>(instr)) {
+      auto new_alloca = std::make_shared<AllocaInstruction>(
+          alloca->m_type, bb, false, alloca->m_is_const);
+      bb->PushBackInstruction(new_alloca);
+      new_vals[alloca] = new_alloca;
+    } else if (auto binary
+               = std::dynamic_pointer_cast<BinaryInstruction>(instr)) {
       auto new_binary = std::make_shared<BinaryInstruction>(binary->m_op, bb);
       new_binary->m_lhs_val_use
           = GetNewVal(binary->m_lhs_val_use->getValue())->AddUse(new_binary);
@@ -43,6 +49,39 @@ void CopyInstructions(
           = GetNewVal(binary->m_rhs_val_use->getValue())->AddUse(new_binary);
       bb->PushBackInstruction(new_binary);
       new_vals[binary] = new_binary;
+    } else if (auto bitcast
+               = std::dynamic_pointer_cast<BitCastInstruction>(instr)) {
+      auto new_bitcast
+          = std::make_shared<BitCastInstruction>(bitcast->m_target_type, bb);
+      new_bitcast->m_val
+          = GetNewVal(bitcast->m_val->getValue())->AddUse(new_bitcast);
+      bb->PushBackInstruction(new_bitcast);
+      new_vals[bitcast] = new_bitcast;
+    } else if (auto zext = std::dynamic_pointer_cast<ZExtInstruction>(instr)) {
+      auto new_zext = std::make_shared<ZExtInstruction>(bb);
+      new_zext->m_val = GetNewVal(zext->m_val->getValue())->AddUse(new_zext);
+      bb->PushBackInstruction(new_zext);
+      new_vals[zext] = new_zext;
+    } else if (auto fneg = std::dynamic_pointer_cast<FNegInstruction>(instr)) {
+      auto new_fneg = std::make_shared<FNegInstruction>(bb);
+      new_fneg->m_lhs_val_use
+          = GetNewVal(fneg->m_lhs_val_use->getValue())->AddUse(new_fneg);
+      bb->PushBackInstruction(new_fneg);
+      new_vals[fneg] = new_fneg;
+    } else if (auto sitofp
+               = std::dynamic_pointer_cast<SIToFPInstruction>(instr)) {
+      auto new_sitofp = std::make_shared<SIToFPInstruction>(bb);
+      new_sitofp->m_val
+          = GetNewVal(sitofp->m_val->getValue())->AddUse(new_sitofp);
+      bb->PushBackInstruction(new_sitofp);
+      new_vals[sitofp] = new_sitofp;
+    } else if (auto fptosi
+               = std::dynamic_pointer_cast<FPToSIInstruction>(instr)) {
+      auto new_fptosi = std::make_shared<FPToSIInstruction>(bb);
+      new_fptosi->m_val
+          = GetNewVal(fptosi->m_val->getValue())->AddUse(new_fptosi);
+      bb->PushBackInstruction(new_fptosi);
+      new_vals[fptosi] = new_fptosi;
     } else if (auto call = std::dynamic_pointer_cast<CallInstruction>(instr)) {
       auto new_call = std::make_shared<CallInstruction>(
           call->m_type.m_base_type, call->m_func_name, call->m_function, bb);
@@ -79,7 +118,8 @@ void CopyInstructions(
       bb->PushBackInstruction(new_gep);
       new_vals[gep] = new_gep;
     } else {
-      assert(false);  // unexpected instructions
+      // return, jump, branch, phi cannot appear here
+      assert(false);
     }
     if (original_easy_loop->m_loop_vars_by_val.count(instr)) {
       if (easy_loop == original_easy_loop) {
@@ -122,14 +162,18 @@ void InsertResetLoop(
     new_phi->AddPhiOperand(easy_loop->m_cond_bb, phi);
     reset_easy_loop->m_phis.push_back(new_phi);
     reset_easy_loop->m_cond_bb->PushBackInstruction(new_phi);
-
+  }
+  assert(easy_loop->m_phis.size() == reset_easy_loop->m_phis.size());
+  for (int i = 0; i < easy_loop->m_phis.size(); ++i) {
+    auto phi = easy_loop->m_phis[i];
+    auto new_phi = reset_easy_loop->m_phis[i];
     auto val = phi->GetValue(easy_loop->m_body_bb);
     if (easy_loop->m_loop_vars_by_phi.count(val)) {
       new_phi->AddPhiOperand(
           reset_easy_loop->m_body_bb,
           reset_easy_loop->GetPhi(
               easy_loop, easy_loop->m_loop_vars_by_phi[val]->m_def_instr));
-      std::cerr << "[debug] ???" << std::endl;
+      std::cerr << "[debug] what does it mean???" << std::endl;
     }
   }
 
@@ -177,6 +221,21 @@ void InsertResetLoop(
     for (auto &loop_var : loop_vars) {
       loop_var->m_def_instr->AddPhiOperand(reset_easy_loop->m_body_bb,
                                            enter_var);
+      std::cerr << "[debug] not null" << std::endl;
+    }
+  }
+  for (auto &instr : reset_easy_loop->m_cond_bb->m_instr_list) {
+    if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
+      if (!phi->m_contents.count(easy_loop->m_cond_bb)) {
+        phi->AddPhiOperand(easy_loop->m_cond_bb, nullptr);
+        std::cerr << "[debug] null" << std::endl;
+      }
+      if (!phi->m_contents.count(reset_easy_loop->m_body_bb)) {
+        phi->AddPhiOperand(reset_easy_loop->m_body_bb, nullptr);
+        std::cerr << "[debug] null" << std::endl;
+      }
+    } else {
+      break;
     }
   }
 
@@ -220,12 +279,15 @@ void InsertResetLoop(
       assert(use_ptr.get() == use);
       use_ptr->m_value = reset_phi;
       reset_phi->m_use_list.push_back(std::move(use_ptr));
+      std::cerr << "[debug] rep" << std::endl;
     }
   }
 }
 
 void MakeRunOnce(std::shared_ptr<EasyLoop> easy_loop) {
-  //
+  // the easy loop will be not a loop
+  // choice 1: update loop info manually
+  // choice 2: delete all of its info
   for (auto &phi : easy_loop->m_phis) {
     auto body_val = phi->m_contents[easy_loop->m_body_bb]->getValue();
     // specially replace uses out of cond_bb and body_bb
@@ -262,59 +324,64 @@ void MakeRunOnce(std::shared_ptr<EasyLoop> easy_loop) {
   easy_loop->m_cond_bb->PushBackInstruction(new_jmp_instr2);
 }
 
+// TODO: only support int
 void FixUnrollLoopCond(std::shared_ptr<EasyLoop> easy_loop, int stride,
-                       int reset_cnt, std::shared_ptr<IRBuilder> builder) {
+                       int reset_cnt, std::shared_ptr<IRBuilder> builder,
+                       bool c = false) {
   // i < n
   // i < n - reset_cnt
   auto lhs_val = easy_loop->m_cmp_instr->m_lhs_val_use->getValue();
   auto rhs_val = easy_loop->m_cmp_instr->m_rhs_val_use->getValue();
-  auto rhs_const = std::dynamic_pointer_cast<Constant>(rhs_val);
-  auto lhs_const = std::dynamic_pointer_cast<Constant>(lhs_val);
-  if (easy_loop->m_cond_var->m_def_instr == lhs_val && rhs_const != nullptr) {
-    auto old_n = rhs_const->Evaluate().IntVal();
-    rhs_const->KillUse(easy_loop->m_cmp_instr->m_rhs_val_use);
-    auto new_n = stride > 0 ? old_n - reset_cnt : old_n + reset_cnt;
-    easy_loop->m_cmp_instr->m_rhs_val_use
-        = builder->GetIntConstant(new_n)->AddUse(easy_loop->m_cmp_instr);
-  } else if (easy_loop->m_cond_var->m_def_instr == rhs_val
-             && lhs_const != nullptr) {
-    auto old_n = lhs_const->Evaluate().IntVal();
-    lhs_const->KillUse(easy_loop->m_cmp_instr->m_lhs_val_use);
-    auto new_n = stride > 0 ? old_n - reset_cnt : old_n + reset_cnt;
-    easy_loop->m_cmp_instr->m_lhs_val_use
-        = builder->GetIntConstant(new_n)->AddUse(easy_loop->m_cmp_instr);
-  } else {
-    // non-const
-    // i < n
-    // K * stride < n - i
-    std::shared_ptr<Value> i = nullptr, n = nullptr;
-    if (lhs_val == easy_loop->m_cond_var->m_def_instr) {
-      i = lhs_val;
-      n = rhs_val;
-    } else {
-      assert(rhs_val == easy_loop->m_cond_var->m_def_instr);
-      i = rhs_val;
-      n = lhs_val;
+  if (c) {
+    auto rhs_const = std::dynamic_pointer_cast<Constant>(rhs_val);
+    auto lhs_const = std::dynamic_pointer_cast<Constant>(lhs_val);
+    if (easy_loop->m_cond_var->m_def_instr == lhs_val && rhs_const != nullptr) {
+      auto old_n = rhs_const->Evaluate().IntVal();
+      rhs_const->KillUse(easy_loop->m_cmp_instr->m_rhs_val_use);
+      auto new_n = stride > 0 ? old_n - reset_cnt : old_n + reset_cnt;
+      easy_loop->m_cmp_instr->m_rhs_val_use
+          = builder->GetIntConstant(new_n)->AddUse(easy_loop->m_cmp_instr);
+      return;
+    } else if (easy_loop->m_cond_var->m_def_instr == rhs_val
+               && lhs_const != nullptr) {
+      auto old_n = lhs_const->Evaluate().IntVal();
+      lhs_const->KillUse(easy_loop->m_cmp_instr->m_lhs_val_use);
+      auto new_n = stride > 0 ? old_n - reset_cnt : old_n + reset_cnt;
+      easy_loop->m_cmp_instr->m_lhs_val_use
+          = builder->GetIntConstant(new_n)->AddUse(easy_loop->m_cmp_instr);
+      return;
     }
-    assert(i->m_type.IsBasicInt());
-    assert(n->m_type.IsBasicInt());
-    auto sub_instr
-        = std::make_shared<BinaryInstruction>(IROp::SUB, easy_loop->m_cond_bb);
-    sub_instr->m_lhs_val_use = n->AddUse(sub_instr);
-    sub_instr->m_rhs_val_use = i->AddUse(sub_instr);
-    auto it = std::find(easy_loop->m_cond_bb->m_instr_list.begin(),
-                        easy_loop->m_cond_bb->m_instr_list.end(),
-                        easy_loop->m_cmp_instr);
-    easy_loop->m_cond_bb->m_instr_list.insert(it, sub_instr);
-    easy_loop->m_cmp_instr->m_lhs_val_use->getValue()->KillUse(
-        easy_loop->m_cmp_instr->m_lhs_val_use);
-    easy_loop->m_cmp_instr->m_lhs_val_use
-        = builder->GetIntConstant(K * stride)->AddUse(easy_loop->m_cmp_instr);
-    easy_loop->m_cmp_instr->m_rhs_val_use->getValue()->KillUse(
-        easy_loop->m_cmp_instr->m_rhs_val_use);
-    easy_loop->m_cmp_instr->m_rhs_val_use
-        = sub_instr->AddUse(easy_loop->m_cmp_instr);
   }
+  // non-const
+  // i < n
+  // K * stride < n - i
+  std::shared_ptr<Value> i = nullptr, n = nullptr;
+  if (lhs_val == easy_loop->m_cond_var->m_def_instr) {
+    i = lhs_val;
+    n = rhs_val;
+  } else {
+    assert(rhs_val == easy_loop->m_cond_var->m_def_instr);
+    i = rhs_val;
+    n = lhs_val;
+  }
+  assert(i->m_type.IsBasicInt());
+  assert(n->m_type.IsBasicInt());
+  auto sub_instr
+      = std::make_shared<BinaryInstruction>(IROp::SUB, easy_loop->m_cond_bb);
+  sub_instr->m_lhs_val_use = n->AddUse(sub_instr);
+  sub_instr->m_rhs_val_use = i->AddUse(sub_instr);
+  auto it = std::find(easy_loop->m_cond_bb->m_instr_list.begin(),
+                      easy_loop->m_cond_bb->m_instr_list.end(),
+                      easy_loop->m_cmp_instr);
+  easy_loop->m_cond_bb->m_instr_list.insert(it, sub_instr);
+  easy_loop->m_cmp_instr->m_lhs_val_use->getValue()->KillUse(
+      easy_loop->m_cmp_instr->m_lhs_val_use);
+  easy_loop->m_cmp_instr->m_lhs_val_use
+      = builder->GetIntConstant(K * stride)->AddUse(easy_loop->m_cmp_instr);
+  easy_loop->m_cmp_instr->m_rhs_val_use->getValue()->KillUse(
+      easy_loop->m_cmp_instr->m_rhs_val_use);
+  easy_loop->m_cmp_instr->m_rhs_val_use
+      = sub_instr->AddUse(easy_loop->m_cmp_instr);
 }
 
 bool unroll(std::shared_ptr<Function> func, std::shared_ptr<Loop> loop,
@@ -353,7 +420,8 @@ bool unroll(std::shared_ptr<Function> func, std::shared_ptr<Loop> loop,
       // 解决方案是控制i只跑到100，剩下的通过reset easy loop完成
       // 也就是要来个不完整的循环展开，弄一个没有回跳的“循环”就可以了
       std::cerr << "[debug] loop unrolling... (const)" << std::endl;
-      FixUnrollLoopCond(easy_loop, easy_loop->m_stride, reset_cnt, builder);
+      FixUnrollLoopCond(easy_loop, easy_loop->m_stride, reset_cnt, builder,
+                        true);
       auto reset_easy_loop = std::make_shared<EasyLoop>();
       InsertResetLoop(func, reset_easy_loop, easy_loop, original_instrs);
       if (reset_cnt > 1) {
@@ -390,11 +458,31 @@ bool unroll(std::shared_ptr<Function> func, std::shared_ptr<Loop> loop,
 
     auto reset_easy_loop = std::make_shared<EasyLoop>();
     InsertResetLoop(func, reset_easy_loop, easy_loop, original_instrs);
-    FixUnrollLoopCond(easy_loop, easy_loop->m_stride, K, builder);
+    FixUnrollLoopCond(easy_loop, easy_loop->m_stride, 233, builder);
     return true;
   } else {
     return false;
   }
+}
+
+bool CanBeUnrolled(std::shared_ptr<Loop> loop) {
+  // bbs.size() == 2
+  if (loop->m_bbs.size() != 2) return false;
+  std::shared_ptr<BasicBlock> loop_body;
+  int cnt = 0;
+  for (auto &bb : loop->m_bbs) {
+    if (bb == loop->m_header) {
+      ++cnt;
+    } else {
+      loop_body = bb;
+      --cnt;
+    }
+  }
+  assert(cnt == 0);
+  for (auto &instr : loop_body->m_instr_list) {
+    if (instr->m_op == IROp::RETURN || instr->m_op == IROp::PHI) return false;
+  }
+  return true;
 }
 
 void IRPassManager::LoopUnrollingPass() {
@@ -402,7 +490,10 @@ void IRPassManager::LoopUnrollingPass() {
     ComputeLoopRelationship(func);
     auto deepest_loops = func->m_deepest_loops;
     for (auto &loop : deepest_loops) {
-      unroll(func, loop, m_builder);
+      if (CanBeUnrolled(loop)) {
+        unroll(func, loop, m_builder);
+      }
     }
+    // DeadCodeElimination(func);
   }
 }
