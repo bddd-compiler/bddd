@@ -59,7 +59,7 @@ void Value::KillAllUses() {
 // move from val's m_use_list to new_val's m_use_list
 void Value::ReplaceUseBy(const std::shared_ptr<Value>& new_val) {
   for (auto it = m_use_list.begin(); it != m_use_list.end();) {
-    auto use = (*it).get();
+    auto use = it->get();
     ++it;
     assert(use->getValue() == shared_from_this());
     // SOMETHING NONTRIVIAL HERE: we just
@@ -133,7 +133,6 @@ void BasicBlock::InsertBackInstruction(const std::shared_ptr<Instruction>& elem,
   auto it = std::find(m_instr_list.begin(), m_instr_list.end(), elem);
   assert(it != m_instr_list.end());
   ++it;
-  assert(it != m_instr_list.end());
   instr->m_bb = shared_from_base<BasicBlock>();
   m_instr_list.insert(it, std::move(instr));
 }
@@ -184,6 +183,9 @@ bool BasicBlock::IsDominatedBy(std::shared_ptr<BasicBlock> bb) {
                          [=](const auto& x) { return x.get() == bb.get(); });
   return it != m_dominated.end();
 }
+void BasicBlock::AddPredecessor(std::shared_ptr<BasicBlock> bb) {
+  m_predecessors.insert(bb);
+}
 void BasicBlock::RemovePredecessor(std::shared_ptr<BasicBlock> bb) {
   for (auto& instr : m_instr_list) {
     if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
@@ -194,21 +196,28 @@ void BasicBlock::RemovePredecessor(std::shared_ptr<BasicBlock> bb) {
   }
   m_predecessors.erase(bb);
 }
-void BasicBlock::ReplacePredecessorBy(std::shared_ptr<BasicBlock> old_block,
-                                      std::shared_ptr<BasicBlock> new_block) {
+void BasicBlock::ReplacePredecessorsBy(
+    std::shared_ptr<BasicBlock> old_block,
+    std::unordered_set<std::shared_ptr<BasicBlock>> new_blocks) {
   // only phi instructions matter the predecessor
-  for (auto instr : m_instr_list) {
+  for (auto& instr : m_instr_list) {
     if (auto phi_instr = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
-      phi_instr->ReplacePhiOperand(old_block, new_block);
+      auto it = phi_instr->m_contents.find(old_block);
+      assert(it != phi_instr->m_contents.end());
+      auto val = (it->second != nullptr ? it->second->getValue() : nullptr);
+      for (auto& new_block : new_blocks) {
+        phi_instr->AddPhiOperand(new_block, val);
+      }
+      phi_instr->RemoveByBasicBlock(old_block);
+      // phi_instr->ReplacePhiOperand(old_block, new_block);
     } else {
       break;
     }
   }
   auto it = m_predecessors.find(old_block);
-  if (it != m_predecessors.end()) {
-    m_predecessors.erase(it);
-    m_predecessors.insert(new_block);
-  }
+  assert(it != m_predecessors.end());
+  m_predecessors.erase(it);
+  m_predecessors.insert(new_blocks.begin(), new_blocks.end());
 }
 
 void BasicBlock::ReplaceSuccessorBy(std::shared_ptr<BasicBlock> old_block,
@@ -239,8 +248,8 @@ void BasicBlock::ReplaceSuccessorBy(std::shared_ptr<BasicBlock> old_block,
       m_instr_list.pop_back();
       m_instr_list.push_back(new_jump_instr);
     }
-    old_block->m_predecessors.erase(jump_instr->m_bb);
-    new_block->m_predecessors.insert(jump_instr->m_bb);
+    old_block->m_predecessors.erase(br_instr->m_bb);
+    new_block->m_predecessors.insert(br_instr->m_bb);
   } else {
     assert(false);  // cannot be return instruction
   }
@@ -322,10 +331,18 @@ std::ostream& operator<<(std::ostream& out, ValueType value_type) {
 }
 
 bool PhiInstruction::IsValid() {
-  for (auto pred : m_bb->Predecessors()) {
+  for (auto& pred : m_bb->Predecessors()) {
     if (m_contents.find(pred) == m_contents.end()) {
       return false;
     }
   }
   return true;
+}
+EvalValue IntGlobalVariable::GetFlattenVal(int offset) {
+  assert(offset < m_flatten_vals.size());
+  return EvalValue(m_flatten_vals[offset]);
+}
+EvalValue FloatGlobalVariable::GetFlattenVal(int offset) {
+  assert(offset < m_flatten_vals.size());
+  return EvalValue(m_flatten_vals[offset]);
 }

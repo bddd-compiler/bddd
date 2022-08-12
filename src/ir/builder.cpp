@@ -636,7 +636,8 @@ std::shared_ptr<Value> IRBuilder::CreateFPToSIInstruction(
 std::shared_ptr<PhiInstruction> IRBuilder::CreatePhiInstruction(
     ValueType type, std::shared_ptr<BasicBlock> bb) {
   auto instr = std::make_shared<PhiInstruction>(type, bb);
-  // TODO(garen): Phi instruction does not initialize users
+  // Phi instruction does not initialize users?
+  // of course, cuz users will be added when adding operands in m_contents
   bb->PushFrontInstruction(instr);
   return instr;
 }

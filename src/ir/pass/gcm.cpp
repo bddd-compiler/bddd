@@ -273,7 +273,7 @@ void RunGCM(std::shared_ptr<Function> function,
     stack.pop();
     if (bb->m_visited) continue;
     bb->m_visited = true;
-    std::cerr << "[debug] bb.id: " << bb->m_id << std::endl;
+    // std::cerr << "[debug] bb.id: " << bb->m_id << std::endl;
 
     // determine "pinned" instructions and "unpinned" instructions
     // here the concept is inside a basic block
@@ -554,7 +554,7 @@ void RunGCM(std::shared_ptr<Function> function,
     assert(order.size() == mmp.size());
     // std::reverse(order.begin(), order.end());
     if (!order.empty()) {
-      std::cerr << "[debug] size: " << order.size() << std::endl;
+      // std::cerr << "[debug] size: " << order.size() << std::endl;
     }
 
     // for every pinned instruction, make sure all uses of operands appear
@@ -651,5 +651,8 @@ void IRPassManager::GCMPass() {
     RunGCM(func, m_builder);
     ReplaceTrivialBranchByJump(func);
     RemoveUnusedBasicBlocks(func);
+    RemoveTrivialPhis(func);
+    RemoveTrivialBasicBlocks(func);
   }
+  // RemoveUnusedFunctions(m_builder->m_module);
 }

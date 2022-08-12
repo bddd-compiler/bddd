@@ -1,10 +1,8 @@
-%skeleton "lalr1.cc" /* -*- C++ -*- */
-%require "3.0.4"
+%skeleton "lalr1.cc"
 %defines
 %define api.parser.class {parser}
 %define api.token.constructor
 %define api.value.type variant
-%define parse.assert
 %code requires
 {
 #include "ast/ast.h"
@@ -15,12 +13,11 @@ using std::vector;
 using std::unique_ptr;
 class Driver;
 }
-// The parsing context.
+
 %param { Driver & driver }
 %locations
 %initial-action
 {
-  // Initialize the initial location.
   @$.begin.filename = @$.end.filename = &driver.file;
 };
 %define parse.trace
@@ -212,7 +209,18 @@ UnaryExp: PrimaryExp { $$ = std::move($1); }
         ;
 
 FuncCall: IDENT TOK_LPAREN FuncRParams TOK_RPAREN { $$ = std::make_unique<FuncCallAST>(std::move($1)); $$->AssignParams(std::move($3)); }
-        | IDENT TOK_LPAREN TOK_RPAREN { $$ = std::make_unique<FuncCallAST>(std::move($1)); }
+        | IDENT TOK_LPAREN TOK_RPAREN {
+          if ($1 == "starttime" || $1 == "stoptime") {
+            // printf("%d,%d\n", @1.begin.line, @1.end.line);
+            assert(@1.begin.line == @1.end.line);
+            vector<unique_ptr<ExprAST>> params;
+            params.push_back(std::make_unique<ExprAST>(@1.begin.line));
+            $$ = std::make_unique<FuncCallAST>("_sysy_" + $1);
+            $$->AssignParams(std::move(params));
+          } else {
+            $$ = std::make_unique<FuncCallAST>(std::move($1));
+          }
+        }
         ;
 
 PrimaryExp: TOK_LPAREN Exp TOK_RPAREN { $$ = std::move($2); }

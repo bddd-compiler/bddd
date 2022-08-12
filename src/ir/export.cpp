@@ -77,52 +77,40 @@ std::string BinaryOpToString(IROp op) {
 }
 
 void PrintGlobalIntArrayValues(std::ofstream& ofs, int n, int& offset,
-                               std::unique_ptr<InitValAST>& init_val,
                                const std::vector<int>& sizes,
                                const std::shared_ptr<IntGlobalVariable>& gv) {
   ofs << gv->m_type.Dereference().Reduce(n) << " ";
-  if (init_val == nullptr || init_val->AllZero()) {
-    if (n == gv->m_type.m_dimensions.size()) {
-      ofs << gv->m_flatten_vals[offset++];
-    } else {
-      ofs << "zeroinitializer";
-      int tot = 1;
-      for (int i = n; i < gv->m_type.m_dimensions.size(); ++i) {
-        tot *= gv->m_type.m_dimensions[i];
-      }
-      offset += tot;
+  if (n == gv->m_type.m_dimensions.size()) {
+    ofs << gv->m_flatten_vals[offset++];
+    return;
+  }
+  auto IsZeroInitialized = [&gv](int l, int r) {
+    int sz = gv->m_flatten_vals.size();
+    int bound = std::min(sz - 1, r);
+    for (int i = l; i <= bound; ++i) {
+      if (gv->m_flatten_vals[i] != 0) return false;
     }
+    return true;
+  };
+  auto temp = offset / sizes[n];
+  auto l = temp * sizes[n];
+  auto r = l + sizes[n];
+  auto size = (n == sizes.size() - 1 ? 1 : sizes[n + 1]);
+  if (IsZeroInitialized(l, r)) {
+    ofs << "zeroinitializer";
+    offset += size;
   } else {
     if (n == gv->m_type.m_dimensions.size()) {
       ofs << gv->m_flatten_vals[offset++];
     } else {
       ofs << "[";
-      assert(init_val->m_vals.size() <= gv->m_type.m_dimensions[n]);
       bool first = true;
       for (int i = 0; i < gv->m_type.m_dimensions[n]; ++i) {
         if (first)
           first = false;
         else
           ofs << ", ";
-        if (i < init_val->m_vals.size()) {
-          // defined in init_val
-          PrintGlobalIntArrayValues(ofs, n + 1, offset, init_val->m_vals[i],
-                                    sizes, gv);
-        } else {
-          // default zero
-          if (n + 1 == gv->m_type.m_dimensions.size()) {
-            ofs << "i32 0";
-            ++offset;
-          } else {
-            ofs << gv->m_type.Dereference().Reduce(n + 1) << " ";
-            ofs << "zeroinitializer";
-            int tot = 1;
-            for (int i = n + 1; i < gv->m_type.m_dimensions.size(); ++i) {
-              tot *= gv->m_type.m_dimensions[i];
-            }
-            offset += tot;
-          }
-        }
+        PrintGlobalIntArrayValues(ofs, n + 1, offset, sizes, gv);
       }
       ofs << "]";
     }
@@ -245,9 +233,7 @@ void BasicBlock::ExportIR(std::ofstream& ofs, int depth) {
   ofs << std::endl;
   for (auto& instr : m_instr_list) {
     instr->ExportIR(ofs, depth);
-    if (instr->m_placed) {
-      ofs << "; (pinned)";
-    }
+    // if (instr->m_placed) ofs << "; (pinned)";
     ofs << std::endl;
   }
 }
@@ -267,7 +253,7 @@ void IntGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
       tot *= m_type.m_dimensions[i];
       sizes[i] = tot;
     }
-    PrintGlobalIntArrayValues(ofs, 0, offset, m_init_val, sizes,
+    PrintGlobalIntArrayValues(ofs, 0, offset, sizes,
                               shared_from_base<IntGlobalVariable>());
     ofs << std::endl;
   }

@@ -24,7 +24,7 @@ set(PARSER_SOURCE
   ${BISON_MyParser_OUTPUTS}
   ${FLEX_MyScanner_OUTPUTS}
   src/parser/driver.cpp
-)
+  )
 
 set(AST_SOURCE
   src/ast/ast.cpp
@@ -32,28 +32,30 @@ set(AST_SOURCE
   src/ast/type-check.cpp
   src/ast/debug.cpp
   src/ast/codegen.cpp
-)
+  )
 
 set(IR_SOURCE
   src/ir/ir.cpp
   src/ir/export.cpp
   src/ir/builder.cpp
   src/ir/ir-name-allocator.cpp
-)
+  )
 
 set(IR_PASSES
   src/ir/pass/mem2reg.cpp
   src/ir/pass/function-inlining.cpp
   src/ir/pass/gvn.cpp
   src/ir/pass/gcm.cpp
-  src/ir/pass/dead-code-elimination.cpp
+  src/ir/pass/dce.cpp
   src/ir/pass/side-effect.cpp
   src/ir/pass/dom.cpp
-  src/ir/pass/rpo.cpp 
-  src/ir/pass/basic.cpp 
+  src/ir/pass/basic.cpp
   src/ir/pass/tail-recursion.cpp
-  src/ir/pass/loop.cpp
-)
+  src/ir/pass/loop-detection.cpp
+  src/ir/pass/strength-reduction.cpp
+  src/ir/pass/loop-unrolling.cpp
+  src/ir/pass/loop-analysis.cpp
+  src/ir/pass/global-const.cpp)
 
 set(ASM_SOURCE
   src/asm/asm.cpp
@@ -64,7 +66,7 @@ set(ASM_SOURCE
   src/asm/asm-register.cpp
   src/asm/asm-fixed.cpp
   src/asm/asm-optimization.cpp
-)
+  )
 
 add_executable(bddd
   src/main.cpp
@@ -73,6 +75,6 @@ add_executable(bddd
   ${IR_SOURCE}
   ${IR_PASSES}
   ${ASM_SOURCE}
-)
+  )
 
 target_include_directories(bddd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

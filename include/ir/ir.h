@@ -351,6 +351,7 @@ public:
         m_is_array(decl->IsArray()) {}
 
   // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
+  virtual EvalValue GetFlattenVal(int offset) = 0;
 };
 
 class IntGlobalVariable : public GlobalVariable {
@@ -375,6 +376,8 @@ public:
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
+
+  EvalValue GetFlattenVal(int offset) override;
 };
 
 class FloatGlobalVariable : public GlobalVariable {
@@ -399,6 +402,8 @@ public:
   }
 
   void ExportIR(std::ofstream &ofs, int depth) override;
+
+  EvalValue GetFlattenVal(int offset) override;
 };
 
 class BasicBlock;
@@ -567,6 +572,28 @@ public:
         m_type.Set(BasicType::FLOAT);
         break;
       case VarType::VOID:
+        m_type.Set(BasicType::VOID);
+        break;
+      default:
+        assert(false);  // unreachable
+    }
+  }
+
+  explicit CallInstruction(BasicType return_type, std::string func_name,
+                           std::shared_ptr<Function> function,
+                           std::shared_ptr<BasicBlock> bb)
+      : Instruction(IROp::CALL, std::move(bb)),
+        m_func_name(std::move(func_name)),
+        m_function(std::move(function)),
+        m_params() {
+    switch (return_type) {
+      case BasicType::INT:
+        m_type.Set(BasicType::INT);
+        break;
+      case BasicType::FLOAT:
+        m_type.Set(BasicType::FLOAT);
+        break;
+      case BasicType::VOID:
         m_type.Set(BasicType::VOID);
         break;
       default:
@@ -769,7 +796,7 @@ public:
     auto it = std::find_if(
         m_contents.begin(), m_contents.end(),
         [=](const auto &x) { return x.first.get() == bb.get(); });
-    if (it == m_contents.end())
+    if (it == m_contents.end() || it->second == nullptr)
       return nullptr;
     else
       return it->second->m_value.lock();
@@ -777,26 +804,30 @@ public:
 
   void AddPhiOperand(std::shared_ptr<BasicBlock> bb,
                      std::shared_ptr<Value> val) {
-    auto it = std::find_if(
-        m_contents.begin(), m_contents.end(),
-        [=](const auto &x) { return x.first.get() == bb.get(); });
-    if (it == m_contents.end()) {
-      if (val == nullptr)
-        m_contents[bb] = nullptr;
-      else
-        m_contents[bb] = val->AddUse(shared_from_this());
-    } else {
-      // na mei shi le
-    }
+    auto it = m_contents.find(bb);
+    assert(it == m_contents.end());  // 想替换就用Replace那个，不要用这个
+    if (val == nullptr)
+      m_contents[bb] = nullptr;
+    else
+      m_contents[bb] = val->AddUse(shared_from_this());
   }
 
   void ReplacePhiOperand(std::shared_ptr<BasicBlock> old_block,
                          std::shared_ptr<BasicBlock> new_block) {
     auto it = m_contents.find(old_block);
-    if (it != m_contents.end()) {
-      AddPhiOperand(new_block, it->second->m_value.lock());
-      m_contents.erase(it);
-    }
+    assert(it != m_contents.end());  // must exist, otherwise should add
+    auto val = it->second->m_value.lock();
+    RemoveByBasicBlock(old_block);
+    AddPhiOperand(new_block, val);
+    // m_contents.erase(it);
+  }
+
+  void ReplacePhiValue(std::shared_ptr<BasicBlock> bb,
+                       std::shared_ptr<Value> new_val) {
+    auto it = m_contents.find(bb);
+    assert(it != m_contents.end());
+    RemoveByBasicBlock(bb);
+    AddPhiOperand(bb, new_val);
   }
 
   bool IsValid();
@@ -810,12 +841,13 @@ public:
   //   }
   // }
   void RemoveByBasicBlock(std::shared_ptr<BasicBlock> bb) {
-    for (auto it = m_contents.begin(); it != m_contents.end(); ++it) {
-      if (it->first == bb) {
-        m_contents.erase(it);
-        return;
-      }
+    auto it = m_contents.find(bb);
+    assert(it != m_contents.end());
+    auto [incoming_bb, use] = *it;
+    if (use != nullptr) {
+      use->getValue()->KillUse(use);
     }
+    m_contents.erase(it);
   }
 
   // void AllocateName(std::shared_ptr<IRNameAllocator> allocator) override;
@@ -921,18 +953,7 @@ public:
   }
 };
 
-class Loop {
-public:
-  std::shared_ptr<BasicBlock> m_preheader;
-  std::shared_ptr<BasicBlock> m_header;
-  std::set<std::shared_ptr<BasicBlock>> m_bbs;
-  std::set<std::shared_ptr<Loop>> m_sub_loops;
-  std::shared_ptr<Loop> m_fa_loop;
-  int m_loop_depth;
-
-  explicit Loop(std::shared_ptr<BasicBlock> header)
-      : m_header(std::move(header)), m_loop_depth(-1) {}
-};
+class Loop;
 
 class BasicBlock : public Value {
 private:
@@ -957,6 +978,7 @@ public:
   std::unordered_set<std::shared_ptr<BasicBlock>> m_predecessors;
 
   std::set<std::shared_ptr<Loop>> m_loops;
+  std::shared_ptr<Loop> m_deepest_loop;
 
   // methods
 
@@ -987,10 +1009,13 @@ public:
   std::unordered_set<std::shared_ptr<BasicBlock>> Predecessors();
   std::vector<std::shared_ptr<BasicBlock>> Successors();  // the order matters
 
+  void AddPredecessor(std::shared_ptr<BasicBlock> bb);
   void RemovePredecessor(std::shared_ptr<BasicBlock> bb);
 
-  void ReplacePredecessorBy(std::shared_ptr<BasicBlock> old_block,
-                            std::shared_ptr<BasicBlock> new_block);
+  void ReplacePredecessorsBy(
+      std::shared_ptr<BasicBlock> old_block,
+      std::unordered_set<std::shared_ptr<BasicBlock>> new_blocks);
+
   void ReplaceSuccessorBy(std::shared_ptr<BasicBlock> old_block,
                           std::shared_ptr<BasicBlock> new_block);
 
@@ -1001,6 +1026,8 @@ public:
   void ExportIR(std::ofstream &ofs, int depth) override;
 
   std::list<std::shared_ptr<Instruction>> GetInstList();
+
+  std::string Name() const { return m_name; }
 
   friend class Module;
 };
@@ -1061,9 +1088,13 @@ public:
   std::vector<std::shared_ptr<FunctionArg>> m_args;
   std::list<std::shared_ptr<BasicBlock>> m_bb_list;
 
-  std::list<std::shared_ptr<BasicBlock>> m_rpo_bb_list;
+  std::vector<
+      std::pair<std::shared_ptr<CallInstruction>, std::shared_ptr<Function>>>
+      m_calls;  // who call me?
+  int m_called_depth;
 
   std::set<std::shared_ptr<Loop>> m_loops;
+  std::vector<std::shared_ptr<Loop>> m_deepest_loops;
 
   bool m_visited;      // first used in ComputeSideEffect
   bool m_side_effect;  // whether the function has side effect
@@ -1074,6 +1105,7 @@ public:
         m_bb_list(),
         m_args(),
         m_is_decl(func_ast->m_is_builtin),
+        m_called_depth(-1),
         m_current_bb(nullptr),
         m_visited(false),
         m_side_effect(false) {
@@ -1098,6 +1130,7 @@ public:
 
   [[nodiscard]] std::string FuncName() const { return m_func_name; }
   [[nodiscard]] VarType ReturnType() const { return m_func_ast->ReturnType(); }
+  bool IsBuiltIn() const { return m_is_decl; }
 
   std::shared_ptr<BasicBlock> GetCurrentBB() { return m_current_bb; }
 

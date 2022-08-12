@@ -9,9 +9,11 @@ void ComputeDominanceFrontier(std::shared_ptr<Function> function);
 void RemoveUnusedBasicBlocks(std::shared_ptr<Function> func);
 void RemoveTrivialPhis(std::shared_ptr<Function> func);
 void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func);
-void RemoveTrivialBasicBlock(std::shared_ptr<Function> func);
+void RemoveTrivialBasicBlocks(std::shared_ptr<Function> func);
 void ComputeLoopRelationship(std::shared_ptr<Function> func);
-void DeadCodeElimination(std::shared_ptr<Function> function);
+void DeadCodeElimination(std::shared_ptr<Function> func);
+void RemoveUnusedFunctions(std::unique_ptr<Module> &module);
+void UpdatePredecessors(std::shared_ptr<Function> func);
 
 class IRPassManager {
 public:
@@ -30,7 +32,13 @@ public:
 
   void SideEffectPass();
 
-private:
+  void StrengthReductionPass();
+
+  void TailRecursionPass();
+
+  void LoopUnrollingPass();
+
+  void EliminateGlobalConstArrayAccess();
 };
 
 #endif  // BDDD_IR_PASS_MANAGER_H

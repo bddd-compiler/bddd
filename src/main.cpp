@@ -85,10 +85,11 @@ int main(int argc, char *argv[]) {
 
   auto pass_manager = std::make_unique<IRPassManager>(builder);
   pass_manager->Mem2RegPass();  // now no allocas for single variable
-  pass_manager->GVNPass();      // global value numbering
-  // but IR after GVN may not be executable since the position is incorrect
-  // (some virtual registers do not dominate all of its uses)
-  // we should hoist these VRs to a proper place, so use GCM
+  pass_manager->EliminateGlobalConstArrayAccess();
+  pass_manager->TailRecursionPass();
+  pass_manager->FunctionInliningPass();
+  pass_manager->LoopUnrollingPass();
+  pass_manager->GVNPass();
   pass_manager->GCMPass();
 
   if (ir_path) {
