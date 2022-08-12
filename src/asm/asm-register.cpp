@@ -81,7 +81,7 @@ void RegisterAllocator::initialColors() {
                       RReg::R10, RReg::R11, RReg::R12, RReg::LR};
     K = rreg_avaliable.size();
   } else {
-    for (int i = 1; i < 32; i++) {
+    for (int i = 0; i < 32; i++) {
       sreg_avaliable.insert((SReg)i);
     }
     K = sreg_avaliable.size();
@@ -137,16 +137,12 @@ void RegisterAllocator::AllocateCurFunc() {
   isSelectSpill = false;
   do {
     if (!simplifyWorklist.empty()) {
-      // std::cout << "Simplify" << std::endl;
       Simplify();
     } else if (!worklistMoves.empty()) {
-      // std::cout << "Coalesce" << std::endl;
       Coalesce();
     } else if (!freezeWorklist.empty()) {
-      // std::cout << "Freeze" << std::endl;
       Freeze();
     } else if (!spillWorklist.empty()) {
-      // std::cout << "SelectSpill" << std::endl;
       SelectSpill();
     }
   } while (!simplifyWorklist.empty() || !worklistMoves.empty()
@@ -272,7 +268,6 @@ std::unordered_set<OpPtr> RegisterAllocator::Adjacent(OpPtr n) {
 
 std::unordered_set<std::shared_ptr<MOVInst>> RegisterAllocator::NodeMoves(
     OpPtr n) {
-  // debug("NodeMoves");
   if (moveList.find(n) == moveList.end()) {
     return {};
   }

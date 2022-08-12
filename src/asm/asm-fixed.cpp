@@ -24,10 +24,9 @@ void fixedParamsOffs(std::shared_ptr<ASM_Module> module) {
       if (Operand::addrOffsCheck(offs, ldr->m_dest->m_is_float))
         ldr->m_offs->m_int_val = offs;
       else {
-        auto mov_temp = std::make_shared<Operand>(OperandType::VREG);
-        auto mov = std::make_shared<MOVInst>(mov_temp, offs);
+        auto mov = std::make_shared<MOVInst>(Operand::getRReg(RReg::R12), offs);
         block->m_insts.insert(func->m_params_pos_map[inst], mov);
-        ldr->m_offs = mov_temp;
+        ldr->m_offs = Operand::getRReg(RReg::R12);
       }
     }
   }

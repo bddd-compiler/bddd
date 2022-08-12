@@ -55,6 +55,7 @@ int main(int argc, char *argv[]) {
   }
 
   std::cout << "compiling: " << argv[optind] << std::endl;
+  std::cout << "parsing..." << std::endl;
   /**
    * parse the source code into AST
    * ASTs can be accessed via driver.comp_unit
@@ -64,7 +65,6 @@ int main(int argc, char *argv[]) {
     std::cerr << argv[optind] << " GG" << std::endl;
     return 1;
   }
-
   InitBuiltinFunctions();
   try {
     SymbolTable symbol_table(g_builtin_funcs);
@@ -73,6 +73,8 @@ int main(int argc, char *argv[]) {
     std::cerr << "exception during typechecking: " << e.Msg() << std::endl;
     return 1;
   }
+
+  std::cout << "generating ir..." << std::endl;
 
   auto module = std::make_unique<Module>();
   for (auto &builtin_func : g_builtin_funcs) {
@@ -103,6 +105,8 @@ int main(int argc, char *argv[]) {
     ofs.close();
   }
 
+  std::cout << "generating asm..." << std::endl;
+
   // generate assembly
   auto asm_module = std::make_shared<ASM_Module>();
   auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
@@ -113,6 +117,8 @@ int main(int argc, char *argv[]) {
     asm_module->exportASM(ofs);
     ofs.close();
   }
+
+  std::cout << "allocating..." << std::endl;
 
   // register allocator
   RegisterAllocator(asm_module, RegType::R).Allocate();

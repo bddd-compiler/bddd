@@ -229,8 +229,9 @@ void MOVInst::exportASM(std::ofstream& ofs) {
     } else {
       ofs << "\tMOVW" << getCondName() << " " << m_dest->getName() << ", #"
           << std::to_string(imm & 65535) << std::endl;
-      ofs << "\tMOVT" << getCondName() << " " << m_dest->getName() << ", #"
-          << std::to_string((unsigned int)imm >> 16) << std::endl;
+      if ((unsigned int)imm >> 16)
+        ofs << "\tMOVT" << getCondName() << " " << m_dest->getName() << ", #"
+            << std::to_string((unsigned int)imm >> 16) << std::endl;
     }
     return;
   }
