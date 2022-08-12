@@ -20,6 +20,8 @@ CondType GetCondFromIR(IROp op) {
     case IROp::I_NE:
     case IROp::F_NE:
       return CondType::NE;
+    default:
+      break;
   }
   return CondType::NONE;
 }
@@ -359,6 +361,8 @@ std::string ASM_Instruction::getOpSuffixName() {
     case InstOp::VLDR:
     case InstOp::VSTR:
       return ".32";
+    default:
+      break;
   }
   return "";
 }
@@ -377,6 +381,8 @@ std::string ASM_Instruction::getCondName() {
       return "GT";
     case CondType::GE:
       return "GE";
+    default:
+      break;
   }
   return "";
 }
@@ -395,6 +401,8 @@ CondType ASM_Instruction::getOppositeCond(CondType cond) {
       return CondType::LE;
     case CondType::GE:
       return CondType::LT;
+    case CondType::NONE:
+      return CondType::NONE;
   }
   return CondType::NONE;
 }
@@ -545,10 +553,10 @@ CALLInst::CALLInst(VarType type, std::string label, int n) {
   addDef(Operand::getRReg(RReg::R12));
   addDef(Operand::getRReg(RReg::LR));
 
-  // if (label == "putfloat") {
-  //   addUse(Operand::getSReg(SReg::S0));
-  //   return;
-  // }
+  if (label == "putfloat") {
+    addUse(Operand::getSReg(SReg::S0));
+    return;
+  }
 
   int i = 0;
   while (i < 4 && i < n) {

@@ -81,7 +81,7 @@ void RegisterAllocator::initialColors() {
                       RReg::R10, RReg::R11, RReg::R12, RReg::LR};
     K = rreg_avaliable.size();
   } else {
-    for (int i = 0; i < 32; i++) {
+    for (int i = 8; i < 32; i++) {
       sreg_avaliable.insert((SReg)i);
     }
     K = sreg_avaliable.size();

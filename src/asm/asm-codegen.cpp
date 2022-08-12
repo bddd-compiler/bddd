@@ -247,6 +247,12 @@ std::shared_ptr<Operand> GenerateBinary(std::shared_ptr<BinaryInstruction> inst,
     case IROp::F_LT:
     case IROp::F_LE:
       return GenerateCMP(inst, builder);
+    case IROp::ZEXT:
+    case IROp::FPTOSI:
+    case IROp::SITOFP:
+      std::cerr << "Is this really a binary instruction???" << std::endl;
+    default:
+      assert(false);
   }
   return nullptr;
 }
@@ -268,12 +274,12 @@ std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
     return nullptr;
   }
 
-  // if (inst->m_func_name == "putfloat") {
-  //   builder->appendMOV(Operand::getSReg(SReg::S0),
-  //                      builder->getOperand(inst->m_params[0]->getValue()));
-  //   builder->appendCALL(VarType::VOID, "putfloat", 1);
-  //   return nullptr;
-  // }
+  if (inst->m_func_name == "putfloat") {
+    builder->appendMOV(Operand::getSReg(SReg::S0),
+                       builder->getOperand(inst->m_params[0]->getValue()));
+    builder->appendCALL(VarType::VOID, "putfloat", 1);
+    return nullptr;
+  }
 
   int n = inst->m_params.size();
   // calculate the stack move size
@@ -326,9 +332,9 @@ std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
   std::shared_ptr<Operand> ret;
   if (return_type == VarType::INT || return_type == VarType::FLOAT) {
     ret = builder->getOperand(inst);
-    // if (inst->m_func_name == "getfloat")
-    //   builder->appendMOV(ret, Operand::getSReg(SReg::S0));
-    // else
+    if (inst->m_func_name == "getfloat")
+      builder->appendMOV(ret, Operand::getSReg(SReg::S0));
+    else
       builder->appendMOV(ret, Operand::getRReg(RReg::R0));
   }
 

@@ -13,6 +13,9 @@ void fixedParamsOffs(std::shared_ptr<ASM_Module> module) {
       stack_size &= ~(unsigned int)7;
       stack_size += 8;
     }
+    if (func->m_push->m_regs.size() % 2) {
+    stack_size += 4;
+  }
     stack_size += func->m_push->m_regs.size() * 4;
     auto block = func->m_blocks.front();
     for (auto& inst : func->m_params_set_list) {

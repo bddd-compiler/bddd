@@ -137,12 +137,15 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
 
   // allocate stack
   int size = m_local_alloc;
-  if (size) {
-    if (size & 7) {
-      size &= ~(unsigned int)7;
-      size += 8;
-    }
+  if (size & 7) {
+    size &= ~(unsigned int)7;
+    size += 8;
+  }
+  if (m_push->m_regs.size() % 2) {
+    size += 4;
+  }
 
+  if (size) {
     // this part is taken from tinbaccc directly
     if (Operand::immCheck(size)) {
       ofs << "\tSUB SP, SP, #" << std::to_string(size) << std::endl;
@@ -229,7 +232,7 @@ void MOVInst::exportASM(std::ofstream& ofs) {
     } else {
       ofs << "\tMOVW" << getCondName() << " " << m_dest->getName() << ", #"
           << std::to_string(imm & 65535) << std::endl;
-      if ((unsigned int)imm >> 16)
+      if (imm & 0xffff0000)
         ofs << "\tMOVT" << getCondName() << " " << m_dest->getName() << ", #"
             << std::to_string((unsigned int)imm >> 16) << std::endl;
     }
