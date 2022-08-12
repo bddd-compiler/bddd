@@ -1,5 +1,5 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 3.16)
-PROJECT(compiler VERSION 0.1)
+PROJECT(bddd VERSION 0.1)
 SET(CMAKE_CXX_STANDARD 17)
 
 include_directories(include)
@@ -66,7 +66,7 @@ set(ASM_SOURCE
   src/asm/asm-optimization.cpp
 )
 
-add_executable(compiler
+add_executable(bddd
   src/main.cpp
   ${PARSER_SOURCE}
   ${AST_SOURCE}
@@ -75,4 +75,4 @@ add_executable(compiler
   ${ASM_SOURCE}
 )
 
-target_include_directories(compiler PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(bddd PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

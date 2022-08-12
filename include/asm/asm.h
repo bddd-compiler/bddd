@@ -324,7 +324,7 @@ public:
 
   std::string getCondName();
 
-  CondType getOppositeCond();
+  static CondType getOppositeCond(CondType cond);
 
   void exportInstHead(std::ofstream& ofs);
 

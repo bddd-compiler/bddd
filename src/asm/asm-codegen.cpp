@@ -165,8 +165,9 @@ std::shared_ptr<Operand> GenerateMod(std::shared_ptr<BinaryInstruction> inst,
   //         builder->appendBIT(InstOp::AND, ret, devidend, mov_temp);
   //       }
   //       // check if val1 is negative
-  //       builder->appendCT(InstOp::CMP, devidend, std::make_shared<Operand>(0));
-  //       auto sub = builder->appendAS(InstOp::SUB, ret, ret,
+  //       builder->appendCT(InstOp::CMP, devidend,
+  //       std::make_shared<Operand>(0)); auto sub =
+  //       builder->appendAS(InstOp::SUB, ret, ret,
   //                                    std::make_shared<Operand>(temp));
   //       sub->m_cond = CondType::LT;
   //       return ret;
@@ -343,7 +344,17 @@ std::shared_ptr<Operand> GenerateBranch(std::shared_ptr<BranchInstruction> inst,
 
   inst_cond
       = std::dynamic_pointer_cast<BinaryInstruction>(inst->m_cond->getValue());
+
+  bool is_not = false;
+  while (inst_cond->m_op == IROp::XOR) {
+    is_not = !is_not;
+    inst_cond = std::dynamic_pointer_cast<BinaryInstruction>(
+        inst_cond->m_lhs_val_use->getValue());
+  }
   CondType cond = GetCondFromIR(inst_cond->m_op);
+  if (is_not) {
+    cond = ASM_Instruction::getOppositeCond(cond);
+  }
   assert(cond != CondType::NONE);
   builder->appendB(true_block, cond);
   builder->m_cur_block->m_branch_pos
@@ -564,8 +575,23 @@ std::shared_ptr<Operand> GenerateBitCast(
 std::shared_ptr<Operand> GenerateZExt(std::shared_ptr<ZExtInstruction> inst,
                                       std::shared_ptr<ASM_Builder> builder) {
   auto src_val = inst->m_val->getValue();
-  auto ret = builder->getOperand(src_val);
-  builder->m_value_map.insert(std::make_pair(inst, ret));
+  auto inst_cond = std::dynamic_pointer_cast<BinaryInstruction>(src_val);
+  bool is_not = false;
+  while (inst_cond->m_op == IROp::XOR) {
+    is_not = !is_not;
+    inst_cond = std::dynamic_pointer_cast<BinaryInstruction>(
+        inst_cond->m_lhs_val_use->getValue());
+  }
+  CondType cond = GetCondFromIR(inst_cond->m_op);
+  if (is_not) {
+    cond = ASM_Instruction::getOppositeCond(cond);
+  }
+  assert(cond != CondType::NONE);
+  auto ret = builder->getOperand(inst);
+  auto mov_true = builder->appendMOV(ret, 1);
+  auto mov_false = builder->appendMOV(ret, 0);
+  mov_true->m_cond = cond;
+  mov_false->m_cond = ASM_Instruction::getOppositeCond(cond);
   return ret;
 }
 

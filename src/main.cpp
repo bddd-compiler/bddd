@@ -19,18 +19,23 @@ static const struct option long_options[]
     = {{"generate-assembly", no_argument, NULL, 'S'},
        {"output", required_argument, NULL, 'o'},
        {"optimization", required_argument, NULL, 'O'},
+       {"output-ir", required_argument, NULL, 'i'},
        {NULL, no_argument, NULL, 0}};
 
 int main(int argc, char *argv[]) {
   int ch;
   const char *asm_path = nullptr;
-  while ((ch = getopt_long(argc, argv, "So:O:", long_options, NULL)) != -1) {
+  const char *ir_path = nullptr;
+  while ((ch = getopt_long(argc, argv, "So:O:i:", long_options, NULL)) != -1) {
     switch (ch) {
       case 'S':
       case 'O':
         break;
       case 'o':
         asm_path = optarg;
+        break;
+      case 'i':
+        ir_path = optarg;
         break;
       default:
         return -1;
@@ -85,6 +90,12 @@ int main(int argc, char *argv[]) {
   // (some virtual registers do not dominate all of its uses)
   // we should hoist these VRs to a proper place, so use GCM
   // pass_manager->GCMPass();
+
+  if (ir_path) {
+    std::ofstream ofs(ir_path);
+    builder->m_module->ExportIR(ofs, 0);
+    ofs.close();
+  }
 
   // generate assembly
   auto asm_module = std::make_shared<ASM_Module>();

@@ -381,8 +381,8 @@ std::string ASM_Instruction::getCondName() {
   return "";
 }
 
-CondType ASM_Instruction::getOppositeCond() {
-  switch (m_cond) {
+CondType ASM_Instruction::getOppositeCond(CondType cond) {
+  switch (cond) {
     case CondType::EQ:
       return CondType::NE;
     case CondType::NE:
