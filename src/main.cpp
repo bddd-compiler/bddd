@@ -20,13 +20,15 @@ static const struct option long_options[]
        {"output", required_argument, NULL, 'o'},
        {"optimization", required_argument, NULL, 'O'},
        {"output-ir", required_argument, NULL, 'i'},
+       {"output-tmp-asm", required_argument, NULL, 't'},
        {NULL, no_argument, NULL, 0}};
 
 int main(int argc, char *argv[]) {
   int ch;
   const char *asm_path = nullptr;
   const char *ir_path = nullptr;
-  while ((ch = getopt_long(argc, argv, "So:O:i:", long_options, NULL)) != -1) {
+  const char *tmp_asm_path = nullptr;
+  while ((ch = getopt_long(argc, argv, "So:O:i:t:", long_options, NULL)) != -1) {
     switch (ch) {
       case 'S':
       case 'O':
@@ -36,6 +38,9 @@ int main(int argc, char *argv[]) {
         break;
       case 'i':
         ir_path = optarg;
+        break;
+      case 't':
+        tmp_asm_path = optarg;
         break;
       default:
         return -1;
@@ -88,7 +93,7 @@ int main(int argc, char *argv[]) {
   pass_manager->EliminateGlobalConstArrayAccess();
   pass_manager->TailRecursionPass();
   pass_manager->FunctionInliningPass();
-  pass_manager->LoopUnrollingPass();
+  // pass_manager->LoopUnrollingPass();
   pass_manager->GVNPass();
   pass_manager->GCMPass();
 
@@ -103,13 +108,19 @@ int main(int argc, char *argv[]) {
   auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
   GenerateModule(std::move(builder->m_module), asm_builder);
 
+  if (tmp_asm_path) {
+    std::ofstream ofs(tmp_asm_path);
+    asm_module->exportASM(ofs);
+    ofs.close();
+  }
+
   // register allocator
   RegisterAllocator(asm_module, RegType::R).Allocate();
   RegisterAllocator(asm_module, RegType::S).Allocate();
 
   // fixing and optimization
   fixedParamsOffs(asm_module);
-  optimize(asm_module);
+  // optimize(asm_module);
   generateLiteralPool(asm_module);
   std::ofstream ofs(asm_path);
   asm_module->exportASM(ofs);

@@ -545,10 +545,10 @@ CALLInst::CALLInst(VarType type, std::string label, int n) {
   addDef(Operand::getRReg(RReg::R12));
   addDef(Operand::getRReg(RReg::LR));
 
-  if (label == "putfloat") {
-    addUse(Operand::getSReg(SReg::S0));
-    return;
-  }
+  // if (label == "putfloat") {
+  //   addUse(Operand::getSReg(SReg::S0));
+  //   return;
+  // }
 
   int i = 0;
   while (i < 4 && i < n) {

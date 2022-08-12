@@ -200,9 +200,9 @@ void RegisterAllocator::Build() {
       if (auto I = std::dynamic_pointer_cast<MOVInst>(inst)) {
         if (I->m_type != MOVType::IMM && I->m_dest->getRegType() == m_reg_type
             && I->m_src->getRegType() == m_reg_type) {
-          for (auto& use : uses) {
-            live.erase(use);
-          }
+          // for (auto& use : uses) {
+          //   live.erase(use);
+          // }
           for (auto& n : defs) {
             moveList[n].insert(I);
             updateDepth(I->m_block, n);

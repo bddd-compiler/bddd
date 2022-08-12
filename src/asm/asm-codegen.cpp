@@ -268,12 +268,12 @@ std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
     return nullptr;
   }
 
-  if (inst->m_func_name == "putfloat") {
-    builder->appendMOV(Operand::getSReg(SReg::S0),
-                       builder->getOperand(inst->m_params[0]->getValue()));
-    builder->appendCALL(VarType::VOID, "putfloat", 1);
-    return nullptr;
-  }
+  // if (inst->m_func_name == "putfloat") {
+  //   builder->appendMOV(Operand::getSReg(SReg::S0),
+  //                      builder->getOperand(inst->m_params[0]->getValue()));
+  //   builder->appendCALL(VarType::VOID, "putfloat", 1);
+  //   return nullptr;
+  // }
 
   int n = inst->m_params.size();
   // calculate the stack move size
@@ -326,9 +326,9 @@ std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
   std::shared_ptr<Operand> ret;
   if (return_type == VarType::INT || return_type == VarType::FLOAT) {
     ret = builder->getOperand(inst);
-    if (inst->m_func_name == "getfloat")
-      builder->appendMOV(ret, Operand::getRReg(RReg::R3));
-    else
+    // if (inst->m_func_name == "getfloat")
+    //   builder->appendMOV(ret, Operand::getSReg(SReg::S0));
+    // else
       builder->appendMOV(ret, Operand::getRReg(RReg::R0));
   }
 
@@ -536,7 +536,7 @@ std::shared_ptr<Operand> GeneratePhi(std::shared_ptr<PhiInstruction> inst,
                                      std::shared_ptr<ASM_Builder> builder) {
   // we need to store the temp result to make sure all PHI instruction execute
   // in parallel  (XXX)
-#if 0
+#if 1
   auto tmp = std::make_shared<Operand>(OperandType::VREG);
   tmp->m_is_float = inst->m_type.IsBasicFloat();
   auto ret = builder->getOperand(inst);

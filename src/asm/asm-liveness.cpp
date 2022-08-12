@@ -38,7 +38,9 @@ void RegisterAllocator::LivenessAnalysis() {
         }
       }
       for (auto& def : defs) {
-        b->m_def.insert(def);
+        if (b->m_use.find(def) == b->m_use.end()) {
+          b->m_def.insert(def);
+        }
       }
     }
     b->m_livein.clear();
