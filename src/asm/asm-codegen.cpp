@@ -2,19 +2,19 @@
 #include "ir/ir.h"
 
 std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
-    std::shared_ptr<Constant> value, bool genimm, bool checkimm) {
+    std::shared_ptr<Constant> value, bool genimm, bool checkimm, std::shared_ptr<ASM_BasicBlock> phi_block) {
   assert(value->m_type.IsConst());
   std::shared_ptr<Operand> ret;
   if (value->m_type.IsBasicFloat()) {
     ret = std::make_shared<Operand>(OperandType::VREG, true);
-    appendMOV(ret, value->m_float_val);
+    appendMOV(ret, value->m_float_val, phi_block);
   } else {
     int imm = value->m_int_val;
     if (genimm && (!checkimm || Operand::immCheck(imm))) {
       return std::make_shared<Operand>(imm);
     }
     ret = std::make_shared<Operand>(OperandType::VREG);
-    appendMOV(ret, imm);
+    appendMOV(ret, imm, phi_block);
   }
   return ret;
 }
@@ -554,7 +554,7 @@ std::shared_ptr<Operand> GeneratePhi(std::shared_ptr<PhiInstruction> inst,
     std::shared_ptr<ASM_BasicBlock> block = builder->getBlock(ir_block);
     assert(block);
     if (!value) continue;
-    auto src = builder->getOperand(value->getValue(), true, false);
+    auto src = builder->getOperand(value->getValue(), true, false, block);
     block->appendFilledMOV(std::make_shared<MOVInst>(tmp, src));
   }
   return ret;

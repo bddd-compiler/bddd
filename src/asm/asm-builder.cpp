@@ -120,13 +120,14 @@ void ASM_Builder::reclaimSP() {
   appendAS(InstOp::ADD, sp, sp, offs);
 }
 
-std::shared_ptr<Operand> ASM_Builder::getOperand(std::shared_ptr<Value> value,
-                                                 bool genimm, bool checkimm) {
+std::shared_ptr<Operand> ASM_Builder::getOperand(
+    std::shared_ptr<Value> value, bool genimm, bool checkimm,
+    std::shared_ptr<ASM_BasicBlock> phi_block) {
   if (m_value_map.find(value) != m_value_map.end()) {
     return m_value_map[value];
   }
   if (auto val = std::dynamic_pointer_cast<Constant>(value)) {
-    return GenerateConstant(val, genimm, checkimm);
+    return GenerateConstant(val, genimm, checkimm, phi_block);
   }
   return createOperand(value);
 }
@@ -178,26 +179,39 @@ std::shared_ptr<STRInst> ASM_Builder::appendSTR(std::shared_ptr<Operand> src,
 }
 
 // appendMOV
-std::shared_ptr<MOVInst> ASM_Builder::appendMOV(std::shared_ptr<Operand> dest,
-                                                int imm) {
+std::shared_ptr<MOVInst> ASM_Builder::appendMOV(
+    std::shared_ptr<Operand> dest, int imm,
+    std::shared_ptr<ASM_BasicBlock> phi_block) {
   auto mov = std::make_shared<MOVInst>(dest, imm);
-  m_cur_block->insert(mov);
+  if (phi_block)
+    phi_block->insertPhiMOV(mov);
+  else
+    m_cur_block->insert(mov);
   return mov;
 }
 
-std::shared_ptr<MOVInst> ASM_Builder::appendMOV(std::shared_ptr<Operand> dest,
-                                                float imm) {
+std::shared_ptr<MOVInst> ASM_Builder::appendMOV(
+    std::shared_ptr<Operand> dest, float imm,
+    std::shared_ptr<ASM_BasicBlock> phi_block) {
   std::shared_ptr<MOVInst> mov;
   if (Operand::immCheck(imm)) {
     mov = std::make_shared<MOVInst>(dest, imm);
-    m_cur_block->insert(mov);
+    if (phi_block)
+      phi_block->insertPhiMOV(mov);
+    else
+      m_cur_block->insert(mov);
   } else {
     int temp = *(int*)&imm;
     auto mov_temp = std::make_shared<MOVInst>(
         std::make_shared<Operand>(OperandType::VREG), temp);
     auto mov = std::make_shared<MOVInst>(dest, mov_temp->m_dest);
-    m_cur_block->insert(mov_temp);
-    m_cur_block->insert(mov);
+    if (phi_block) {
+      phi_block->insertPhiMOV(mov_temp);
+      phi_block->insertPhiMOV(mov);
+    } else {
+      m_cur_block->insert(mov_temp);
+      m_cur_block->insert(mov);
+    }
   }
   return mov;
 }

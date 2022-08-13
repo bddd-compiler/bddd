@@ -46,8 +46,9 @@ public:
   void reclaimSP();
 
   std::shared_ptr<Operand> getOperand(std::shared_ptr<Value> value,
-                                      bool genimm = false,
-                                      bool checkimm = true);
+                                      bool genimm = false, bool checkimm = true,
+                                      std::shared_ptr<ASM_BasicBlock> phi_block
+                                      = nullptr);
 
   std::shared_ptr<Operand> createOperand(std::shared_ptr<Value> value);
 
@@ -69,9 +70,11 @@ public:
                                      std::shared_ptr<Operand> offs);
 
   // appendMOV
-  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, int imm);
+  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, int imm,
+                                     std::shared_ptr<ASM_BasicBlock> phi_block = nullptr);
 
-  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, float imm);
+  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, float imm,
+                                     std::shared_ptr<ASM_BasicBlock> phi_block = nullptr);
 
   std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest,
                                      std::shared_ptr<Operand> src);
@@ -97,10 +100,9 @@ public:
                                          std::shared_ptr<Operand> sval);
 
   // appendAS
-  std::shared_ptr<ASInst> appendAS(InstOp op,
-                                            std::shared_ptr<Operand> dest,
-                                            std::shared_ptr<Operand> operand1,
-                                            std::shared_ptr<Operand> operand2);
+  std::shared_ptr<ASInst> appendAS(InstOp op, std::shared_ptr<Operand> dest,
+                                   std::shared_ptr<Operand> operand1,
+                                   std::shared_ptr<Operand> operand2);
 
   // appendMUL
   std::shared_ptr<MULInst> appendMUL(InstOp op, std::shared_ptr<Operand> dest,
@@ -133,8 +135,9 @@ public:
   std::shared_ptr<VNEGInst> appendVNEG(std::shared_ptr<Operand> dest,
                                        std::shared_ptr<Operand> operand);
 
-  std::shared_ptr<Operand> GenerateConstant(std::shared_ptr<Constant> value,
-                                            bool genimm, bool checkimm);
+  std::shared_ptr<Operand> GenerateConstant(
+      std::shared_ptr<Constant> value, bool genimm, bool checkimm,
+      std::shared_ptr<ASM_BasicBlock> phi_block = nullptr);
 };
 
 void GenerateModule(std::shared_ptr<Module> ir_module,
