@@ -172,15 +172,20 @@ std::shared_ptr<Value> IRBuilder::GetConstant(IROp op, EvalValue lhs,
 
 std::shared_ptr<IntGlobalVariable> IRBuilder::CreateIntGlobalVariable(
     std::shared_ptr<DeclAST> decl) {
-  std::vector<int> flatten_vals;
-
-  for (const auto& expr : decl->m_flatten_vals) {
-    if (expr == nullptr) {
-      flatten_vals.push_back(0);
-    } else {
-      flatten_vals.push_back(expr->IntVal());
-    }
-  }
+  // std::vector<int> flatten_vals;
+  // for (const auto& expr : decl->m_flatten_vals) {
+  //   if (expr == nullptr) {
+  //     flatten_vals.push_back(0);
+  //   } else {
+  //     if (expr->GetOp() == Op::LVAL) {
+  //       auto lval_decl = expr->LVal()->m_decl;
+  //       assert(lval_decl->m_flatten_vals.size() == 1);
+  //       flatten_vals.push_back(lval_decl->m_flatten_vals[0]->IntVal());
+  //     } else {
+  //       flatten_vals.push_back(expr->IntVal());
+  //     }
+  //   }
+  // }
 
   auto global_variable = std::make_shared<IntGlobalVariable>(std::move(decl));
   m_module->AppendGlobalVariable(global_variable);
@@ -188,15 +193,20 @@ std::shared_ptr<IntGlobalVariable> IRBuilder::CreateIntGlobalVariable(
 }
 std::shared_ptr<FloatGlobalVariable> IRBuilder::CreateFloatGlobalVariable(
     std::shared_ptr<DeclAST> decl) {
-  std::vector<float> flatten_vals;
-
-  for (const auto& expr : decl->m_flatten_vals) {
-    if (expr == nullptr) {
-      flatten_vals.push_back(0.0);
-    } else {
-      flatten_vals.push_back(expr->FloatVal());
-    }
-  }
+  // std::vector<float> flatten_vals;
+  // for (const auto& expr : decl->m_flatten_vals) {
+  //   if (expr == nullptr) {
+  //     flatten_vals.push_back(0.0);
+  //   } else {
+  //     if (expr->GetOp() == Op::LVAL) {
+  //       auto lval_decl = expr->LVal()->m_decl;
+  //       assert(lval_decl->m_flatten_vals.size() == 1);
+  //       flatten_vals.push_back(lval_decl->m_flatten_vals[0]->FloatVal());
+  //     } else {
+  //       flatten_vals.push_back(expr->FloatVal());
+  //     }
+  //   }
+  // }
   auto global_variable = std::make_shared<FloatGlobalVariable>(std::move(decl));
   m_module->AppendGlobalVariable(global_variable);
   return global_variable;
