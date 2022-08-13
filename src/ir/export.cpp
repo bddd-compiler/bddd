@@ -117,52 +117,41 @@ void PrintGlobalIntArrayValues(std::ofstream& ofs, int n, int& offset,
   }
 }
 void PrintGlobalFloatArrayValues(
-    std::ofstream& ofs, int n, int& offset,
-    std::unique_ptr<InitValAST>& init_val, const std::vector<int>& sizes,
+    std::ofstream& ofs, int n, int& offset, const std::vector<int>& sizes,
     const std::shared_ptr<FloatGlobalVariable>& gv) {
   ofs << gv->m_type.Dereference().Reduce(n) << " ";
-  if (init_val == nullptr || init_val->AllZero()) {
-    if (n == gv->m_type.m_dimensions.size()) {
-      ofs << gv->m_flatten_vals[offset++];
-    } else {
-      ofs << "zeroinitializer";
-      int tot = 1;
-      for (int i = n; i < gv->m_type.m_dimensions.size(); ++i) {
-        tot *= gv->m_type.m_dimensions[i];
-      }
-      offset += tot;
+  if (n == gv->m_type.m_dimensions.size()) {
+    ofs << gv->m_flatten_vals[offset++];
+    return;
+  }
+  auto IsZeroInitialized = [&gv](int l, int r) {
+    int sz = gv->m_flatten_vals.size();
+    int bound = std::min(sz - 1, r);
+    for (int i = l; i <= bound; ++i) {
+      if (gv->m_flatten_vals[i] != 0) return false;
     }
+    return true;
+  };
+  auto temp = offset / sizes[n];
+  auto l = temp * sizes[n];
+  auto r = l + sizes[n];
+  auto size = (n == sizes.size() - 1 ? 1 : sizes[n + 1]);
+  if (IsZeroInitialized(l, r)) {
+    ofs << "zeroinitializer";
+    offset += size;
   } else {
     if (n == gv->m_type.m_dimensions.size()) {
+      // ofs << gv->m_flatten_vals[offset++];
       ofs << std::hexfloat << gv->m_flatten_vals[offset++];
     } else {
       ofs << "[";
-      assert(init_val->m_vals.size() <= gv->m_type.m_dimensions[n]);
       bool first = true;
       for (int i = 0; i < gv->m_type.m_dimensions[n]; ++i) {
         if (first)
           first = false;
         else
           ofs << ", ";
-        if (i < init_val->m_vals.size()) {
-          // defined in init_val
-          PrintGlobalFloatArrayValues(ofs, n + 1, offset, init_val->m_vals[i],
-                                      sizes, gv);
-        } else {
-          // default zero
-          if (n + 1 == gv->m_type.m_dimensions.size()) {
-            ofs << "float 0";
-            ++offset;
-          } else {
-            ofs << gv->m_type.Dereference().Reduce(n + 1) << " ";
-            ofs << "zeroinitializer";
-            int tot = 1;
-            for (int i = n + 1; i < gv->m_type.m_dimensions.size(); ++i) {
-              tot *= gv->m_type.m_dimensions[i];
-            }
-            offset += tot;
-          }
-        }
+        PrintGlobalFloatArrayValues(ofs, n + 1, offset, sizes, gv);
       }
       ofs << "]";
     }
@@ -239,11 +228,11 @@ void BasicBlock::ExportIR(std::ofstream& ofs, int depth) {
 }
 void IntGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
   // depth is useless here
-  if (m_is_const && m_flatten_vals.size() == 1) return;
+  if (m_is_const && !m_is_array) return;  // constants are folded
   // g_allocator.SetGlobalVarName(shared_from_this(), "@" + m_allocated_name);
   ofs << "@" << m_name << " = dso_local "
       << (m_is_const ? "constant " : "global ");
-  if (m_flatten_vals.size() == 1) {
+  if (!m_is_array) {
     ofs << "i32 " << m_flatten_vals[0] << std::endl;
   } else {
     int offset = 0;
@@ -260,10 +249,10 @@ void IntGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
 }
 void FloatGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
   // depth is useless here
-  if (m_is_const && m_flatten_vals.size() == 1) return;
+  if (m_is_const && !m_is_array) return;  // constants are folded
   ofs << "@" << m_name << " = dso_local "
       << (m_is_const ? "constant " : "global ");
-  if (m_flatten_vals.size() == 1) {
+  if (!m_is_array) {
     ofs << "float " << m_flatten_vals[0] << std::endl;
   } else {
     int offset = 0;
@@ -273,7 +262,7 @@ void FloatGlobalVariable::ExportIR(std::ofstream& ofs, int depth) {
       tot *= m_type.m_dimensions[i];
       sizes[i] = tot;
     }
-    PrintGlobalFloatArrayValues(ofs, 0, offset, m_init_val, sizes,
+    PrintGlobalFloatArrayValues(ofs, 0, offset, sizes,
                                 shared_from_base<FloatGlobalVariable>());
     ofs << std::endl;
   }

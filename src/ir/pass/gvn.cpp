@@ -454,6 +454,7 @@ void IRPassManager::GVNPass() {
   SideEffectPass();
   for (auto &func : m_builder->m_module->m_function_list) {
     if (func->m_bb_list.empty()) continue;
+    DeadCodeElimination(func);
     ComputeDominanceRelationship(func);
     g_vns.clear();
     g_idx.clear();

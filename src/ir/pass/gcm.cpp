@@ -180,11 +180,15 @@ void ScheduleLate(std::shared_ptr<Instruction> instr) {
   }
   assert(lca != nullptr);
   auto best = lca;
-  while (lca != instr->m_bb) {
+  while (lca != nullptr && lca != instr->m_bb) {
     if (lca->m_loop_depth < best->m_loop_depth) {
       best = lca;
     }
     lca = lca->m_idom;
+  }
+  if (lca == nullptr) {
+    std::cerr << "[debug] strange: lca == nullptr" << std::endl;
+    return;
   }
   MoveInstructionBack(instr, best);
 }

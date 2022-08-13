@@ -357,10 +357,10 @@ public:
 class IntGlobalVariable : public GlobalVariable {
 public:
   std::vector<int> m_flatten_vals;
-  std::unique_ptr<InitValAST> &m_init_val;
+  bool m_is_array;
 
   explicit IntGlobalVariable(const std::shared_ptr<DeclAST> &decl)
-      : GlobalVariable(decl), m_flatten_vals(), m_init_val(decl->m_init_val) {
+      : GlobalVariable(decl), m_flatten_vals(), m_is_array(decl->IsArray()) {
     for (const auto &init_val : decl->m_flatten_vals) {
       if (init_val == nullptr)
         m_flatten_vals.push_back(0);
@@ -383,10 +383,10 @@ public:
 class FloatGlobalVariable : public GlobalVariable {
 public:
   std::vector<float> m_flatten_vals;
-  std::unique_ptr<InitValAST> &m_init_val;
+  bool m_is_array;
 
   explicit FloatGlobalVariable(const std::shared_ptr<DeclAST> &decl)
-      : GlobalVariable(decl), m_flatten_vals(), m_init_val(decl->m_init_val) {
+      : GlobalVariable(decl), m_flatten_vals(), m_is_array(decl->IsArray()) {
     for (const auto &init_val : decl->m_flatten_vals) {
       if (init_val == nullptr)
         m_flatten_vals.push_back(0);
