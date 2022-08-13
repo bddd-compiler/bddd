@@ -38,6 +38,7 @@ void RegisterAllocator::Allocate() {
           node->m_is_float = true;
           node->m_sreg = sreg;
         }
+        storeRegisters(func, Operand::getSReg(sreg));
       }
     }
     initial.clear();
@@ -81,7 +82,7 @@ void RegisterAllocator::initialColors() {
                       RReg::R10, RReg::R11, RReg::R12, RReg::LR};
     K = rreg_avaliable.size();
   } else {
-    for (int i = 8; i < 32; i++) {
+    for (int i = 1; i < 32; i++) {
       sreg_avaliable.insert((SReg)i);
     }
     K = sreg_avaliable.size();
@@ -617,7 +618,7 @@ void RegisterAllocator::RewriteProgram() {
             offs = std::make_shared<Operand>(OperandType::VREG);
             mov = std::make_shared<MOVInst>(offs, fixed_offs);
             mov->m_params_offset = i->m_params_offset;
-            newTemps.insert(offs);
+            if (m_reg_type == RegType::R) newTemps.insert(offs);
             updateDepth(b, offs);
           }
           auto ldr = std::make_shared<LDRInst>(
@@ -652,7 +653,7 @@ void RegisterAllocator::RewriteProgram() {
             offs = std::make_shared<Operand>(OperandType::VREG);
             mov = std::make_shared<MOVInst>(offs, fixed_offs);
             mov->m_params_offset = i->m_params_offset;
-            newTemps.insert(offs);
+            if (m_reg_type == RegType::R) newTemps.insert(offs);
             updateDepth(b, offs);
           }
           auto str = std::make_shared<STRInst>(

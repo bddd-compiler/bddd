@@ -34,17 +34,26 @@ std::unordered_map<std::shared_ptr<Operand>, std::string> Operand::vreg_map;
 std::unordered_map<RReg, std::shared_ptr<Operand>> Operand::rreg_map;
 std::unordered_map<SReg, std::shared_ptr<Operand>> Operand::sreg_map;
 
+int ASM_Function::getPushSize() {
+  return m_push->m_regs.size() + m_f_push->m_regs.size();
+}
+
 int ASM_Function::getStackSize() { return m_local_alloc; }
 
 void ASM_Function::allocateStack(int size) { m_local_alloc += size; }
 
 void ASM_Function::appendPush(std::shared_ptr<Operand> reg) {
-  if (m_push->m_regs.find(reg) == m_push->m_regs.end())
+  if (reg->m_is_float)
+    m_f_push->m_regs.insert(reg);
+  else
     m_push->m_regs.insert(reg);
 }
 
 void ASM_Function::appendPop(std::shared_ptr<Operand> reg) {
-  if (m_pop->m_regs.find(reg) == m_pop->m_regs.end()) m_pop->m_regs.insert(reg);
+  if (reg->m_is_float)
+    m_f_pop->m_regs.insert(reg);
+  else
+    m_pop->m_regs.insert(reg);
 }
 
 void ASM_BasicBlock::insert(std::shared_ptr<ASM_Instruction> inst) {
@@ -342,6 +351,10 @@ std::string ASM_Instruction::getOpName() {
       return "VLDR";
     case InstOp::VSTR:
       return "VSTR";
+    case InstOp::VPUSH:
+      return "VPUSH";
+    case InstOp::VPOP:
+      return "VPOP";
   }
   return "";
 }
@@ -528,7 +541,7 @@ PInst::PInst(InstOp op) {
     m_regs.insert(Operand::getRReg(RReg::LR));
   else if (op == InstOp::POP)
     m_regs.insert(Operand::getRReg(RReg::PC));
-  else
+  else if (op != InstOp::VPUSH && op != InstOp::VPOP)
     assert(false);
 }
 

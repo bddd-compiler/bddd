@@ -119,6 +119,8 @@ enum class InstOp {
   VMRS,
   VLDR,
   VSTR,
+  VPUSH,
+  VPOP
 };
 
 enum class OperandType { SPECIAL_REG, REG, VREG, IMM };
@@ -213,6 +215,7 @@ public:
   std::list<std::shared_ptr<ASM_BasicBlock>> m_blocks;
   std::shared_ptr<ASM_BasicBlock> m_rblock;
   std::unique_ptr<PInst> m_push, m_pop;
+  std::unique_ptr<PInst> m_f_push, m_f_pop;
   std::list<std::shared_ptr<ASM_Instruction>> m_params_set_list;
   std::unordered_map<std::shared_ptr<ASM_Instruction>,
                      std::list<std::shared_ptr<ASM_Instruction>>::iterator>
@@ -227,7 +230,11 @@ public:
         m_rblock(std::make_shared<ASM_BasicBlock>()),
         m_local_alloc(0),
         m_push(std::make_unique<PInst>(InstOp::PUSH)),
-        m_pop(std::make_unique<PInst>(InstOp::POP)) {}
+        m_pop(std::make_unique<PInst>(InstOp::POP)),
+        m_f_push(std::make_unique<PInst>(InstOp::VPUSH)),
+        m_f_pop(std::make_unique<PInst>(InstOp::VPOP)) {}
+
+  int getPushSize();
 
   int getStackSize();
 
@@ -258,7 +265,9 @@ public:
   std::vector<std::shared_ptr<ASM_BasicBlock>> m_successors;
 
   ASM_BasicBlock(int depth = 0)
-      : m_loop_depth(depth), m_branch_pos(m_insts.end()), m_label(".L" + std::to_string(block_id++)) {}
+      : m_loop_depth(depth),
+        m_branch_pos(m_insts.end()),
+        m_label(".L" + std::to_string(block_id++)) {}
 
   void insert(std::shared_ptr<ASM_Instruction> inst);
 
@@ -316,7 +325,8 @@ public:
   std::unordered_set<std::shared_ptr<Operand>> m_f_def;
   std::unordered_set<std::shared_ptr<Operand>> m_f_use;
 
-  ASM_Instruction() : m_params_offset(0), m_is_mov(false), m_is_deleted(false) {}
+  ASM_Instruction()
+      : m_params_offset(0), m_is_mov(false), m_is_deleted(false) {}
 
   std::string getOpName();
 
@@ -432,6 +442,9 @@ public:
   PInst(InstOp op);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void exportBody(std::ofstream& ofs,
+                  std::vector<std::shared_ptr<Operand>> regs, int l, int r);
 
   void replaceDef(std::shared_ptr<Operand> newOp,
                   std::shared_ptr<Operand> oldOp) override;

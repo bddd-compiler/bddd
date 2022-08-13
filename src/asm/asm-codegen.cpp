@@ -234,6 +234,8 @@ std::shared_ptr<Operand> GenerateBinary(std::shared_ptr<BinaryInstruction> inst,
       return GenerateDiv(inst, builder);
     case IROp::SREM:
       return GenerateMod(inst, builder);
+    case IROp::XOR:
+      return nullptr;
     case IROp::I_SGE:
     case IROp::I_SGT:
     case IROp::I_SLE:
@@ -252,6 +254,7 @@ std::shared_ptr<Operand> GenerateBinary(std::shared_ptr<BinaryInstruction> inst,
     case IROp::SITOFP:
       std::cerr << "Is this really a binary instruction???" << std::endl;
     default:
+      std::cout << (int)inst->m_op << std::endl;
       assert(false);
   }
   return nullptr;

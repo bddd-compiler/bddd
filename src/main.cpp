@@ -121,8 +121,8 @@ int main(int argc, char *argv[]) {
   std::cout << "allocating..." << std::endl;
 
   // register allocator
-  RegisterAllocator(asm_module, RegType::R).Allocate();
   RegisterAllocator(asm_module, RegType::S).Allocate();
+  RegisterAllocator(asm_module, RegType::R).Allocate();
 
   // fixing and optimization
   fixedParamsOffs(asm_module);

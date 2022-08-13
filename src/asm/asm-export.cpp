@@ -134,6 +134,7 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
   ofs << "\t.type " << m_name << ", \%function" << std::endl;
   ofs << m_name << ":" << std::endl;
   m_push->exportASM(ofs);
+  m_f_push->exportASM(ofs);
 
   // allocate stack
   int size = m_local_alloc;
@@ -141,7 +142,7 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
     size &= ~(unsigned int)7;
     size += 8;
   }
-  if (m_push->m_regs.size() % 2) {
+  if (getPushSize() % 2) {
     size += 4;
   }
 
@@ -173,6 +174,7 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
     }
   }
 
+  m_f_pop->exportASM(ofs);
   m_pop->exportASM(ofs);
   ofs << "\t.pool" << std::endl;
   ofs << "\t.size " << m_name << ", .-" << m_name << std::endl;
@@ -248,21 +250,39 @@ void MRSInst::exportASM(std::ofstream& ofs) {
 }
 
 void PInst::exportASM(std::ofstream& ofs) {
+  if (m_regs.empty()) return;
   exportInstHead(ofs);
-  ofs << "{";
   std::vector<std::shared_ptr<Operand>> regs(m_regs.begin(), m_regs.end());
   sort(regs.begin(), regs.end(),
        [=](std::shared_ptr<Operand> a, std::shared_ptr<Operand> b) {
-         return a->m_rreg < b->m_rreg;
+         if (a->m_is_float && b->m_is_float)
+           return a->m_sreg < b->m_sreg;
+         else if (!a->m_is_float && !b->m_is_float)
+           return a->m_rreg < b->m_rreg;
+         else
+           assert(false);
        });
+  if (regs.size() > 16) {
+    exportBody(ofs, regs, 0, 16);
+    exportInstHead(ofs);
+    exportBody(ofs, regs, 16, regs.size());
+  } else {
+    exportBody(ofs, regs, 0, regs.size());
+  }
+}
+
+void PInst::exportBody(std::ofstream& ofs,
+                       std::vector<std::shared_ptr<Operand>> regs, int l,
+                       int r) {
+  ofs << "{";
   bool first = true;
-  for (auto& reg : regs) {
+  for (int i = l; i < r; i++) {
     if (first) {
       first = false;
     } else {
       ofs << ", ";
     }
-    ofs << reg->getName();
+    ofs << regs[i]->getName();
   }
   ofs << "}" << std::endl;
 }
