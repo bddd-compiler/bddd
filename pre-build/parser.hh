@@ -44,7 +44,7 @@
 #ifndef YY_YY_ROOT_BDDD_BUILD_PARSER_HH_INCLUDED
 # define YY_YY_ROOT_BDDD_BUILD_PARSER_HH_INCLUDED
 // "%code requires" blocks.
-#line 9 "/root/bddd/src/parser/parser.y"
+#line 7 "/root/bddd/src/parser/parser.y"
 
 #include "ast/ast.h"
 #include <string>
@@ -56,7 +56,7 @@ class Driver;
 
 #line 58 "/root/bddd/build/parser.hh"
 
-# include <cassert>
+
 # include <cstdlib> // std::abort
 # include <iostream>
 # include <stdexcept>
@@ -100,7 +100,7 @@ class Driver;
 # define YY_CONSTEXPR
 #endif
 # include "location.hh"
-#include <typeinfo>
+
 #ifndef YY_ASSERT
 # include <cassert>
 # define YY_ASSERT assert
@@ -212,13 +212,11 @@ namespace yy {
     /// Empty construction.
     semantic_type () YY_NOEXCEPT
       : yybuffer_ ()
-      , yytypeid_ (YY_NULLPTR)
     {}
 
     /// Construct and fill.
     template <typename T>
     semantic_type (YY_RVREF (T) t)
-      : yytypeid_ (&typeid (T))
     {
       YY_ASSERT (sizeof (T) <= size);
       new (yyas_<T> ()) T (YY_MOVE (t));
@@ -226,9 +224,7 @@ namespace yy {
 
     /// Destruction, allowed only if empty.
     ~semantic_type () YY_NOEXCEPT
-    {
-      YY_ASSERT (!yytypeid_);
-    }
+    {}
 
 # if 201103L <= YY_CPLUSPLUS
     /// Instantiate a \a T in here from \a t.
@@ -236,9 +232,6 @@ namespace yy {
     T&
     emplace (U&&... u)
     {
-      YY_ASSERT (!yytypeid_);
-      YY_ASSERT (sizeof (T) <= size);
-      yytypeid_ = & typeid (T);
       return *new (yyas_<T> ()) T (std::forward <U>(u)...);
     }
 # else
@@ -247,9 +240,6 @@ namespace yy {
     T&
     emplace ()
     {
-      YY_ASSERT (!yytypeid_);
-      YY_ASSERT (sizeof (T) <= size);
-      yytypeid_ = & typeid (T);
       return *new (yyas_<T> ()) T ();
     }
 
@@ -258,9 +248,6 @@ namespace yy {
     T&
     emplace (const T& t)
     {
-      YY_ASSERT (!yytypeid_);
-      YY_ASSERT (sizeof (T) <= size);
-      yytypeid_ = & typeid (T);
       return *new (yyas_<T> ()) T (t);
     }
 # endif
@@ -288,9 +275,6 @@ namespace yy {
     T&
     as () YY_NOEXCEPT
     {
-      YY_ASSERT (yytypeid_);
-      YY_ASSERT (*yytypeid_ == typeid (T));
-      YY_ASSERT (sizeof (T) <= size);
       return *yyas_<T> ();
     }
 
@@ -299,9 +283,6 @@ namespace yy {
     const T&
     as () const YY_NOEXCEPT
     {
-      YY_ASSERT (yytypeid_);
-      YY_ASSERT (*yytypeid_ == typeid (T));
-      YY_ASSERT (sizeof (T) <= size);
       return *yyas_<T> ();
     }
 
@@ -317,8 +298,6 @@ namespace yy {
     void
     swap (self_type& that) YY_NOEXCEPT
     {
-      YY_ASSERT (yytypeid_);
-      YY_ASSERT (*yytypeid_ == *that.yytypeid_);
       std::swap (as<T> (), that.as<T> ());
     }
 
@@ -363,7 +342,6 @@ namespace yy {
     destroy ()
     {
       as<T> ().~T ();
-      yytypeid_ = YY_NULLPTR;
     }
 
   private:
@@ -502,9 +480,6 @@ namespace yy {
       /// A buffer large enough to store any of the semantic values.
       char yyraw[size];
     } yybuffer_;
-
-    /// Whether the content is built: if defined, the name of the stored type.
-    const std::type_info *yytypeid_;
   };
 
 #else
@@ -2635,7 +2610,7 @@ switch (yytype)
   }
 
 } // yy
-#line 2639 "/root/bddd/build/parser.hh"
+#line 2614 "/root/bddd/build/parser.hh"
 
 
 

@@ -41,7 +41,7 @@
 
 
 // Unqualified %code blocks.
-#line 29 "/root/bddd/src/parser/parser.y"
+#line 26 "/root/bddd/src/parser/parser.y"
 
 # include "parser/driver.h"
 
@@ -928,13 +928,12 @@ namespace yy {
 
 
     // User initialization code.
-#line 22 "/root/bddd/src/parser/parser.y"
+#line 20 "/root/bddd/src/parser/parser.y"
 {
-  // Initialize the initial location.
   yyla.location.begin.filename = yyla.location.end.filename = &driver.file;
 }
 
-#line 938 "/root/bddd/build/parser.cpp"
+#line 937 "/root/bddd/build/parser.cpp"
 
 
     /* Initialize the stack.  The initial state will be set in
@@ -1181,769 +1180,780 @@ namespace yy {
           switch (yyn)
             {
   case 2:
-#line 102 "/root/bddd/src/parser/parser.y"
+#line 99 "/root/bddd/src/parser/parser.y"
                    { /* printf("(delimiter, ;)\n"); */ }
-#line 1187 "/root/bddd/build/parser.cpp"
+#line 1186 "/root/bddd/build/parser.cpp"
     break;
 
   case 3:
-#line 103 "/root/bddd/src/parser/parser.y"
+#line 100 "/root/bddd/src/parser/parser.y"
                    { /* printf("(keyword, const)\n"); */ }
-#line 1193 "/root/bddd/build/parser.cpp"
+#line 1192 "/root/bddd/build/parser.cpp"
     break;
 
   case 4:
-#line 104 "/root/bddd/src/parser/parser.y"
+#line 101 "/root/bddd/src/parser/parser.y"
                    { /* printf("(delimiter, ,)\n"); */ }
-#line 1199 "/root/bddd/build/parser.cpp"
+#line 1198 "/root/bddd/build/parser.cpp"
     break;
 
   case 5:
-#line 105 "/root/bddd/src/parser/parser.y"
+#line 102 "/root/bddd/src/parser/parser.y"
                    { /* printf("(op, =)\n"); */ }
-#line 1205 "/root/bddd/build/parser.cpp"
+#line 1204 "/root/bddd/build/parser.cpp"
     break;
 
   case 6:
-#line 106 "/root/bddd/src/parser/parser.y"
+#line 103 "/root/bddd/src/parser/parser.y"
                    { /* printf("(op, &&)\n"); */ }
-#line 1211 "/root/bddd/build/parser.cpp"
+#line 1210 "/root/bddd/build/parser.cpp"
     break;
 
   case 7:
-#line 107 "/root/bddd/src/parser/parser.y"
+#line 104 "/root/bddd/src/parser/parser.y"
                    { /* printf("(op, ||)\n"); */ }
-#line 1217 "/root/bddd/build/parser.cpp"
+#line 1216 "/root/bddd/build/parser.cpp"
     break;
 
   case 8:
-#line 108 "/root/bddd/src/parser/parser.y"
+#line 105 "/root/bddd/src/parser/parser.y"
                    { /* printf("(op, ==)\n"); */ }
-#line 1223 "/root/bddd/build/parser.cpp"
+#line 1222 "/root/bddd/build/parser.cpp"
     break;
 
   case 9:
-#line 109 "/root/bddd/src/parser/parser.y"
+#line 106 "/root/bddd/src/parser/parser.y"
                    { /* printf("(op, !=)\n"); */ }
-#line 1229 "/root/bddd/build/parser.cpp"
+#line 1228 "/root/bddd/build/parser.cpp"
     break;
 
   case 10:
-#line 110 "/root/bddd/src/parser/parser.y"
+#line 107 "/root/bddd/src/parser/parser.y"
                    { /* printf("(keyword, void)\n"); */ }
-#line 1235 "/root/bddd/build/parser.cpp"
+#line 1234 "/root/bddd/build/parser.cpp"
     break;
 
   case 11:
-#line 111 "/root/bddd/src/parser/parser.y"
+#line 108 "/root/bddd/src/parser/parser.y"
                    { /* printf("(delimiter, ()\n"); */ }
-#line 1241 "/root/bddd/build/parser.cpp"
+#line 1240 "/root/bddd/build/parser.cpp"
     break;
 
   case 12:
-#line 112 "/root/bddd/src/parser/parser.y"
+#line 109 "/root/bddd/src/parser/parser.y"
                    { /* printf("(delimiter, ))\n"); */ }
-#line 1247 "/root/bddd/build/parser.cpp"
+#line 1246 "/root/bddd/build/parser.cpp"
     break;
 
   case 13:
-#line 113 "/root/bddd/src/parser/parser.y"
+#line 110 "/root/bddd/src/parser/parser.y"
                    { /* printf("(delimiter, {)\n"); */ }
-#line 1253 "/root/bddd/build/parser.cpp"
+#line 1252 "/root/bddd/build/parser.cpp"
     break;
 
   case 14:
-#line 114 "/root/bddd/src/parser/parser.y"
+#line 111 "/root/bddd/src/parser/parser.y"
                    { /* printf("(delimiter, })\n"); */ }
-#line 1259 "/root/bddd/build/parser.cpp"
+#line 1258 "/root/bddd/build/parser.cpp"
     break;
 
   case 15:
-#line 115 "/root/bddd/src/parser/parser.y"
+#line 112 "/root/bddd/src/parser/parser.y"
                    { /* printf("(delimiter, [)\n"); */ }
-#line 1265 "/root/bddd/build/parser.cpp"
+#line 1264 "/root/bddd/build/parser.cpp"
     break;
 
   case 16:
-#line 116 "/root/bddd/src/parser/parser.y"
+#line 113 "/root/bddd/src/parser/parser.y"
                    { /* printf("(delimiter, ])\n"); */ }
-#line 1271 "/root/bddd/build/parser.cpp"
+#line 1270 "/root/bddd/build/parser.cpp"
     break;
 
   case 17:
-#line 117 "/root/bddd/src/parser/parser.y"
+#line 114 "/root/bddd/src/parser/parser.y"
                      { /* printf("(keyword, return)\n"); */ }
-#line 1277 "/root/bddd/build/parser.cpp"
+#line 1276 "/root/bddd/build/parser.cpp"
     break;
 
   case 18:
-#line 118 "/root/bddd/src/parser/parser.y"
+#line 115 "/root/bddd/src/parser/parser.y"
                    { /* printf("(keyword, if)\n"); */ }
-#line 1283 "/root/bddd/build/parser.cpp"
+#line 1282 "/root/bddd/build/parser.cpp"
     break;
 
   case 19:
-#line 119 "/root/bddd/src/parser/parser.y"
+#line 116 "/root/bddd/src/parser/parser.y"
                    { /* printf("(keyword, else)\n"); */ }
-#line 1289 "/root/bddd/build/parser.cpp"
+#line 1288 "/root/bddd/build/parser.cpp"
     break;
 
   case 20:
-#line 120 "/root/bddd/src/parser/parser.y"
+#line 117 "/root/bddd/src/parser/parser.y"
                    { /* printf("(keyword, while)\n"); */ }
-#line 1295 "/root/bddd/build/parser.cpp"
+#line 1294 "/root/bddd/build/parser.cpp"
     break;
 
   case 21:
-#line 121 "/root/bddd/src/parser/parser.y"
+#line 118 "/root/bddd/src/parser/parser.y"
                    { /* printf("(keyword, break)\n"); */ }
-#line 1301 "/root/bddd/build/parser.cpp"
+#line 1300 "/root/bddd/build/parser.cpp"
     break;
 
   case 22:
-#line 122 "/root/bddd/src/parser/parser.y"
+#line 119 "/root/bddd/src/parser/parser.y"
                          { /* printf("(keyword, continue)\n"); */ }
-#line 1307 "/root/bddd/build/parser.cpp"
+#line 1306 "/root/bddd/build/parser.cpp"
     break;
 
   case 23:
-#line 124 "/root/bddd/src/parser/parser.y"
+#line 121 "/root/bddd/src/parser/parser.y"
                         { driver.comp_unit->AppendDecls(std::move(yystack_[0].value.as < vector<unique_ptr<DeclAST>> > ())); }
-#line 1313 "/root/bddd/build/parser.cpp"
+#line 1312 "/root/bddd/build/parser.cpp"
     break;
 
   case 24:
-#line 125 "/root/bddd/src/parser/parser.y"
+#line 122 "/root/bddd/src/parser/parser.y"
                            { driver.comp_unit->AppendFuncDef(std::move(yystack_[0].value.as < unique_ptr<FuncDefAST> > ())); }
-#line 1319 "/root/bddd/build/parser.cpp"
+#line 1318 "/root/bddd/build/parser.cpp"
     break;
 
   case 25:
-#line 126 "/root/bddd/src/parser/parser.y"
+#line 123 "/root/bddd/src/parser/parser.y"
                { driver.comp_unit->AppendDecls(std::move(yystack_[0].value.as < vector<unique_ptr<DeclAST>> > ())); }
-#line 1325 "/root/bddd/build/parser.cpp"
+#line 1324 "/root/bddd/build/parser.cpp"
     break;
 
   case 26:
-#line 127 "/root/bddd/src/parser/parser.y"
+#line 124 "/root/bddd/src/parser/parser.y"
                   { driver.comp_unit->AppendFuncDef(std::move(yystack_[0].value.as < unique_ptr<FuncDefAST> > ())); }
-#line 1331 "/root/bddd/build/parser.cpp"
+#line 1330 "/root/bddd/build/parser.cpp"
     break;
 
   case 27:
-#line 130 "/root/bddd/src/parser/parser.y"
+#line 127 "/root/bddd/src/parser/parser.y"
                               { yylhs.value.as < vector<unique_ptr<DeclAST>> > ().assign(std::make_move_iterator(std::begin(yystack_[1].value.as < vector<unique_ptr<DeclAST>> > ())), std::make_move_iterator(std::end(yystack_[1].value.as < vector<unique_ptr<DeclAST>> > ()))); yystack_[1].value.as < vector<unique_ptr<DeclAST>> > ().clear(); }
-#line 1337 "/root/bddd/build/parser.cpp"
+#line 1336 "/root/bddd/build/parser.cpp"
     break;
 
   case 28:
-#line 131 "/root/bddd/src/parser/parser.y"
+#line 128 "/root/bddd/src/parser/parser.y"
                             { yylhs.value.as < vector<unique_ptr<DeclAST>> > ().assign(std::make_move_iterator(std::begin(yystack_[1].value.as < vector<unique_ptr<DeclAST>> > ())), std::make_move_iterator(std::end(yystack_[1].value.as < vector<unique_ptr<DeclAST>> > ()))); yystack_[1].value.as < vector<unique_ptr<DeclAST>> > ().clear(); }
-#line 1343 "/root/bddd/build/parser.cpp"
+#line 1342 "/root/bddd/build/parser.cpp"
     break;
 
   case 29:
-#line 134 "/root/bddd/src/parser/parser.y"
+#line 131 "/root/bddd/src/parser/parser.y"
              { yylhs.value.as < VarType > () = VarType::INT; /* printf("(keyword, int)\n"); */ }
-#line 1349 "/root/bddd/build/parser.cpp"
+#line 1348 "/root/bddd/build/parser.cpp"
     break;
 
   case 30:
-#line 135 "/root/bddd/src/parser/parser.y"
+#line 132 "/root/bddd/src/parser/parser.y"
                { yylhs.value.as < VarType > () = VarType::FLOAT; /* printf("(keyword, float)\n"); */ }
-#line 1355 "/root/bddd/build/parser.cpp"
+#line 1354 "/root/bddd/build/parser.cpp"
     break;
 
   case 31:
-#line 138 "/root/bddd/src/parser/parser.y"
+#line 135 "/root/bddd/src/parser/parser.y"
                                     { yystack_[0].value.as < unique_ptr<DeclAST> > ()->SetIsConst(true); yystack_[0].value.as < unique_ptr<DeclAST> > ()->SetVarType(yystack_[1].value.as < VarType > ()); yylhs.value.as < vector<unique_ptr<DeclAST>> > ().push_back(std::move(yystack_[0].value.as < unique_ptr<DeclAST> > ())); }
-#line 1361 "/root/bddd/build/parser.cpp"
+#line 1360 "/root/bddd/build/parser.cpp"
     break;
 
   case 32:
-#line 139 "/root/bddd/src/parser/parser.y"
+#line 136 "/root/bddd/src/parser/parser.y"
                                         { yylhs.value.as < vector<unique_ptr<DeclAST>> > ().assign(std::make_move_iterator(std::begin(yystack_[2].value.as < vector<unique_ptr<DeclAST>> > ())), std::make_move_iterator(std::end(yystack_[2].value.as < vector<unique_ptr<DeclAST>> > ()))); yystack_[2].value.as < vector<unique_ptr<DeclAST>> > ().clear(); yystack_[0].value.as < unique_ptr<DeclAST> > ()->SetVarType(yylhs.value.as < vector<unique_ptr<DeclAST>> > ()[0]->GetVarType()); yystack_[0].value.as < unique_ptr<DeclAST> > ()->SetIsConst(true); yylhs.value.as < vector<unique_ptr<DeclAST>> > ().push_back(std::move(yystack_[0].value.as < unique_ptr<DeclAST> > ())); }
-#line 1367 "/root/bddd/build/parser.cpp"
+#line 1366 "/root/bddd/build/parser.cpp"
     break;
 
   case 33:
-#line 142 "/root/bddd/src/parser/parser.y"
+#line 139 "/root/bddd/src/parser/parser.y"
                       { yystack_[0].value.as < unique_ptr<DeclAST> > ()->SetVarType(yystack_[1].value.as < VarType > ()); yylhs.value.as < vector<unique_ptr<DeclAST>> > ().push_back(std::move(yystack_[0].value.as < unique_ptr<DeclAST> > ())); }
-#line 1373 "/root/bddd/build/parser.cpp"
+#line 1372 "/root/bddd/build/parser.cpp"
     break;
 
   case 34:
-#line 143 "/root/bddd/src/parser/parser.y"
+#line 140 "/root/bddd/src/parser/parser.y"
                                   { yylhs.value.as < vector<unique_ptr<DeclAST>> > ().assign(std::make_move_iterator(std::begin(yystack_[2].value.as < vector<unique_ptr<DeclAST>> > ())), std::make_move_iterator(std::end(yystack_[2].value.as < vector<unique_ptr<DeclAST>> > ()))); yystack_[2].value.as < vector<unique_ptr<DeclAST>> > ().clear(); yystack_[0].value.as < unique_ptr<DeclAST> > ()->SetVarType(yylhs.value.as < vector<unique_ptr<DeclAST>> > ()[0]->GetVarType()); yylhs.value.as < vector<unique_ptr<DeclAST>> > ().push_back(std::move(yystack_[0].value.as < unique_ptr<DeclAST> > ())); }
-#line 1379 "/root/bddd/build/parser.cpp"
+#line 1378 "/root/bddd/build/parser.cpp"
     break;
 
   case 35:
-#line 146 "/root/bddd/src/parser/parser.y"
+#line 143 "/root/bddd/src/parser/parser.y"
                      { yylhs.value.as < unique_ptr<DeclAST> > () = std::move(yystack_[0].value.as < unique_ptr<DeclAST> > ()); }
-#line 1385 "/root/bddd/build/parser.cpp"
+#line 1384 "/root/bddd/build/parser.cpp"
     break;
 
   case 36:
-#line 147 "/root/bddd/src/parser/parser.y"
+#line 144 "/root/bddd/src/parser/parser.y"
                     { yylhs.value.as < unique_ptr<DeclAST> > () = std::move(yystack_[0].value.as < unique_ptr<DeclAST> > ()); }
-#line 1391 "/root/bddd/build/parser.cpp"
+#line 1390 "/root/bddd/build/parser.cpp"
     break;
 
   case 37:
-#line 149 "/root/bddd/src/parser/parser.y"
+#line 146 "/root/bddd/src/parser/parser.y"
                                        { yylhs.value.as < unique_ptr<DeclAST> > () = std::make_unique<DeclAST>(std::move(yystack_[2].value.as < string > ()), std::move(yystack_[0].value.as < unique_ptr<InitValAST> > ())); }
-#line 1397 "/root/bddd/build/parser.cpp"
+#line 1396 "/root/bddd/build/parser.cpp"
     break;
 
   case 38:
-#line 150 "/root/bddd/src/parser/parser.y"
+#line 147 "/root/bddd/src/parser/parser.y"
                     { yylhs.value.as < unique_ptr<DeclAST> > () = std::make_unique<DeclAST>(std::move(yystack_[0].value.as < string > ())); }
-#line 1403 "/root/bddd/build/parser.cpp"
+#line 1402 "/root/bddd/build/parser.cpp"
     break;
 
   case 39:
-#line 152 "/root/bddd/src/parser/parser.y"
+#line 149 "/root/bddd/src/parser/parser.y"
                                                   { yylhs.value.as < unique_ptr<DeclAST> > () = std::move(yystack_[2].value.as < unique_ptr<DeclAST> > ()); yylhs.value.as < unique_ptr<DeclAST> > ()->SetInitVal(std::move(yystack_[0].value.as < unique_ptr<InitValAST> > ())); }
-#line 1409 "/root/bddd/build/parser.cpp"
+#line 1408 "/root/bddd/build/parser.cpp"
     break;
 
   case 40:
-#line 153 "/root/bddd/src/parser/parser.y"
+#line 150 "/root/bddd/src/parser/parser.y"
                           { yylhs.value.as < unique_ptr<DeclAST> > () = std::move(yystack_[0].value.as < unique_ptr<DeclAST> > ()); }
-#line 1415 "/root/bddd/build/parser.cpp"
+#line 1414 "/root/bddd/build/parser.cpp"
     break;
 
   case 41:
-#line 156 "/root/bddd/src/parser/parser.y"
+#line 153 "/root/bddd/src/parser/parser.y"
                                                          { yylhs.value.as < unique_ptr<DeclAST> > () = std::move(yystack_[3].value.as < unique_ptr<DeclAST> > ()); yylhs.value.as < unique_ptr<DeclAST> > ()->AddDimension(std::move(yystack_[1].value.as < unique_ptr<ExprAST> > ())); }
-#line 1421 "/root/bddd/build/parser.cpp"
+#line 1420 "/root/bddd/build/parser.cpp"
     break;
 
   case 42:
-#line 157 "/root/bddd/src/parser/parser.y"
+#line 154 "/root/bddd/src/parser/parser.y"
                                            { yylhs.value.as < unique_ptr<DeclAST> > () = std::make_unique<DeclAST>(yystack_[3].value.as < string > ()); yylhs.value.as < unique_ptr<DeclAST> > ()->AddDimension(std::move(yystack_[1].value.as < unique_ptr<ExprAST> > ())); }
-#line 1427 "/root/bddd/build/parser.cpp"
+#line 1426 "/root/bddd/build/parser.cpp"
     break;
 
   case 43:
-#line 160 "/root/bddd/src/parser/parser.y"
+#line 157 "/root/bddd/src/parser/parser.y"
                          { yylhs.value.as < unique_ptr<DeclAST> > () = std::move(yystack_[0].value.as < unique_ptr<DeclAST> > ()); }
-#line 1433 "/root/bddd/build/parser.cpp"
+#line 1432 "/root/bddd/build/parser.cpp"
     break;
 
   case 44:
-#line 161 "/root/bddd/src/parser/parser.y"
+#line 158 "/root/bddd/src/parser/parser.y"
                         { yylhs.value.as < unique_ptr<DeclAST> > () = std::move(yystack_[0].value.as < unique_ptr<DeclAST> > ()); }
-#line 1439 "/root/bddd/build/parser.cpp"
+#line 1438 "/root/bddd/build/parser.cpp"
     break;
 
   case 45:
-#line 164 "/root/bddd/src/parser/parser.y"
+#line 161 "/root/bddd/src/parser/parser.y"
                                          { yylhs.value.as < unique_ptr<DeclAST> > () = std::make_unique<DeclAST>(std::move(yystack_[2].value.as < string > ()), std::move(yystack_[0].value.as < unique_ptr<InitValAST> > ())); }
-#line 1445 "/root/bddd/build/parser.cpp"
+#line 1444 "/root/bddd/build/parser.cpp"
     break;
 
   case 46:
-#line 167 "/root/bddd/src/parser/parser.y"
+#line 164 "/root/bddd/src/parser/parser.y"
                                                     { yylhs.value.as < unique_ptr<DeclAST> > () = std::move(yystack_[2].value.as < unique_ptr<DeclAST> > ()); yylhs.value.as < unique_ptr<DeclAST> > ()->SetInitVal(std::move(yystack_[0].value.as < unique_ptr<InitValAST> > ())); }
-#line 1451 "/root/bddd/build/parser.cpp"
+#line 1450 "/root/bddd/build/parser.cpp"
     break;
 
   case 47:
-#line 170 "/root/bddd/src/parser/parser.y"
+#line 167 "/root/bddd/src/parser/parser.y"
                 { yylhs.value.as < unique_ptr<InitValAST> > () = std::make_unique<InitValAST>(std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1457 "/root/bddd/build/parser.cpp"
+#line 1456 "/root/bddd/build/parser.cpp"
     break;
 
   case 48:
-#line 172 "/root/bddd/src/parser/parser.y"
+#line 169 "/root/bddd/src/parser/parser.y"
                                                      { yylhs.value.as < unique_ptr<InitValAST> > () = std::move(yystack_[1].value.as < unique_ptr<InitValAST> > ()); }
-#line 1463 "/root/bddd/build/parser.cpp"
+#line 1462 "/root/bddd/build/parser.cpp"
     break;
 
   case 49:
-#line 173 "/root/bddd/src/parser/parser.y"
+#line 170 "/root/bddd/src/parser/parser.y"
                                     { yylhs.value.as < unique_ptr<InitValAST> > () = std::make_unique<InitValAST>(); }
-#line 1469 "/root/bddd/build/parser.cpp"
+#line 1468 "/root/bddd/build/parser.cpp"
     break;
 
   case 50:
-#line 176 "/root/bddd/src/parser/parser.y"
+#line 173 "/root/bddd/src/parser/parser.y"
                                                           { yylhs.value.as < unique_ptr<InitValAST> > () = std::move(yystack_[2].value.as < unique_ptr<InitValAST> > ()); yylhs.value.as < unique_ptr<InitValAST> > ()->AppendVal(std::move(yystack_[0].value.as < unique_ptr<InitValAST> > ())); }
-#line 1475 "/root/bddd/build/parser.cpp"
+#line 1474 "/root/bddd/build/parser.cpp"
     break;
 
   case 51:
-#line 177 "/root/bddd/src/parser/parser.y"
+#line 174 "/root/bddd/src/parser/parser.y"
                                                      { yylhs.value.as < unique_ptr<InitValAST> > () = std::move(yystack_[2].value.as < unique_ptr<InitValAST> > ()); yylhs.value.as < unique_ptr<InitValAST> > ()->AppendVal(std::move(yystack_[0].value.as < unique_ptr<InitValAST> > ())); }
-#line 1481 "/root/bddd/build/parser.cpp"
+#line 1480 "/root/bddd/build/parser.cpp"
     break;
 
   case 52:
-#line 178 "/root/bddd/src/parser/parser.y"
+#line 175 "/root/bddd/src/parser/parser.y"
                                { yylhs.value.as < unique_ptr<InitValAST> > () = std::make_unique<InitValAST>(std::move(yystack_[0].value.as < unique_ptr<InitValAST> > ())); }
-#line 1487 "/root/bddd/build/parser.cpp"
+#line 1486 "/root/bddd/build/parser.cpp"
     break;
 
   case 53:
-#line 179 "/root/bddd/src/parser/parser.y"
+#line 176 "/root/bddd/src/parser/parser.y"
                           { yylhs.value.as < unique_ptr<InitValAST> > () = std::make_unique<InitValAST>(std::move(yystack_[0].value.as < unique_ptr<InitValAST> > ())); }
-#line 1493 "/root/bddd/build/parser.cpp"
+#line 1492 "/root/bddd/build/parser.cpp"
     break;
 
   case 54:
-#line 182 "/root/bddd/src/parser/parser.y"
+#line 179 "/root/bddd/src/parser/parser.y"
             { yylhs.value.as < unique_ptr<ExprAST> > () = std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ()); }
-#line 1499 "/root/bddd/build/parser.cpp"
+#line 1498 "/root/bddd/build/parser.cpp"
     break;
 
   case 55:
-#line 184 "/root/bddd/src/parser/parser.y"
+#line 181 "/root/bddd/src/parser/parser.y"
                               { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(Op::OR, std::move(yystack_[2].value.as < unique_ptr<ExprAST> > ()), std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1505 "/root/bddd/build/parser.cpp"
+#line 1504 "/root/bddd/build/parser.cpp"
     break;
 
   case 56:
-#line 185 "/root/bddd/src/parser/parser.y"
+#line 182 "/root/bddd/src/parser/parser.y"
                 { yylhs.value.as < unique_ptr<ExprAST> > () = std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ()); }
-#line 1511 "/root/bddd/build/parser.cpp"
+#line 1510 "/root/bddd/build/parser.cpp"
     break;
 
   case 57:
-#line 188 "/root/bddd/src/parser/parser.y"
+#line 185 "/root/bddd/src/parser/parser.y"
                { yylhs.value.as < unique_ptr<ExprAST> > () = std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ()); }
-#line 1517 "/root/bddd/build/parser.cpp"
+#line 1516 "/root/bddd/build/parser.cpp"
     break;
 
   case 58:
-#line 189 "/root/bddd/src/parser/parser.y"
+#line 186 "/root/bddd/src/parser/parser.y"
                                { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(Op::AND, std::move(yystack_[2].value.as < unique_ptr<ExprAST> > ()), std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1523 "/root/bddd/build/parser.cpp"
+#line 1522 "/root/bddd/build/parser.cpp"
     break;
 
   case 59:
-#line 192 "/root/bddd/src/parser/parser.y"
+#line 189 "/root/bddd/src/parser/parser.y"
               { yylhs.value.as < unique_ptr<ExprAST> > () = std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ()); }
-#line 1529 "/root/bddd/build/parser.cpp"
+#line 1528 "/root/bddd/build/parser.cpp"
     break;
 
   case 60:
-#line 193 "/root/bddd/src/parser/parser.y"
-                            { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(Op::EQ, std::move(yystack_[2].value.as < unique_ptr<ExprAST> > ()), std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1535 "/root/bddd/build/parser.cpp"
+#line 190 "/root/bddd/src/parser/parser.y"
+                           { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(Op::EQ, std::move(yystack_[2].value.as < unique_ptr<ExprAST> > ()), std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
+#line 1534 "/root/bddd/build/parser.cpp"
     break;
 
   case 61:
-#line 194 "/root/bddd/src/parser/parser.y"
-                             { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(Op::NEQ, std::move(yystack_[2].value.as < unique_ptr<ExprAST> > ()), std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1541 "/root/bddd/build/parser.cpp"
+#line 191 "/root/bddd/src/parser/parser.y"
+                            { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(Op::NEQ, std::move(yystack_[2].value.as < unique_ptr<ExprAST> > ()), std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
+#line 1540 "/root/bddd/build/parser.cpp"
     break;
 
   case 62:
-#line 197 "/root/bddd/src/parser/parser.y"
+#line 194 "/root/bddd/src/parser/parser.y"
                { yylhs.value.as < unique_ptr<ExprAST> > () = std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ()); }
-#line 1547 "/root/bddd/build/parser.cpp"
+#line 1546 "/root/bddd/build/parser.cpp"
     break;
 
   case 63:
-#line 198 "/root/bddd/src/parser/parser.y"
+#line 195 "/root/bddd/src/parser/parser.y"
                             { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(yystack_[1].value.as < Op > (), std::move(yystack_[2].value.as < unique_ptr<ExprAST> > ()), std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1553 "/root/bddd/build/parser.cpp"
+#line 1552 "/root/bddd/build/parser.cpp"
     break;
 
   case 64:
-#line 201 "/root/bddd/src/parser/parser.y"
+#line 198 "/root/bddd/src/parser/parser.y"
                { yylhs.value.as < unique_ptr<ExprAST> > () = std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ()); }
-#line 1559 "/root/bddd/build/parser.cpp"
+#line 1558 "/root/bddd/build/parser.cpp"
     break;
 
   case 65:
-#line 202 "/root/bddd/src/parser/parser.y"
+#line 199 "/root/bddd/src/parser/parser.y"
                             { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(yystack_[1].value.as < Op > (), std::move(yystack_[2].value.as < unique_ptr<ExprAST> > ()), std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1565 "/root/bddd/build/parser.cpp"
+#line 1564 "/root/bddd/build/parser.cpp"
     break;
 
   case 66:
-#line 205 "/root/bddd/src/parser/parser.y"
+#line 202 "/root/bddd/src/parser/parser.y"
                  { yylhs.value.as < unique_ptr<ExprAST> > () = std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ()); }
-#line 1571 "/root/bddd/build/parser.cpp"
+#line 1570 "/root/bddd/build/parser.cpp"
     break;
 
   case 67:
-#line 206 "/root/bddd/src/parser/parser.y"
+#line 203 "/root/bddd/src/parser/parser.y"
                               { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(yystack_[1].value.as < Op > (), std::move(yystack_[2].value.as < unique_ptr<ExprAST> > ()), std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1577 "/root/bddd/build/parser.cpp"
+#line 1576 "/root/bddd/build/parser.cpp"
     break;
 
   case 68:
-#line 209 "/root/bddd/src/parser/parser.y"
+#line 206 "/root/bddd/src/parser/parser.y"
                      { yylhs.value.as < unique_ptr<ExprAST> > () = std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ()); }
-#line 1583 "/root/bddd/build/parser.cpp"
+#line 1582 "/root/bddd/build/parser.cpp"
     break;
 
   case 69:
-#line 210 "/root/bddd/src/parser/parser.y"
+#line 207 "/root/bddd/src/parser/parser.y"
                    { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(std::move(yystack_[0].value.as < unique_ptr<FuncCallAST> > ())); }
-#line 1589 "/root/bddd/build/parser.cpp"
+#line 1588 "/root/bddd/build/parser.cpp"
     break;
 
   case 70:
-#line 211 "/root/bddd/src/parser/parser.y"
+#line 208 "/root/bddd/src/parser/parser.y"
                            { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(yystack_[1].value.as < Op > (), std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1595 "/root/bddd/build/parser.cpp"
+#line 1594 "/root/bddd/build/parser.cpp"
     break;
 
   case 71:
-#line 214 "/root/bddd/src/parser/parser.y"
+#line 211 "/root/bddd/src/parser/parser.y"
                                                   { yylhs.value.as < unique_ptr<FuncCallAST> > () = std::make_unique<FuncCallAST>(std::move(yystack_[3].value.as < string > ())); yylhs.value.as < unique_ptr<FuncCallAST> > ()->AssignParams(std::move(yystack_[1].value.as < vector<unique_ptr<ExprAST>> > ())); }
-#line 1601 "/root/bddd/build/parser.cpp"
+#line 1600 "/root/bddd/build/parser.cpp"
     break;
 
   case 72:
-#line 215 "/root/bddd/src/parser/parser.y"
-                                      { yylhs.value.as < unique_ptr<FuncCallAST> > () = std::make_unique<FuncCallAST>(std::move(yystack_[2].value.as < string > ())); }
-#line 1607 "/root/bddd/build/parser.cpp"
+#line 212 "/root/bddd/src/parser/parser.y"
+                                      {
+          if (yystack_[2].value.as < string > () == "starttime" || yystack_[2].value.as < string > () == "stoptime") {
+            // printf("%d,%d\n", @1.begin.line, @1.end.line);
+            assert(yystack_[2].location.begin.line == yystack_[2].location.end.line);
+            vector<unique_ptr<ExprAST>> params;
+            params.push_back(std::make_unique<ExprAST>(yystack_[2].location.begin.line));
+            yylhs.value.as < unique_ptr<FuncCallAST> > () = std::make_unique<FuncCallAST>("_sysy_" + yystack_[2].value.as < string > ());
+            yylhs.value.as < unique_ptr<FuncCallAST> > ()->AssignParams(std::move(params));
+          } else {
+            yylhs.value.as < unique_ptr<FuncCallAST> > () = std::make_unique<FuncCallAST>(std::move(yystack_[2].value.as < string > ()));
+          }
+        }
+#line 1617 "/root/bddd/build/parser.cpp"
     break;
 
   case 73:
-#line 218 "/root/bddd/src/parser/parser.y"
+#line 226 "/root/bddd/src/parser/parser.y"
                                       { yylhs.value.as < unique_ptr<ExprAST> > () = std::move(yystack_[1].value.as < unique_ptr<ExprAST> > ()); }
-#line 1613 "/root/bddd/build/parser.cpp"
+#line 1623 "/root/bddd/build/parser.cpp"
     break;
 
   case 74:
-#line 219 "/root/bddd/src/parser/parser.y"
+#line 227 "/root/bddd/src/parser/parser.y"
                  { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(std::move(yystack_[0].value.as < unique_ptr<LValAST> > ())); }
-#line 1619 "/root/bddd/build/parser.cpp"
+#line 1629 "/root/bddd/build/parser.cpp"
     break;
 
   case 75:
-#line 220 "/root/bddd/src/parser/parser.y"
+#line 228 "/root/bddd/src/parser/parser.y"
                    { yylhs.value.as < unique_ptr<ExprAST> > () = std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ()); }
-#line 1625 "/root/bddd/build/parser.cpp"
+#line 1635 "/root/bddd/build/parser.cpp"
     break;
 
   case 76:
-#line 223 "/root/bddd/src/parser/parser.y"
+#line 231 "/root/bddd/src/parser/parser.y"
                                          { yylhs.value.as < unique_ptr<LValAST> > () = std::move(yystack_[3].value.as < unique_ptr<LValAST> > ()); yylhs.value.as < unique_ptr<LValAST> > ()->AddDimension(std::move(yystack_[1].value.as < unique_ptr<ExprAST> > ())); }
-#line 1631 "/root/bddd/build/parser.cpp"
+#line 1641 "/root/bddd/build/parser.cpp"
     break;
 
   case 77:
-#line 224 "/root/bddd/src/parser/parser.y"
+#line 232 "/root/bddd/src/parser/parser.y"
             { yylhs.value.as < unique_ptr<LValAST> > () = std::make_unique<LValAST>(std::move(yystack_[0].value.as < string > ())); }
-#line 1637 "/root/bddd/build/parser.cpp"
+#line 1647 "/root/bddd/build/parser.cpp"
     break;
 
   case 78:
-#line 227 "/root/bddd/src/parser/parser.y"
+#line 235 "/root/bddd/src/parser/parser.y"
                                                                 { yylhs.value.as < unique_ptr<FuncDefAST> > () = std::make_unique<FuncDefAST>(VarType::VOID, std::move(yystack_[4].value.as < string > ()), std::move(yystack_[2].value.as < vector<unique_ptr<FuncFParamAST>> > ()), std::move(yystack_[0].value.as < unique_ptr<BlockAST> > ())); }
-#line 1643 "/root/bddd/build/parser.cpp"
+#line 1653 "/root/bddd/build/parser.cpp"
     break;
 
   case 79:
-#line 228 "/root/bddd/src/parser/parser.y"
+#line 236 "/root/bddd/src/parser/parser.y"
                                                     { yylhs.value.as < unique_ptr<FuncDefAST> > () = std::make_unique<FuncDefAST>(VarType::VOID, std::move(yystack_[3].value.as < string > ()), std::move(yystack_[0].value.as < unique_ptr<BlockAST> > ())); }
-#line 1649 "/root/bddd/build/parser.cpp"
+#line 1659 "/root/bddd/build/parser.cpp"
     break;
 
   case 80:
-#line 229 "/root/bddd/src/parser/parser.y"
+#line 237 "/root/bddd/src/parser/parser.y"
                                                              { yylhs.value.as < unique_ptr<FuncDefAST> > () = std::make_unique<FuncDefAST>(yystack_[5].value.as < VarType > (), std::move(yystack_[4].value.as < string > ()), std::move(yystack_[2].value.as < vector<unique_ptr<FuncFParamAST>> > ()), std::move(yystack_[0].value.as < unique_ptr<BlockAST> > ())); }
-#line 1655 "/root/bddd/build/parser.cpp"
+#line 1665 "/root/bddd/build/parser.cpp"
     break;
 
   case 81:
-#line 230 "/root/bddd/src/parser/parser.y"
+#line 238 "/root/bddd/src/parser/parser.y"
                                                  { yylhs.value.as < unique_ptr<FuncDefAST> > () = std::make_unique<FuncDefAST>(yystack_[4].value.as < VarType > (), std::move(yystack_[3].value.as < string > ()), std::move(yystack_[0].value.as < unique_ptr<BlockAST> > ())); }
-#line 1661 "/root/bddd/build/parser.cpp"
+#line 1671 "/root/bddd/build/parser.cpp"
     break;
 
   case 82:
-#line 233 "/root/bddd/src/parser/parser.y"
+#line 241 "/root/bddd/src/parser/parser.y"
                                               { yylhs.value.as < vector<unique_ptr<FuncFParamAST>> > ().assign(std::make_move_iterator(std::begin(yystack_[2].value.as < vector<unique_ptr<FuncFParamAST>> > ())), std::make_move_iterator(std::end(yystack_[2].value.as < vector<unique_ptr<FuncFParamAST>> > ()))); yystack_[2].value.as < vector<unique_ptr<FuncFParamAST>> > ().clear(); yylhs.value.as < vector<unique_ptr<FuncFParamAST>> > ().push_back(std::move(yystack_[0].value.as < unique_ptr<FuncFParamAST> > ())); }
-#line 1667 "/root/bddd/build/parser.cpp"
+#line 1677 "/root/bddd/build/parser.cpp"
     break;
 
   case 83:
-#line 234 "/root/bddd/src/parser/parser.y"
+#line 242 "/root/bddd/src/parser/parser.y"
                         { yylhs.value.as < vector<unique_ptr<FuncFParamAST>> > ().push_back(std::move(yystack_[0].value.as < unique_ptr<FuncFParamAST> > ())); }
-#line 1673 "/root/bddd/build/parser.cpp"
+#line 1683 "/root/bddd/build/parser.cpp"
     break;
 
   case 84:
-#line 237 "/root/bddd/src/parser/parser.y"
+#line 245 "/root/bddd/src/parser/parser.y"
                                           { yylhs.value.as < vector<unique_ptr<ExprAST>> > ().assign(std::make_move_iterator(std::begin(yystack_[2].value.as < vector<unique_ptr<ExprAST>> > ())), std::make_move_iterator(std::end(yystack_[2].value.as < vector<unique_ptr<ExprAST>> > ()))); yystack_[2].value.as < vector<unique_ptr<ExprAST>> > ().clear(); yylhs.value.as < vector<unique_ptr<ExprAST>> > ().push_back(std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1679 "/root/bddd/build/parser.cpp"
+#line 1689 "/root/bddd/build/parser.cpp"
     break;
 
   case 85:
-#line 238 "/root/bddd/src/parser/parser.y"
+#line 246 "/root/bddd/src/parser/parser.y"
                     { yylhs.value.as < vector<unique_ptr<ExprAST>> > ().push_back(std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1685 "/root/bddd/build/parser.cpp"
+#line 1695 "/root/bddd/build/parser.cpp"
     break;
 
   case 86:
-#line 241 "/root/bddd/src/parser/parser.y"
+#line 249 "/root/bddd/src/parser/parser.y"
                              { yylhs.value.as < unique_ptr<FuncFParamAST> > () = std::move(yystack_[0].value.as < unique_ptr<FuncFParamAST> > ()); }
-#line 1691 "/root/bddd/build/parser.cpp"
+#line 1701 "/root/bddd/build/parser.cpp"
     break;
 
   case 87:
-#line 242 "/root/bddd/src/parser/parser.y"
+#line 250 "/root/bddd/src/parser/parser.y"
                             { yylhs.value.as < unique_ptr<FuncFParamAST> > () = std::move(yystack_[0].value.as < unique_ptr<FuncFParamAST> > ()); }
-#line 1697 "/root/bddd/build/parser.cpp"
+#line 1707 "/root/bddd/build/parser.cpp"
     break;
 
   case 88:
-#line 245 "/root/bddd/src/parser/parser.y"
+#line 253 "/root/bddd/src/parser/parser.y"
                               { yylhs.value.as < unique_ptr<FuncFParamAST> > () = std::make_unique<FuncFParamAST>(yystack_[1].value.as < VarType > (), std::move(yystack_[0].value.as < string > ())); }
-#line 1703 "/root/bddd/build/parser.cpp"
+#line 1713 "/root/bddd/build/parser.cpp"
     break;
 
   case 89:
-#line 247 "/root/bddd/src/parser/parser.y"
+#line 255 "/root/bddd/src/parser/parser.y"
                                                        { yylhs.value.as < unique_ptr<FuncFParamAST> > () = std::make_unique<FuncFParamAST>(yystack_[3].value.as < VarType > (), std::move(yystack_[2].value.as < string > ())); yylhs.value.as < unique_ptr<FuncFParamAST> > ()->AddDimension(nullptr); }
-#line 1709 "/root/bddd/build/parser.cpp"
+#line 1719 "/root/bddd/build/parser.cpp"
     break;
 
   case 90:
-#line 248 "/root/bddd/src/parser/parser.y"
+#line 256 "/root/bddd/src/parser/parser.y"
                                                                { yylhs.value.as < unique_ptr<FuncFParamAST> > () = std::move(yystack_[3].value.as < unique_ptr<FuncFParamAST> > ()); yylhs.value.as < unique_ptr<FuncFParamAST> > ()->AddDimension(std::move(yystack_[1].value.as < unique_ptr<ExprAST> > ())); }
-#line 1715 "/root/bddd/build/parser.cpp"
+#line 1725 "/root/bddd/build/parser.cpp"
     break;
 
   case 91:
-#line 251 "/root/bddd/src/parser/parser.y"
+#line 259 "/root/bddd/src/parser/parser.y"
                              { yylhs.value.as < unique_ptr<BlockAST> > () = std::make_unique<BlockAST>(); }
-#line 1721 "/root/bddd/build/parser.cpp"
+#line 1731 "/root/bddd/build/parser.cpp"
     break;
 
   case 92:
-#line 252 "/root/bddd/src/parser/parser.y"
+#line 260 "/root/bddd/src/parser/parser.y"
                                         { yylhs.value.as < unique_ptr<BlockAST> > () = std::move(yystack_[1].value.as < unique_ptr<BlockAST> > ()); }
-#line 1727 "/root/bddd/build/parser.cpp"
+#line 1737 "/root/bddd/build/parser.cpp"
     break;
 
   case 93:
-#line 255 "/root/bddd/src/parser/parser.y"
+#line 263 "/root/bddd/src/parser/parser.y"
                       { yylhs.value.as < unique_ptr<BlockAST> > () = std::make_unique<BlockAST>(); yylhs.value.as < unique_ptr<BlockAST> > ()->AppendNodes(std::move(yystack_[0].value.as < vector<unique_ptr<AST>> > ())); }
-#line 1733 "/root/bddd/build/parser.cpp"
+#line 1743 "/root/bddd/build/parser.cpp"
     break;
 
   case 94:
-#line 256 "/root/bddd/src/parser/parser.y"
+#line 264 "/root/bddd/src/parser/parser.y"
                                  { yylhs.value.as < unique_ptr<BlockAST> > () = std::move(yystack_[1].value.as < unique_ptr<BlockAST> > ()); yylhs.value.as < unique_ptr<BlockAST> > ()->AppendNodes(std::move(yystack_[0].value.as < vector<unique_ptr<AST>> > ())); }
-#line 1739 "/root/bddd/build/parser.cpp"
+#line 1749 "/root/bddd/build/parser.cpp"
     break;
 
   case 95:
-#line 259 "/root/bddd/src/parser/parser.y"
+#line 267 "/root/bddd/src/parser/parser.y"
                 { yylhs.value.as < vector<unique_ptr<AST>> > ().insert(std::end(yylhs.value.as < vector<unique_ptr<AST>> > ()), std::make_move_iterator(std::begin(yystack_[0].value.as < vector<unique_ptr<DeclAST>> > ())), std::make_move_iterator(std::end(yystack_[0].value.as < vector<unique_ptr<DeclAST>> > ()))); yystack_[0].value.as < vector<unique_ptr<DeclAST>> > ().clear(); }
-#line 1745 "/root/bddd/build/parser.cpp"
+#line 1755 "/root/bddd/build/parser.cpp"
     break;
 
   case 96:
-#line 260 "/root/bddd/src/parser/parser.y"
+#line 268 "/root/bddd/src/parser/parser.y"
                 { yylhs.value.as < vector<unique_ptr<AST>> > ().push_back(std::move(yystack_[0].value.as < unique_ptr<StmtAST> > ())); }
-#line 1751 "/root/bddd/build/parser.cpp"
+#line 1761 "/root/bddd/build/parser.cpp"
     break;
 
   case 97:
-#line 263 "/root/bddd/src/parser/parser.y"
+#line 271 "/root/bddd/src/parser/parser.y"
                                         { yylhs.value.as < unique_ptr<StmtAST> > () = std::make_unique<AssignStmtAST>(std::move(yystack_[3].value.as < unique_ptr<LValAST> > ()), std::move(yystack_[1].value.as < unique_ptr<ExprAST> > ())); }
-#line 1757 "/root/bddd/build/parser.cpp"
+#line 1767 "/root/bddd/build/parser.cpp"
     break;
 
   case 98:
-#line 264 "/root/bddd/src/parser/parser.y"
+#line 272 "/root/bddd/src/parser/parser.y"
                         { yylhs.value.as < unique_ptr<StmtAST> > () = std::make_unique<EvalStmtAST>(std::move(yystack_[1].value.as < unique_ptr<ExprAST> > ())); }
-#line 1763 "/root/bddd/build/parser.cpp"
+#line 1773 "/root/bddd/build/parser.cpp"
     break;
 
   case 99:
-#line 265 "/root/bddd/src/parser/parser.y"
+#line 273 "/root/bddd/src/parser/parser.y"
                     { yylhs.value.as < unique_ptr<StmtAST> > () = std::make_unique<BlockAST>(); }
-#line 1769 "/root/bddd/build/parser.cpp"
+#line 1779 "/root/bddd/build/parser.cpp"
     break;
 
   case 100:
-#line 266 "/root/bddd/src/parser/parser.y"
+#line 274 "/root/bddd/src/parser/parser.y"
             { yylhs.value.as < unique_ptr<StmtAST> > () = std::move(yystack_[0].value.as < unique_ptr<BlockAST> > ()); }
-#line 1775 "/root/bddd/build/parser.cpp"
+#line 1785 "/root/bddd/build/parser.cpp"
     break;
 
   case 101:
-#line 267 "/root/bddd/src/parser/parser.y"
+#line 275 "/root/bddd/src/parser/parser.y"
              { yylhs.value.as < unique_ptr<StmtAST> > () = std::move(yystack_[0].value.as < unique_ptr<IfStmtAST> > ()); }
-#line 1781 "/root/bddd/build/parser.cpp"
+#line 1791 "/root/bddd/build/parser.cpp"
     break;
 
   case 102:
-#line 268 "/root/bddd/src/parser/parser.y"
+#line 276 "/root/bddd/src/parser/parser.y"
                 { yylhs.value.as < unique_ptr<StmtAST> > () = std::move(yystack_[0].value.as < unique_ptr<WhileStmtAST> > ()); }
-#line 1787 "/root/bddd/build/parser.cpp"
+#line 1797 "/root/bddd/build/parser.cpp"
     break;
 
   case 103:
-#line 269 "/root/bddd/src/parser/parser.y"
+#line 277 "/root/bddd/src/parser/parser.y"
                 { yylhs.value.as < unique_ptr<StmtAST> > () = std::move(yystack_[0].value.as < unique_ptr<BreakStmtAST> > ()); }
-#line 1793 "/root/bddd/build/parser.cpp"
+#line 1803 "/root/bddd/build/parser.cpp"
     break;
 
   case 104:
-#line 270 "/root/bddd/src/parser/parser.y"
+#line 278 "/root/bddd/src/parser/parser.y"
                    { yylhs.value.as < unique_ptr<StmtAST> > () = std::move(yystack_[0].value.as < unique_ptr<ContinueStmtAST> > ()); }
-#line 1799 "/root/bddd/build/parser.cpp"
+#line 1809 "/root/bddd/build/parser.cpp"
     break;
 
   case 105:
-#line 271 "/root/bddd/src/parser/parser.y"
+#line 279 "/root/bddd/src/parser/parser.y"
                  { yylhs.value.as < unique_ptr<StmtAST> > () = std::move(yystack_[0].value.as < unique_ptr<ReturnStmtAST> > ()); }
-#line 1805 "/root/bddd/build/parser.cpp"
+#line 1815 "/root/bddd/build/parser.cpp"
     break;
 
   case 106:
-#line 274 "/root/bddd/src/parser/parser.y"
+#line 282 "/root/bddd/src/parser/parser.y"
                                                              { yylhs.value.as < unique_ptr<IfStmtAST> > () = std::make_unique<IfStmtAST>(std::move(yystack_[4].value.as < unique_ptr<CondAST> > ()), std::move(yystack_[2].value.as < unique_ptr<StmtAST> > ()), std::move(yystack_[0].value.as < unique_ptr<StmtAST> > ())); }
-#line 1811 "/root/bddd/build/parser.cpp"
+#line 1821 "/root/bddd/build/parser.cpp"
     break;
 
   case 107:
-#line 275 "/root/bddd/src/parser/parser.y"
+#line 283 "/root/bddd/src/parser/parser.y"
                                                { yylhs.value.as < unique_ptr<IfStmtAST> > () = std::make_unique<IfStmtAST>(std::move(yystack_[2].value.as < unique_ptr<CondAST> > ()), std::move(yystack_[0].value.as < unique_ptr<StmtAST> > ())); }
-#line 1817 "/root/bddd/build/parser.cpp"
+#line 1827 "/root/bddd/build/parser.cpp"
     break;
 
   case 108:
-#line 278 "/root/bddd/src/parser/parser.y"
+#line 286 "/root/bddd/src/parser/parser.y"
                                          { yylhs.value.as < unique_ptr<ReturnStmtAST> > () = std::make_unique<ReturnStmtAST>(std::move(yystack_[1].value.as < unique_ptr<ExprAST> > ())); }
-#line 1823 "/root/bddd/build/parser.cpp"
+#line 1833 "/root/bddd/build/parser.cpp"
     break;
 
   case 109:
-#line 279 "/root/bddd/src/parser/parser.y"
+#line 287 "/root/bddd/src/parser/parser.y"
                                      { yylhs.value.as < unique_ptr<ReturnStmtAST> > () = std::make_unique<ReturnStmtAST>(); }
-#line 1829 "/root/bddd/build/parser.cpp"
+#line 1839 "/root/bddd/build/parser.cpp"
     break;
 
   case 110:
-#line 282 "/root/bddd/src/parser/parser.y"
+#line 290 "/root/bddd/src/parser/parser.y"
                                                      { yylhs.value.as < unique_ptr<WhileStmtAST> > () = std::make_unique<WhileStmtAST>(std::move(yystack_[2].value.as < unique_ptr<CondAST> > ()), std::move(yystack_[0].value.as < unique_ptr<StmtAST> > ())); }
-#line 1835 "/root/bddd/build/parser.cpp"
+#line 1845 "/root/bddd/build/parser.cpp"
     break;
 
   case 111:
-#line 284 "/root/bddd/src/parser/parser.y"
+#line 292 "/root/bddd/src/parser/parser.y"
                                    { yylhs.value.as < unique_ptr<BreakStmtAST> > () = std::make_unique<BreakStmtAST>(); }
-#line 1841 "/root/bddd/build/parser.cpp"
+#line 1851 "/root/bddd/build/parser.cpp"
     break;
 
   case 112:
-#line 286 "/root/bddd/src/parser/parser.y"
+#line 294 "/root/bddd/src/parser/parser.y"
                                          { yylhs.value.as < unique_ptr<ContinueStmtAST> > () = std::make_unique<ContinueStmtAST>(); }
-#line 1847 "/root/bddd/build/parser.cpp"
+#line 1857 "/root/bddd/build/parser.cpp"
     break;
 
   case 113:
-#line 288 "/root/bddd/src/parser/parser.y"
+#line 296 "/root/bddd/src/parser/parser.y"
              { yylhs.value.as < unique_ptr<CondAST> > () = std::make_unique<CondAST>(std::move(yystack_[0].value.as < unique_ptr<ExprAST> > ())); }
-#line 1853 "/root/bddd/build/parser.cpp"
+#line 1863 "/root/bddd/build/parser.cpp"
     break;
 
   case 114:
-#line 290 "/root/bddd/src/parser/parser.y"
+#line 298 "/root/bddd/src/parser/parser.y"
                  { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(yystack_[0].value.as < int > ()); /* printf("(intconst, %d)\n", $1); */ }
-#line 1859 "/root/bddd/build/parser.cpp"
+#line 1869 "/root/bddd/build/parser.cpp"
     break;
 
   case 115:
-#line 291 "/root/bddd/src/parser/parser.y"
+#line 299 "/root/bddd/src/parser/parser.y"
                  { yylhs.value.as < unique_ptr<ExprAST> > () = std::make_unique<ExprAST>(yystack_[0].value.as < float > ()); /* printf("(floatconst, %f)\n", $1); */ }
-#line 1865 "/root/bddd/build/parser.cpp"
+#line 1875 "/root/bddd/build/parser.cpp"
     break;
 
   case 116:
-#line 293 "/root/bddd/src/parser/parser.y"
+#line 301 "/root/bddd/src/parser/parser.y"
            { yylhs.value.as < Op > () = Op::PLUS;  /* printf("(op, +)\n"); */ }
-#line 1871 "/root/bddd/build/parser.cpp"
+#line 1881 "/root/bddd/build/parser.cpp"
     break;
 
   case 117:
-#line 294 "/root/bddd/src/parser/parser.y"
+#line 302 "/root/bddd/src/parser/parser.y"
            { yylhs.value.as < Op > () = Op::MINUS; /* printf("(op, -)\n"); */ }
-#line 1877 "/root/bddd/build/parser.cpp"
+#line 1887 "/root/bddd/build/parser.cpp"
     break;
 
   case 118:
-#line 297 "/root/bddd/src/parser/parser.y"
+#line 305 "/root/bddd/src/parser/parser.y"
            { yylhs.value.as < Op > () = Op::MULTI; /* printf("(op, *)\n"); */ }
-#line 1883 "/root/bddd/build/parser.cpp"
+#line 1893 "/root/bddd/build/parser.cpp"
     break;
 
   case 119:
-#line 298 "/root/bddd/src/parser/parser.y"
+#line 306 "/root/bddd/src/parser/parser.y"
            { yylhs.value.as < Op > () = Op::DIV;  /* printf("(op, /)\n"); */ }
-#line 1889 "/root/bddd/build/parser.cpp"
+#line 1899 "/root/bddd/build/parser.cpp"
     break;
 
   case 120:
-#line 299 "/root/bddd/src/parser/parser.y"
+#line 307 "/root/bddd/src/parser/parser.y"
            { yylhs.value.as < Op > () = Op::MOD;  /* printf("(op, %)\n"); */ }
-#line 1895 "/root/bddd/build/parser.cpp"
+#line 1905 "/root/bddd/build/parser.cpp"
     break;
 
   case 121:
-#line 302 "/root/bddd/src/parser/parser.y"
+#line 310 "/root/bddd/src/parser/parser.y"
              { yylhs.value.as < Op > () = Op::POSITIVE; /* printf("(op, +)\n"); */ }
-#line 1901 "/root/bddd/build/parser.cpp"
+#line 1911 "/root/bddd/build/parser.cpp"
     break;
 
   case 122:
-#line 303 "/root/bddd/src/parser/parser.y"
+#line 311 "/root/bddd/src/parser/parser.y"
              { yylhs.value.as < Op > () = Op::NEGATIVE; /* printf("(op, -)\n"); */ }
-#line 1907 "/root/bddd/build/parser.cpp"
+#line 1917 "/root/bddd/build/parser.cpp"
     break;
 
   case 123:
-#line 304 "/root/bddd/src/parser/parser.y"
+#line 312 "/root/bddd/src/parser/parser.y"
              { yylhs.value.as < Op > () = Op::NOT; /* printf("(op, !)\n"); */ }
-#line 1913 "/root/bddd/build/parser.cpp"
+#line 1923 "/root/bddd/build/parser.cpp"
     break;
 
   case 124:
-#line 307 "/root/bddd/src/parser/parser.y"
+#line 315 "/root/bddd/src/parser/parser.y"
            { yylhs.value.as < Op > () = Op::GE;   /* printf("(op, >)\n"); */ }
-#line 1919 "/root/bddd/build/parser.cpp"
+#line 1929 "/root/bddd/build/parser.cpp"
     break;
 
   case 125:
-#line 308 "/root/bddd/src/parser/parser.y"
+#line 316 "/root/bddd/src/parser/parser.y"
             { yylhs.value.as < Op > () = Op::GEQ; /* printf("(op, >=)\n"); */ }
-#line 1925 "/root/bddd/build/parser.cpp"
+#line 1935 "/root/bddd/build/parser.cpp"
     break;
 
   case 126:
-#line 309 "/root/bddd/src/parser/parser.y"
+#line 317 "/root/bddd/src/parser/parser.y"
            { yylhs.value.as < Op > () = Op::LE;   /* printf("(op, <)\n"); */ }
-#line 1931 "/root/bddd/build/parser.cpp"
+#line 1941 "/root/bddd/build/parser.cpp"
     break;
 
   case 127:
-#line 310 "/root/bddd/src/parser/parser.y"
+#line 318 "/root/bddd/src/parser/parser.y"
             { yylhs.value.as < Op > () = Op::LEQ; /* printf("(op, <=)\n"); */ }
-#line 1937 "/root/bddd/build/parser.cpp"
+#line 1947 "/root/bddd/build/parser.cpp"
     break;
 
   case 128:
-#line 313 "/root/bddd/src/parser/parser.y"
+#line 321 "/root/bddd/src/parser/parser.y"
                   { yylhs.value.as < string > () = std::move(yystack_[0].value.as < string > ()); /* printf("(identifier, %s)\n", $1.c_str()); */ }
-#line 1943 "/root/bddd/build/parser.cpp"
+#line 1953 "/root/bddd/build/parser.cpp"
     break;
 
 
-#line 1947 "/root/bddd/build/parser.cpp"
+#line 1957 "/root/bddd/build/parser.cpp"
 
             default:
               break;
@@ -2222,25 +2232,25 @@ namespace yy {
   parser::yypact_[] =
   {
       68,   -97,   -97,   -97,   -97,    21,    10,    82,   -97,    10,
-     137,   137,   -97,    10,   -97,    23,   -97,   -97,   -97,   -97,
-     -97,   -97,    86,   103,   -97,   -97,   -97,    10,   -97,    10,
-      86,   -97,   -97,   -97,    86,   -97,    44,   -97,   -97,     7,
-     228,   228,    44,   228,   -97,   -97,    86,     7,   228,   -97,
+      94,    94,   -97,    10,   -97,    23,   -97,   -97,   -97,   -97,
+     -97,   -97,    81,    80,   -97,   -97,   -97,    10,   -97,    10,
+      81,   -97,   -97,   -97,    81,   -97,    44,   -97,   -97,     7,
+     228,   228,    44,   228,   -97,   -97,    81,     7,   228,   -97,
        7,    10,    54,   -97,   -97,    37,   -97,   196,   -97,   -97,
-     -97,   -97,   -97,   -97,   228,    41,   139,   101,   -97,   -97,
-     -97,    37,   -97,   228,    23,   -97,   139,     7,    54,    41,
+     -97,   -97,   -97,   -97,   228,    41,   103,    91,   -97,   -97,
+     -97,    37,   -97,   228,    23,   -97,   103,     7,    54,    41,
      -97,   -97,   148,   -97,    37,    21,     7,   228,   -97,   -97,
      -97,   -97,    35,    42,   -97,   -97,   -97,   -97,   228,   -97,
      -97,   -97,   228,   228,   -97,   199,   -97,     7,   -97,   -97,
      -97,   -97,   -97,   -97,   -97,   -97,   213,    23,    23,    67,
-      67,   -97,    10,    67,    86,   -97,   148,   -97,   -97,   -97,
+      67,   -97,    10,    67,    81,   -97,   148,   -97,   -97,   -97,
      -97,   -97,   -97,   -97,    41,   -97,   -97,    41,   237,   -97,
-     -97,   101,   -97,    41,   -97,   139,    54,   -97,   -97,    67,
+     -97,    91,   -97,    41,   -97,   103,    54,   -97,   -97,    67,
      228,   228,   -97,   -97,   -97,   228,   -97,   -97,   -97,   -97,
-     -97,   -97,   -97,   228,   -97,   -97,    47,    70,   -97,    63,
-     139,    42,    42,    67,   139,   -97,   228,   -97,   228,   -97,
-     -97,   -97,   -97,   -97,   -97,   228,   228,   228,   172,   172,
-     -97,    70,   -97,   112,   112,   139,    84,   -97,   -97,   172,
+     -97,   -97,   -97,   228,   -97,   -97,    47,    60,   108,   116,
+     103,    42,    42,    67,   103,   -97,   228,   -97,   228,   -97,
+     -97,   228,   228,   -97,   -97,   -97,   -97,   228,   172,   172,
+     -97,    60,   108,   116,   116,   103,    79,   -97,   -97,   172,
      -97
   };
 
@@ -2264,8 +2274,8 @@ namespace yy {
       73,    65,    67,     0,    72,    85,     0,    80,   109,     0,
        0,     0,   111,   112,    98,     0,    92,    94,    89,    90,
       51,    50,    76,     0,    71,   108,   113,    56,    57,    59,
-      62,     0,     0,     0,    84,     7,     0,     6,     0,   124,
-     125,   126,   127,     8,     9,     0,     0,     0,     0,     0,
+      62,     0,     0,     0,    84,     7,     0,     6,     0,     8,
+       9,     0,     0,   124,   125,   126,   127,     0,     0,     0,
       97,    55,    58,    60,    61,    63,   107,   110,    19,     0,
      106
   };
@@ -2275,17 +2285,17 @@ namespace yy {
   {
      -97,   -10,   -97,    -8,     4,   -97,   -97,   -97,   -97,   -97,
       -6,   -38,     3,   -46,     2,   -71,   -97,   -97,   -97,   -97,
-     -97,   -97,   -97,    74,     6,   -97,   -97,    91,   -97,   -97,
-      20,    96,   -97,   -97,   -20,   -22,   -97,   -33,   -97,   -39,
-     -16,    -5,   -36,    60,   -58,   -97,   -97,   -64,   160,   127,
-     -97,    94,   -97,   -97,   -28,   -97,    56,   -96,   -97,   -97,
-     -97,   -97,   -97,    34,   -97,   -97,   -97,   -97,   -97,    14
+     -97,   -97,   -97,    74,     6,   -97,   -97,    78,   -97,   -97,
+      20,    90,   -97,   -97,   -20,   -22,   -97,   -33,   -97,   -53,
+     -47,   -16,   -36,    39,   -58,   -97,   -97,   -64,   151,   120,
+     -97,    84,   -97,   -97,   -28,   -97,    53,   -96,   -97,   -97,
+     -97,   -97,   -97,    16,   -97,   -97,   -97,   -97,   -97,    14
   };
 
   const short
   parser::yydefgoto_[] =
   {
-      -1,   114,     5,    85,    41,   178,   176,   185,   186,     6,
+      -1,   114,     5,    85,    41,   178,   176,   181,   182,     6,
       64,    50,    82,    89,    43,    95,   116,   117,   199,   118,
      119,   120,     7,   121,    51,    10,    11,    19,    20,    21,
       22,    31,    32,    33,    75,    58,    92,   123,   166,   167,
@@ -2306,16 +2316,16 @@ namespace yy {
       57,    49,   124,   158,    24,    84,   159,   144,   105,   145,
      143,    49,   162,   103,     8,     1,     2,     3,    25,   147,
      156,    17,    16,   149,   138,   175,   134,     4,   122,     1,
-       2,     3,   196,   197,   179,   180,   181,   182,   183,   184,
-      37,     4,    76,   200,    38,   198,   148,   177,   164,   152,
-     153,   150,   151,   154,   170,   170,   161,    37,   160,    35,
-      45,    38,   173,    44,   124,   124,   103,   174,   155,    99,
-     100,   101,   122,   188,   189,   124,    46,   191,   163,   165,
-     170,    57,   170,   179,   180,   181,   182,    24,    25,   170,
-     170,   195,    59,    60,    14,     1,     2,     3,   141,    25,
-      56,    88,   192,   190,    35,    96,    97,    18,   109,    78,
-     110,   111,   112,   113,    61,    62,    59,    60,    14,   135,
-     193,   194,   157,    25,    56,   172,     0,    63,    35,     0,
+       2,     3,   196,   197,    37,    37,    35,   177,    38,    38,
+     198,     4,    76,   200,    24,    25,   148,    45,   164,   152,
+     153,   150,   151,   154,   170,   170,   161,    44,   160,    99,
+     100,   101,   173,   191,   124,   124,   103,   174,   155,    96,
+      97,   192,   122,   188,   189,   124,    46,   141,   163,   165,
+     170,    57,   170,   179,   180,   170,   170,   183,   184,   185,
+     186,   195,    59,    60,    14,     1,     2,     3,    18,    25,
+      56,    88,    78,   190,    35,   193,   194,   172,   109,   135,
+     110,   111,   112,   113,    61,    62,    59,    60,    14,   157,
+       0,     0,     0,    25,    56,     0,     0,    63,    35,     0,
        0,     0,   109,     0,   110,   111,   112,   113,    61,    62,
       59,    60,    14,    59,    60,    14,     0,     0,    56,    88,
        0,    63,    35,     0,     0,    35,    49,    59,    60,    14,
@@ -2339,16 +2349,16 @@ namespace yy {
       57,    17,   126,   134,    10,    51,   137,   105,    74,   105,
      103,    17,   143,    71,     0,     7,     8,     9,    11,   107,
      126,     7,     0,   116,    92,    38,    84,    19,    82,     7,
-       8,     9,   188,   189,    31,    32,    33,    34,    35,    36,
-      14,    19,   138,   199,    18,    21,   116,    37,   146,   119,
-     120,   117,   118,   123,   150,   151,   138,    14,   138,    16,
-      29,    18,   155,    27,   188,   189,   124,   163,   124,    28,
-      29,    30,   126,   171,   172,   199,   122,   176,   146,   149,
-     176,   138,   178,    31,    32,    33,    34,    10,    11,   185,
-     186,   187,     4,     5,     6,     7,     8,     9,    98,    11,
-      12,    13,   178,   173,    16,    26,    27,     7,    20,    42,
-      22,    23,    24,    25,    26,    27,     4,     5,     6,    85,
-     185,   186,   126,    11,    12,   151,    -1,    39,    16,    -1,
+       8,     9,   188,   189,    14,    14,    16,    37,    18,    18,
+      21,    19,   138,   199,    10,    11,   116,    29,   146,   119,
+     120,   117,   118,   123,   150,   151,   138,    27,   138,    28,
+      29,    30,   155,   176,   188,   189,   124,   163,   124,    26,
+      27,   178,   126,   171,   172,   199,   122,    98,   146,   149,
+     176,   138,   178,    35,    36,   181,   182,    31,    32,    33,
+      34,   187,     4,     5,     6,     7,     8,     9,     7,    11,
+      12,    13,    42,   173,    16,   181,   182,   151,    20,    85,
+      22,    23,    24,    25,    26,    27,     4,     5,     6,   126,
+      -1,    -1,    -1,    11,    12,    -1,    -1,    39,    16,    -1,
       -1,    -1,    20,    -1,    22,    23,    24,    25,    26,    27,
        4,     5,     6,     4,     5,     6,    -1,    -1,    12,    13,
       -1,    39,    16,    -1,    -1,    16,    17,     4,     5,     6,
@@ -2380,8 +2390,8 @@ namespace yy {
       51,    83,    84,    77,    51,    82,    90,    94,    41,    77,
       50,    50,    41,    41,    41,    44,    53,    96,    55,    55,
       74,    75,    55,    43,    51,    41,    78,    79,    80,    81,
-      82,   103,   103,    77,    82,    38,    46,    37,    45,    31,
-      32,    33,    34,    35,    36,    47,    48,   108,    51,    51,
+      82,   103,   103,    77,    82,    38,    46,    37,    45,    35,
+      36,    47,    48,    31,    32,    33,    34,   108,    51,    51,
       41,    79,    80,    81,    81,    82,    97,    97,    21,    58,
       97
   };
@@ -2455,19 +2465,19 @@ namespace yy {
   const short
   parser::yyrline_[] =
   {
-       0,   102,   102,   103,   104,   105,   106,   107,   108,   109,
-     110,   111,   112,   113,   114,   115,   116,   117,   118,   119,
-     120,   121,   122,   124,   125,   126,   127,   130,   131,   134,
-     135,   138,   139,   142,   143,   146,   147,   149,   150,   152,
-     153,   156,   157,   160,   161,   164,   167,   170,   172,   173,
-     176,   177,   178,   179,   182,   184,   185,   188,   189,   192,
-     193,   194,   197,   198,   201,   202,   205,   206,   209,   210,
-     211,   214,   215,   218,   219,   220,   223,   224,   227,   228,
-     229,   230,   233,   234,   237,   238,   241,   242,   245,   247,
-     248,   251,   252,   255,   256,   259,   260,   263,   264,   265,
-     266,   267,   268,   269,   270,   271,   274,   275,   278,   279,
-     282,   284,   286,   288,   290,   291,   293,   294,   297,   298,
-     299,   302,   303,   304,   307,   308,   309,   310,   313
+       0,    99,    99,   100,   101,   102,   103,   104,   105,   106,
+     107,   108,   109,   110,   111,   112,   113,   114,   115,   116,
+     117,   118,   119,   121,   122,   123,   124,   127,   128,   131,
+     132,   135,   136,   139,   140,   143,   144,   146,   147,   149,
+     150,   153,   154,   157,   158,   161,   164,   167,   169,   170,
+     173,   174,   175,   176,   179,   181,   182,   185,   186,   189,
+     190,   191,   194,   195,   198,   199,   202,   203,   206,   207,
+     208,   211,   212,   226,   227,   228,   231,   232,   235,   236,
+     237,   238,   241,   242,   245,   246,   249,   250,   253,   255,
+     256,   259,   260,   263,   264,   267,   268,   271,   272,   273,
+     274,   275,   276,   277,   278,   279,   282,   283,   286,   287,
+     290,   292,   294,   296,   298,   299,   301,   302,   305,   306,
+     307,   310,   311,   312,   315,   316,   317,   318,   321
   };
 
   // Print the state stack on the debug stream.
@@ -2501,9 +2511,9 @@ namespace yy {
 
 
 } // yy
-#line 2505 "/root/bddd/build/parser.cpp"
+#line 2515 "/root/bddd/build/parser.cpp"
 
-#line 319 "/root/bddd/src/parser/parser.y"
+#line 327 "/root/bddd/src/parser/parser.y"
 
 
 void yy::parser::error (const location_type& l, const std::string& m) {
