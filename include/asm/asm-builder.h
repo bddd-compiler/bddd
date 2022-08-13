@@ -71,10 +71,12 @@ public:
 
   // appendMOV
   std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, int imm,
-                                     std::shared_ptr<ASM_BasicBlock> phi_block = nullptr);
+                                     std::shared_ptr<ASM_BasicBlock> phi_block
+                                     = nullptr);
 
   std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, float imm,
-                                     std::shared_ptr<ASM_BasicBlock> phi_block = nullptr);
+                                     std::shared_ptr<ASM_BasicBlock> phi_block
+                                     = nullptr);
 
   std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest,
                                      std::shared_ptr<Operand> src);

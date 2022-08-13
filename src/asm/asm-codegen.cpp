@@ -2,7 +2,8 @@
 #include "ir/ir.h"
 
 std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
-    std::shared_ptr<Constant> value, bool genimm, bool checkimm, std::shared_ptr<ASM_BasicBlock> phi_block) {
+    std::shared_ptr<Constant> value, bool genimm, bool checkimm,
+    std::shared_ptr<ASM_BasicBlock> phi_block) {
   assert(value->m_type.IsConst());
   std::shared_ptr<Operand> ret;
   if (value->m_type.IsBasicFloat()) {
@@ -310,15 +311,36 @@ std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
     std::shared_ptr<Value> value = inst->m_params[i]->getValue();
     int sp_offs = (i - 4) * 4;
     std::shared_ptr<Operand> offs;
+    std::shared_ptr<STRInst> str;
     if (Operand::addrOffsCheck(sp_offs, value->m_type.IsBasicFloat())) {
       offs = std::make_shared<Operand>(sp_offs);
+      str = builder->appendSTR(builder->getOperand(value),
+                               Operand::getRReg(RReg::SP), offs);
     } else {
-      offs = std::make_shared<Operand>(OperandType::VREG);
-      auto mov = builder->appendMOV(offs, sp_offs);
-      mov->m_params_offset = stack_move_size;
+      if (value->m_type.IsBasicInt()) {
+        offs = std::make_shared<Operand>(OperandType::VREG);
+        auto mov = builder->appendMOV(offs, sp_offs);
+        mov->m_params_offset = stack_move_size;
+        str = builder->appendSTR(builder->getOperand(value),
+                                 Operand::getRReg(RReg::SP), offs);
+      } else {
+        offs = std::make_shared<Operand>(OperandType::VREG);
+        if (Operand::immCheck(sp_offs)) {
+          auto add
+              = builder->appendAS(InstOp::ADD, offs, Operand::getRReg(RReg::SP),
+                                  std::make_shared<Operand>(sp_offs));
+          add->m_params_offset = stack_move_size;
+        } else {
+          auto mov = builder->appendMOV(offs, sp_offs);
+          auto add = builder->appendAS(InstOp::ADD, offs,
+                                       Operand::getRReg(RReg::SP), offs);
+          mov->m_params_offset = stack_move_size;
+          add->m_params_offset = stack_move_size;
+        }
+        str = builder->appendSTR(builder->getOperand(value), offs,
+                                 std::make_shared<Operand>(0));
+      }
     }
-    auto str = builder->appendSTR(builder->getOperand(value),
-                                  Operand::getRReg(RReg::SP), offs);
     str->m_params_offset = stack_move_size;
     i++;
   }
@@ -365,6 +387,9 @@ std::shared_ptr<Operand> GenerateBranch(std::shared_ptr<BranchInstruction> inst,
     cond = ASM_Instruction::getOppositeCond(cond);
   }
   assert(cond != CondType::NONE);
+  if (builder->m_cur_block->m_status_load_inst) {
+    builder->m_cur_block->insert(builder->m_cur_block->m_status_load_inst);
+  }
   builder->appendB(true_block, cond);
   builder->m_cur_block->m_branch_pos
       = std::prev(builder->m_cur_block->m_insts.end());
@@ -596,6 +621,9 @@ std::shared_ptr<Operand> GenerateZExt(std::shared_ptr<ZExtInstruction> inst,
     cond = ASM_Instruction::getOppositeCond(cond);
   }
   assert(cond != CondType::NONE);
+  if (builder->m_cur_block->m_status_load_inst) {
+    builder->m_cur_block->insert(builder->m_cur_block->m_status_load_inst);
+  }
   auto ret = builder->getOperand(inst);
   auto mov_true = builder->appendMOV(ret, 1);
   auto mov_false = builder->appendMOV(ret, 0);

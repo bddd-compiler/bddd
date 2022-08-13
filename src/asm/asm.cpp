@@ -63,11 +63,15 @@ void ASM_BasicBlock::insert(std::shared_ptr<ASM_Instruction> inst) {
 
 void ASM_BasicBlock::insertSpillLDR(
     std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
-    std::shared_ptr<ASM_Instruction> ldr,
+    std::shared_ptr<ASM_Instruction> ldr, std::shared_ptr<ASM_Instruction> add,
     std::shared_ptr<ASM_Instruction> mov) {
   if (mov) {
     m_insts.insert(iter, mov);
     mov->m_block = shared_from_this();
+  }
+  if (add) {
+    m_insts.insert(iter, add);
+    add->m_block = shared_from_this();
   }
   m_insts.insert(iter, ldr);
   ldr->m_block = shared_from_this();
@@ -75,12 +79,16 @@ void ASM_BasicBlock::insertSpillLDR(
 
 void ASM_BasicBlock::insertSpillSTR(
     std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
-    std::shared_ptr<ASM_Instruction> str,
+    std::shared_ptr<ASM_Instruction> str, std::shared_ptr<ASM_Instruction> add,
     std::shared_ptr<ASM_Instruction> mov) {
   auto next = std::next(iter);
   if (mov) {
     m_insts.insert(next, mov);
     mov->m_block = shared_from_this();
+  }
+  if (add) {
+    m_insts.insert(next, add);
+    add->m_block = shared_from_this();
   }
   m_insts.insert(next, str);
   str->m_block = shared_from_this();
@@ -565,6 +573,10 @@ CALLInst::CALLInst(VarType type, std::string label, int n) {
   addDef(Operand::getRReg(RReg::R3));
   addDef(Operand::getRReg(RReg::R12));
   addDef(Operand::getRReg(RReg::LR));
+
+  for (int i = 0; i < 16; i++) {
+    addDef(Operand::getSReg((SReg)i));
+  }
 
   if (label == "putfloat") {
     addUse(Operand::getSReg(SReg::S0));

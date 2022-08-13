@@ -38,7 +38,9 @@ void RegisterAllocator::Allocate() {
           node->m_is_float = true;
           node->m_sreg = sreg;
         }
-        storeRegisters(func, Operand::getSReg(sreg));
+        if (16 <= (int)sreg && (int)sreg <= 31) {
+          storeRegisters(func, Operand::getSReg(sreg));
+        }
       }
     }
     initial.clear();
@@ -82,7 +84,7 @@ void RegisterAllocator::initialColors() {
                       RReg::R10, RReg::R11, RReg::R12, RReg::LR};
     K = rreg_avaliable.size();
   } else {
-    for (int i = 1; i < 32; i++) {
+    for (int i = 0; i < 32; i++) {
       sreg_avaliable.insert((SReg)i);
     }
     K = sreg_avaliable.size();
@@ -612,23 +614,41 @@ void RegisterAllocator::RewriteProgram() {
           // insert a load instruction before use of newOp
           OpPtr offs;
           std::shared_ptr<MOVInst> mov = nullptr;
+          std::shared_ptr<ASInst> add = nullptr;
+          std::shared_ptr<LDRInst> ldr;
           if (Operand::addrOffsCheck(fixed_offs, newOp->m_is_float)) {
             offs = std::make_shared<Operand>(fixed_offs);
+            ldr = std::make_shared<LDRInst>(newOp, Operand::getRReg(RReg::SP),
+                                            offs);
           } else {
-            offs = std::make_shared<Operand>(OperandType::VREG);
-            mov = std::make_shared<MOVInst>(offs, fixed_offs);
-            mov->m_params_offset = i->m_params_offset;
+            if (!newOp->m_is_float) {
+              offs = std::make_shared<Operand>(OperandType::VREG);
+              mov = std::make_shared<MOVInst>(offs, fixed_offs);
+              mov->m_params_offset = i->m_params_offset;
+              ldr = std::make_shared<LDRInst>(newOp, Operand::getRReg(RReg::SP),
+                                              offs);
+            } else {
+              offs = std::make_shared<Operand>(OperandType::VREG);
+              if (Operand::immCheck(fixed_offs)) {
+                add = std::make_shared<ASInst>(
+                    InstOp::ADD, offs, Operand::getRReg(RReg::SP),
+                    std::make_shared<Operand>(fixed_offs));
+                add->m_params_offset = i->m_params_offset;
+              } else {
+                mov = std::make_shared<MOVInst>(offs, fixed_offs);
+                add = std::make_shared<ASInst>(
+                    InstOp::ADD, offs, Operand::getRReg(RReg::SP), offs);
+                mov->m_params_offset = i->m_params_offset;
+                add->m_params_offset = i->m_params_offset;
+              }
+              ldr = std::make_shared<LDRInst>(newOp, offs,
+                                              std::make_shared<Operand>(0));
+            }
             if (m_reg_type == RegType::R) newTemps.insert(offs);
             updateDepth(b, offs);
           }
-          auto ldr = std::make_shared<LDRInst>(
-              newOp, Operand::getRReg(RReg::SP), offs);
           ldr->m_params_offset = i->m_params_offset;
-          if (mov) {
-            b->insertSpillLDR(iter, ldr, mov);
-          } else {
-            b->insertSpillLDR(iter, ldr);
-          }
+          b->insertSpillLDR(iter, ldr, add, mov);
           newTemps.insert(newOp);
           updateDepth(b, newOp);
         }
@@ -647,23 +667,41 @@ void RegisterAllocator::RewriteProgram() {
           // insert a store instruction after defination of newOp
           OpPtr offs;
           std::shared_ptr<MOVInst> mov = nullptr;
+          std::shared_ptr<ASInst> add = nullptr;
+          std::shared_ptr<STRInst> str;
           if (Operand::addrOffsCheck(fixed_offs, newOp->m_is_float)) {
             offs = std::make_shared<Operand>(fixed_offs);
+            str = std::make_shared<STRInst>(newOp, Operand::getRReg(RReg::SP),
+                                            offs);
           } else {
-            offs = std::make_shared<Operand>(OperandType::VREG);
-            mov = std::make_shared<MOVInst>(offs, fixed_offs);
-            mov->m_params_offset = i->m_params_offset;
+            if (!newOp->m_is_float) {
+              offs = std::make_shared<Operand>(OperandType::VREG);
+              mov = std::make_shared<MOVInst>(offs, fixed_offs);
+              mov->m_params_offset = i->m_params_offset;
+              str = std::make_shared<STRInst>(newOp, Operand::getRReg(RReg::SP),
+                                              offs);
+            } else {
+              offs = std::make_shared<Operand>(OperandType::VREG);
+              if (Operand::immCheck(fixed_offs)) {
+                add = std::make_shared<ASInst>(
+                    InstOp::ADD, offs, Operand::getRReg(RReg::SP),
+                    std::make_shared<Operand>(fixed_offs));
+                add->m_params_offset = i->m_params_offset;
+              } else {
+                mov = std::make_shared<MOVInst>(offs, fixed_offs);
+                add = std::make_shared<ASInst>(
+                    InstOp::ADD, offs, Operand::getRReg(RReg::SP), offs);
+                mov->m_params_offset = i->m_params_offset;
+                add->m_params_offset = i->m_params_offset;
+              }
+              str = std::make_shared<STRInst>(newOp, offs,
+                                              std::make_shared<Operand>(0));
+            }
             if (m_reg_type == RegType::R) newTemps.insert(offs);
             updateDepth(b, offs);
           }
-          auto str = std::make_shared<STRInst>(
-              newOp, Operand::getRReg(RReg::SP), offs);
           str->m_params_offset = i->m_params_offset;
-          if (mov) {
-            b->insertSpillSTR(iter, str, mov);
-          } else {
-            b->insertSpillSTR(iter, str);
-          }
+          b->insertSpillSTR(iter, str, add, mov);
           newTemps.insert(newOp);
           updateDepth(b, newOp);
           // while (next != b->m_insts.end()) {

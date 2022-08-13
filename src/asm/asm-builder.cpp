@@ -327,7 +327,7 @@ std::shared_ptr<CTInst> ASM_Builder::appendCT(
   if (op == InstOp::VCMP) {
     auto temp_reg = std::make_shared<Operand>(OperandType::VREG);
     appendMRS(temp_reg, "FPSCR");
-    appendMRS("APSR", temp_reg);
+    m_cur_block->m_status_load_inst = std::make_shared<MRSInst>("APSR", temp_reg);
   }
   return ct;
 }

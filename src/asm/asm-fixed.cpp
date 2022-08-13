@@ -27,9 +27,29 @@ void fixedParamsOffs(std::shared_ptr<ASM_Module> module) {
       if (Operand::addrOffsCheck(offs, ldr->m_dest->m_is_float))
         ldr->m_offs->m_int_val = offs;
       else {
-        auto mov = std::make_shared<MOVInst>(Operand::getRReg(RReg::R12), offs);
-        block->m_insts.insert(func->m_params_pos_map[inst], mov);
-        ldr->m_offs = Operand::getRReg(RReg::R12);
+        if (!ldr->m_dest->m_is_float) {
+          auto mov
+              = std::make_shared<MOVInst>(Operand::getRReg(RReg::R12), offs);
+          block->m_insts.insert(func->m_params_pos_map[inst], mov);
+          ldr->m_offs = Operand::getRReg(RReg::R12);
+        } else {
+          if (Operand::immCheck(offs)) {
+            auto add = std::make_shared<ASInst>(
+                InstOp::ADD, Operand::getRReg(RReg::R12),
+                Operand::getRReg(RReg::SP), std::make_shared<Operand>(offs));
+            block->m_insts.insert(func->m_params_pos_map[inst], add);
+          } else {
+            auto mov
+                = std::make_shared<MOVInst>(Operand::getRReg(RReg::R12), offs);
+            auto add = std::make_shared<ASInst>(
+                InstOp::ADD, Operand::getRReg(RReg::R12),
+                Operand::getRReg(RReg::SP), Operand::getRReg(RReg::R12));
+            block->m_insts.insert(func->m_params_pos_map[inst], mov);
+            block->m_insts.insert(func->m_params_pos_map[inst], add);
+          }
+          ldr->m_src = Operand::getRReg(RReg::R12);
+          ldr->m_offs = std::make_shared<Operand>(0);
+        }
       }
     }
   }

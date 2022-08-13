@@ -247,6 +247,8 @@ public:
   void exportASM(std::ofstream& ofs);
 };
 
+class MRSInst;
+
 class ASM_BasicBlock : public std::enable_shared_from_this<ASM_BasicBlock> {
 public:
   static int block_id;
@@ -254,6 +256,7 @@ public:
   std::list<std::shared_ptr<ASM_Instruction>> m_insts;
   std::list<std::shared_ptr<ASM_Instruction>>::iterator m_branch_pos;
   std::list<std::shared_ptr<ASM_Instruction>> m_mov_filled_list;
+  std::shared_ptr<MRSInst> m_status_load_inst;
 
   int m_loop_depth;
 
@@ -267,19 +270,22 @@ public:
   ASM_BasicBlock(int depth = 0)
       : m_loop_depth(depth),
         m_branch_pos(m_insts.end()),
-        m_label(".L" + std::to_string(block_id++)) {}
+        m_label(".L" + std::to_string(block_id++)),
+        m_status_load_inst(nullptr) {}
 
   void insert(std::shared_ptr<ASM_Instruction> inst);
 
   void insertSpillLDR(
       std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
       std::shared_ptr<ASM_Instruction> ldr,
-      std::shared_ptr<ASM_Instruction> mov = nullptr);
+      std::shared_ptr<ASM_Instruction> add,
+      std::shared_ptr<ASM_Instruction> mov);
 
   void insertSpillSTR(
       std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
       std::shared_ptr<ASM_Instruction> str,
-      std::shared_ptr<ASM_Instruction> mov = nullptr);
+      std::shared_ptr<ASM_Instruction> add,
+      std::shared_ptr<ASM_Instruction> mov);
 
   void insertPhiMOV(std::shared_ptr<ASM_Instruction> mov);
 
