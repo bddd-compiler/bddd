@@ -505,6 +505,9 @@ bool CanBeUnrolled(std::shared_ptr<Loop> loop) {
   for (auto &instr : loop_body->m_instr_list) {
     if (instr->m_op == IROp::RETURN || instr->m_op == IROp::PHI) return false;
   }
+  for (auto &instr : loop->m_header->m_instr_list) {
+    if (instr->m_type.IsBasicFloat()) return false;
+  }
   return true;
 }
 

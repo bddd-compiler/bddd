@@ -187,8 +187,8 @@ LAndExp: EqExp { $$ = std::move($1); }
        ;
 
 EqExp: RelExp { $$ = std::move($1); }
-     | RelExp TOK_EQ RelExp { $$ = std::make_unique<ExprAST>(Op::EQ, std::move($1), std::move($3)); }
-     | RelExp TOK_NEQ RelExp { $$ = std::make_unique<ExprAST>(Op::NEQ, std::move($1), std::move($3)); }
+     | EqExp TOK_EQ RelExp { $$ = std::make_unique<ExprAST>(Op::EQ, std::move($1), std::move($3)); }
+     | EqExp TOK_NEQ RelExp { $$ = std::make_unique<ExprAST>(Op::NEQ, std::move($1), std::move($3)); }
      ;
 
 RelExp: AddExp { $$ = std::move($1); }

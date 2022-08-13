@@ -124,7 +124,7 @@ public:
   void Debug(std::ofstream &ofs, int depth) override;
 
   void TypeCheck(SymbolTable &symbol_table) override;
-  void FillVals(int n, int &offset, const std::vector<int> &sizes,
+  bool FillVals(int n, int &offset, const std::vector<int> &sizes,
                 std::vector<std::shared_ptr<ExprAST>> &vals);
 
   std::shared_ptr<Value> CodeGen(std::shared_ptr<IRBuilder> builder) override;

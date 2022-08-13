@@ -28,12 +28,14 @@ void InitValAST::TypeCheck(SymbolTable& symbol_table) {
     SetAllZero(all_zero);
   }
 }
-void InitValAST::FillVals(int n, int& offset, const std::vector<int>& sizes,
+bool InitValAST::FillVals(int n, int& offset, const std::vector<int>& sizes,
                           std::vector<std::shared_ptr<ExprAST>>& vals) {
+  if (n >= sizes.size()) return false;
   auto temp = offset / sizes[n];
   auto l = temp * sizes[n];
   auto r = l + sizes[n];
   auto size = (n == sizes.size() - 1 ? 1 : sizes[n + 1]);
+  if (r > sizes[0]) return false;
 
   // assign values
   // TODO(garen): WARNING!!! nullptr represents zero, dangerous behaviour
@@ -47,6 +49,7 @@ void InitValAST::FillVals(int n, int& offset, const std::vector<int>& sizes,
     }
   }
   while (offset < r) vals[offset++] = nullptr;  // align
+  return true;
 }
 void LValAST::TypeCheck(SymbolTable& symbol_table) {
   auto ptr = symbol_table.GetDecl(m_name);
@@ -609,8 +612,11 @@ void DeclAST::TypeCheck(SymbolTable& symbol_table) {
     assert(tot > 0);
     m_flatten_vals.resize(tot);
     if (m_init_val) {
-      int offset = 0;
-      m_init_val->FillVals(0, offset, m_products, m_flatten_vals);
+      for (int i = 0; i < m_products.size(); ++i) {
+        int offset = 0;
+        bool flag = m_init_val->FillVals(i, offset, m_products, m_flatten_vals);
+        if (flag) break;
+      }
     } else {
       // temporarily all set to nullptr
       // TODO(garen): insert *tot* random values

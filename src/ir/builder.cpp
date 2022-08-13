@@ -169,84 +169,6 @@ std::shared_ptr<Value> IRBuilder::GetConstant(IROp op, EvalValue lhs,
       assert(false);  // uncovered
   }
 }
-// // only support binary operators
-// // lhs and rhs can be allowed to be int or float
-// std::shared_ptr<Value> IRBuilder::GetConstant(IROp op, EvalValue lhs,
-//                                               EvalValue rhs,
-//                                               std::unique_ptr<Module>&
-//                                               module) {
-//   switch (op) {
-//     case IROp::ADD:
-//       assert(lhs.IsConstInt() && rhs.IsConstInt());
-//       return GetIntConstant((lhs + rhs).IntVal(), module);
-//     case IROp::F_ADD:
-//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
-//       return GetFloatConstant((lhs + rhs).FloatVal(), module);
-//     case IROp::SUB:
-//       assert(lhs.IsConstInt() && rhs.IsConstInt());
-//       return GetIntConstant((lhs - rhs).IntVal(), module);
-//     case IROp::F_SUB:
-//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
-//       return GetFloatConstant((lhs - rhs).FloatVal(), module);
-//     case IROp::MUL:
-//       assert(lhs.IsConstInt() && rhs.IsConstInt());
-//       return GetIntConstant((lhs * rhs).IntVal(), module);
-//     case IROp::F_MUL:
-//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
-//       return GetFloatConstant((lhs * rhs).FloatVal(), module);
-//     case IROp::SDIV:
-//       assert(lhs.IsConstInt() && rhs.IsConstInt());
-//       return GetIntConstant((lhs / rhs).IntVal(), module);
-//     case IROp::F_DIV:
-//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
-//       return GetFloatConstant((lhs / rhs).FloatVal(), module);
-//     case IROp::SREM:
-//       assert(lhs.IsConstInt() && rhs.IsConstInt());
-//       return GetIntConstant((lhs % rhs).IntVal(), module);
-//     case IROp::F_NEG:
-//       assert(lhs.IsConstFloat());
-//       return GetFloatConstant(-lhs.FloatVal(), module);
-//       break;
-//     case IROp::I_SGE:
-//       assert(lhs.IsConstInt() && rhs.IsConstInt());
-//       return GetBoolConstant(lhs.IntVal() >= rhs.IntVal(), module);
-//     case IROp::I_SGT:
-//       assert(lhs.IsConstInt() && rhs.IsConstInt());
-//       return GetBoolConstant(lhs.IntVal() > rhs.IntVal(), module);
-//     case IROp::I_SLE:
-//       assert(lhs.IsConstInt() && rhs.IsConstInt());
-//       return GetBoolConstant(lhs.IntVal() <= rhs.IntVal(), module);
-//     case IROp::I_SLT:
-//       assert(lhs.IsConstInt() && rhs.IsConstInt());
-//       return GetBoolConstant(lhs.IntVal() < rhs.IntVal(), module);
-//     case IROp::I_EQ:
-//       assert(lhs.IsConstInt() && rhs.IsConstInt());
-//       return GetBoolConstant(lhs.IntVal() == rhs.IntVal(), module);
-//     case IROp::I_NE:
-//       assert(lhs.IsConstInt() && rhs.IsConstInt());
-//       return GetBoolConstant(lhs.IntVal() != rhs.IntVal(), module);
-//     case IROp::F_EQ:
-//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
-//       return GetBoolConstant(lhs.FloatVal() == rhs.FloatVal(), module);
-//     case IROp::F_NE:
-//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
-//       return GetBoolConstant(lhs.FloatVal() != rhs.FloatVal(), module);
-//     case IROp::F_GT:
-//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
-//       return GetBoolConstant(lhs.FloatVal() > rhs.FloatVal(), module);
-//     case IROp::F_GE:
-//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
-//       return GetBoolConstant(lhs.FloatVal() >= rhs.FloatVal(), module);
-//     case IROp::F_LT:
-//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
-//       return GetBoolConstant(lhs.FloatVal() < rhs.FloatVal(), module);
-//     case IROp::F_LE:
-//       assert(lhs.IsConstFloat() && rhs.IsConstFloat());
-//       return GetBoolConstant(lhs.FloatVal() <= rhs.FloatVal(), module);
-//     default:
-//       assert(false);  // uncovered
-//   }
-// }
 
 std::shared_ptr<IntGlobalVariable> IRBuilder::CreateIntGlobalVariable(
     std::shared_ptr<DeclAST> decl) {
@@ -337,28 +259,53 @@ std::shared_ptr<Instruction> IRBuilder::CreateBinaryInstruction(
 
   auto lhs_type = instr->m_lhs_val_use->getValue()->m_type,
        rhs_type = instr->m_rhs_val_use->getValue()->m_type;
+  // consider these situations:
+  // i32 and float
+  // i32 and i1
+  // float and i1
   if (lhs_type.IsBasicBool() && rhs_type.IsBasicInt()) {
+    // i1 vs i32
     // zext for lhs
     auto new_lhs = CreateZExtInstruction(instr->m_lhs_val_use->getValue());
     instr->m_lhs_val_use->getValue()->KillUse(instr->m_lhs_val_use);
     instr->m_lhs_val_use = new_lhs->AddUse(instr);
   } else if (lhs_type.IsBasicInt() && rhs_type.IsBasicBool()) {
+    // i32 vs i1
     // zext for rhs
     auto new_rhs = CreateZExtInstruction(instr->m_rhs_val_use->getValue());
     instr->m_rhs_val_use->getValue()->KillUse(instr->m_rhs_val_use);
     instr->m_rhs_val_use = new_rhs->AddUse(instr);
   } else if (lhs_type.IsBasicInt() && rhs_type.IsBasicFloat()) {
+    // i32 vs float
     // sitofp for lhs
     auto new_lhs = CreateSIToFPInstruction(instr->m_lhs_val_use->getValue());
     instr->m_lhs_val_use->getValue()->KillUse(instr->m_lhs_val_use);
     instr->m_lhs_val_use = new_lhs->AddUse(instr);
   } else if (lhs_type.IsBasicFloat() && rhs_type.IsBasicInt()) {
+    // float vs i32
     // sitofp for rhs
     auto new_rhs = CreateSIToFPInstruction(instr->m_rhs_val_use->getValue());
     instr->m_rhs_val_use->getValue()->KillUse(instr->m_rhs_val_use);
     instr->m_rhs_val_use = new_rhs->AddUse(instr);
-  } else if (instr->m_lhs_val_use->getValue()->m_type
-             != instr->m_rhs_val_use->getValue()->m_type) {
+  } else if (lhs_type.IsBasicFloat() && rhs_type.IsBasicBool()) {
+    // float vs i1
+    // i1 -> i32 -> float
+    // zext and sitofp for rhs
+
+    auto zext = CreateZExtInstruction(instr->m_rhs_val_use->getValue());
+    auto sitofp = CreateSIToFPInstruction(zext);
+    instr->m_rhs_val_use->getValue()->KillUse(instr->m_rhs_val_use);
+    instr->m_rhs_val_use = sitofp->AddUse(instr);
+  } else if (lhs_type.IsBasicBool() && rhs_type.IsBasicFloat()) {
+    // i1 vs float
+    // i1 -> i32 -> float
+    // zext and sitofp for lhs
+
+    auto zext = CreateZExtInstruction(instr->m_lhs_val_use->getValue());
+    auto sitofp = CreateSIToFPInstruction(zext);
+    instr->m_lhs_val_use->getValue()->KillUse(instr->m_lhs_val_use);
+    instr->m_lhs_val_use = sitofp->AddUse(instr);
+  } else if (lhs_type != rhs_type) {
     assert(false);  // not considered yet
   }
   bb->PushBackInstruction(instr);

@@ -92,12 +92,12 @@ int main(int argc, char *argv[]) {
 
   auto pass_manager = std::make_unique<IRPassManager>(builder);
   pass_manager->Mem2RegPass();  // now no allocas for single variable
-  pass_manager->EliminateGlobalConstArrayAccess();
-  pass_manager->TailRecursionPass();
-  pass_manager->FunctionInliningPass();
+  // pass_manager->EliminateGlobalConstArrayAccess();
+  // pass_manager->TailRecursionPass();
+  // pass_manager->FunctionInliningPass();
   // pass_manager->LoopUnrollingPass();
-  pass_manager->GVNPass();
-  pass_manager->GCMPass();
+  // pass_manager->GVNPass();
+  // pass_manager->GCMPass();
 
   if (ir_path) {
     std::ofstream ofs(ir_path);
