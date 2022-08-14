@@ -304,7 +304,7 @@ public:
       std::shared_ptr<ASM_Instruction> add,
       std::shared_ptr<ASM_Instruction> mov);
 
-  void insertBeforePhi(std::shared_ptr<ASM_Instruction> mov);
+  void insertPhiMOV(std::shared_ptr<ASM_Instruction> mov);
 
   void appendFilledMOV(std::shared_ptr<ASM_Instruction> mov);
 

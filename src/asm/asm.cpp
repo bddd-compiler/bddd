@@ -94,7 +94,7 @@ void ASM_BasicBlock::insertSpillSTR(
   str->m_block = shared_from_this();
 }
 
-void ASM_BasicBlock::insertBeforePhi(std::shared_ptr<ASM_Instruction> mov) {
+void ASM_BasicBlock::insertPhiMOV(std::shared_ptr<ASM_Instruction> mov) {
   assert(m_branch_pos != m_insts.end());
   m_insts.insert(m_branch_pos, mov);
   mov->m_block = shared_from_this();
@@ -106,7 +106,7 @@ void ASM_BasicBlock::appendFilledMOV(std::shared_ptr<ASM_Instruction> mov) {
 
 void ASM_BasicBlock::fillMOV() {
   for (auto& mov : m_mov_filled_list) {
-    insertBeforePhi(mov);
+    insertPhiMOV(mov);
   }
 }
 

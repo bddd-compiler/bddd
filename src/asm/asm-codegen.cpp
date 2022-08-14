@@ -5,33 +5,17 @@ std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
     std::shared_ptr<Constant> value, bool genimm, bool checkimm,
     std::shared_ptr<ASM_BasicBlock> phi_block) {
   assert(value->m_type.IsConst());
-  assert(!phi_block || phi_block && genimm && !checkimm);
   std::shared_ptr<Operand> ret;
   if (value->m_type.IsBasicFloat()) {
-    float imm = value->m_float_val;
-    if (phi_block) {
-      if (Operand::immCheck(imm))
-        return std::make_shared<Operand>(imm);
-      else {
-        int temp = *(int *)&imm;
         ret = std::make_shared<Operand>(OperandType::VREG, true);
-        auto mov_temp = std::make_shared<MOVInst>(
-            std::make_shared<Operand>(OperandType::VREG), temp);
-        auto mov = std::make_shared<MOVInst>(ret, mov_temp->m_dest);
-        phi_block->appendFilledMOV(mov_temp);
-        phi_block->appendFilledMOV(mov);
-      }
-    } else {
-      ret = std::make_shared<Operand>(OperandType::VREG, true);
-      appendMOV(ret, value->m_float_val);
-    }
+    appendMOV(ret, value->m_float_val, phi_block);
   } else {
     int imm = value->m_int_val;
     if (genimm && (!checkimm || Operand::immCheck(imm))) {
       return std::make_shared<Operand>(imm);
     }
     ret = std::make_shared<Operand>(OperandType::VREG);
-    appendMOV(ret, imm);
+    appendMOV(ret, imm, phi_block);
   }
   return ret;
 }
@@ -218,19 +202,20 @@ std::shared_ptr<Operand> GenerateCMP(std::shared_ptr<BinaryInstruction> inst,
   auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
   std::shared_ptr<Operand> operand2;
 
-  if (is_int) {
-    operand2 = builder->getOperand(inst->m_rhs_val_use->getValue(), is_int);
-    builder->appendCT(InstOp::CMP, operand1, operand2);
-  } else {
     // vcmp allow op2 to be constant 0.0
+  if (!is_int) {
     auto float_val
         = std::dynamic_pointer_cast<Constant>(inst->m_rhs_val_use->getValue());
     if (float_val && float_val->m_float_val == (float)0.0) {
       operand2 = std::make_shared<Operand>((float)0.0);
       builder->appendCT(InstOp::VCMP, operand1, operand2);
+      return nullptr;
     }
   }
 
+  operand2 = builder->getOperand(inst->m_rhs_val_use->getValue(), is_int);
+  InstOp op = is_int ? InstOp::CMP : InstOp::VCMP;
+  builder->appendCT(op, operand1, operand2);
   return nullptr;
 }
 
