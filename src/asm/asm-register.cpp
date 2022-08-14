@@ -583,8 +583,18 @@ void RegisterAllocator::RewriteProgram() {
       continue;
     }
 
-    int sp_offs = m_cur_func->getStackSize();
-    m_cur_func->allocateStack(4);
+    bool is_stack_param;
+    int sp_offs;
+    if (m_cur_func->m_stack_params_offs.find(v)
+        != m_cur_func->m_stack_params_offs.end()) {
+      is_stack_param = true;
+      sp_offs = m_cur_func->m_stack_params_offs[v];
+    } else {
+      is_stack_param = false;
+      sp_offs = m_cur_func->getStackSize();
+      m_cur_func->allocateStack(4);
+    }
+
     for (auto& b : m_cur_func->m_blocks) {
       for (auto iter = b->m_insts.begin(); iter != b->m_insts.end(); iter++) {
         auto& i = *iter;
@@ -600,62 +610,15 @@ void RegisterAllocator::RewriteProgram() {
           defs = i->m_f_def;
           uses = i->m_f_use;
         }
-        if (uses.find(v) != uses.end()) {
-          OpPtr newOp;
-          if (i->m_is_mov) {
-            newOp = std::dynamic_pointer_cast<MOVInst>(i)->m_dest;
-            i->m_is_deleted = true;
-          } else {
-            // replace use
-            newOp = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
-            i->replaceUse(newOp, v);
-          }
 
-          // insert a load instruction before use of newOp
-          OpPtr offs;
-          std::shared_ptr<MOVInst> mov = nullptr;
-          std::shared_ptr<ASInst> add = nullptr;
-          std::shared_ptr<LDRInst> ldr;
-          if (Operand::addrOffsCheck(fixed_offs, newOp->m_is_float)) {
-            offs = std::make_shared<Operand>(fixed_offs);
-            ldr = std::make_shared<LDRInst>(newOp, Operand::getRReg(RReg::SP),
-                                            offs);
-          } else {
-            if (!newOp->m_is_float) {
-              offs = std::make_shared<Operand>(OperandType::VREG);
-              mov = std::make_shared<MOVInst>(offs, fixed_offs);
-              mov->m_params_offset = i->m_params_offset;
-              ldr = std::make_shared<LDRInst>(newOp, Operand::getRReg(RReg::SP),
-                                              offs);
-            } else {
-              offs = std::make_shared<Operand>(OperandType::VREG);
-              if (Operand::immCheck(fixed_offs)) {
-                add = std::make_shared<ASInst>(
-                    InstOp::ADD, offs, Operand::getRReg(RReg::SP),
-                    std::make_shared<Operand>(fixed_offs));
-                add->m_params_offset = i->m_params_offset;
-              } else {
-                mov = std::make_shared<MOVInst>(offs, fixed_offs);
-                add = std::make_shared<ASInst>(
-                    InstOp::ADD, offs, Operand::getRReg(RReg::SP), offs);
-                mov->m_params_offset = i->m_params_offset;
-                add->m_params_offset = i->m_params_offset;
-              }
-              ldr = std::make_shared<LDRInst>(newOp, offs,
-                                              std::make_shared<Operand>(0));
-            }
-            if (m_reg_type == RegType::R) newTemps.insert(offs);
-            updateDepth(b, offs);
-          }
-          ldr->m_params_offset = i->m_params_offset;
-          b->insertSpillLDR(iter, ldr, add, mov);
-          newTemps.insert(newOp);
-          updateDepth(b, newOp);
-        }
+        // replace def
         if (defs.find(v) != defs.end()) {
           OpPtr newOp;
           auto next = std::next(iter);
-          if (i->m_is_mov) {
+          if (is_stack_param) {
+            i->m_is_deleted = true;
+            continue;
+          } else if (i->m_is_mov) {
             newOp = std::dynamic_pointer_cast<MOVInst>(i)->m_src;
             i->m_is_deleted = true;
           } else {
@@ -663,7 +626,6 @@ void RegisterAllocator::RewriteProgram() {
             newOp = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
             i->replaceDef(newOp, v);
           }
-
           // insert a store instruction after defination of newOp
           OpPtr offs;
           std::shared_ptr<MOVInst> mov = nullptr;
@@ -704,26 +666,60 @@ void RegisterAllocator::RewriteProgram() {
           b->insertSpillSTR(iter, str, add, mov);
           newTemps.insert(newOp);
           updateDepth(b, newOp);
-          // while (next != b->m_insts.end()) {
-          //   auto inst = *next;
-          //   if (!inst->m_is_deleted) {
-          //     if (m_reg_type == RegType::R) {
-          //       if (inst->m_def.find(v) == inst->m_def.end()
-          //           && inst->m_use.find(v) != inst->m_use.end()) {
-          //         inst->replaceUse(newOp, v);
-          //       } else
-          //         break;
-          //     } else {
-          //       if (inst->m_f_def.find(v) == inst->m_f_def.end()
-          //           && inst->m_f_use.find(v) != inst->m_f_use.end()) {
-          //         inst->replaceUse(newOp, v);
-          //       } else
-          //         break;
-          //     }
-          //   }
-          //   next++;
-          //   iter++;
-          // }
+        }
+
+        // replace use
+        if (uses.find(v) != uses.end()) {
+          OpPtr newOp;
+          if (i->m_is_mov) {
+            newOp = std::dynamic_pointer_cast<MOVInst>(i)->m_dest;
+            i->m_is_deleted = true;
+          } else {
+            // replace use
+            newOp = std::make_shared<Operand>(OperandType::VREG, v->m_is_float);
+            i->replaceUse(newOp, v);
+          }
+          // insert a load instruction before use of newOp
+          OpPtr offs;
+          std::shared_ptr<MOVInst> mov = nullptr;
+          std::shared_ptr<ASInst> add = nullptr;
+          std::shared_ptr<LDRInst> ldr;
+          if (is_stack_param || Operand::addrOffsCheck(fixed_offs, newOp->m_is_float)) {
+            offs = std::make_shared<Operand>(fixed_offs);
+            ldr = std::make_shared<LDRInst>(newOp, Operand::getRReg(RReg::SP),
+                                            offs);
+            if (is_stack_param) m_cur_func->m_params_set_list.push_back(ldr);
+          } else {
+            if (!newOp->m_is_float) {
+              offs = std::make_shared<Operand>(OperandType::VREG);
+              mov = std::make_shared<MOVInst>(offs, fixed_offs);
+              mov->m_params_offset = i->m_params_offset;
+              ldr = std::make_shared<LDRInst>(newOp, Operand::getRReg(RReg::SP),
+                                              offs);
+            } else {
+              offs = std::make_shared<Operand>(OperandType::VREG);
+              if (Operand::immCheck(fixed_offs)) {
+                add = std::make_shared<ASInst>(
+                    InstOp::ADD, offs, Operand::getRReg(RReg::SP),
+                    std::make_shared<Operand>(fixed_offs));
+                add->m_params_offset = i->m_params_offset;
+              } else {
+                mov = std::make_shared<MOVInst>(offs, fixed_offs);
+                add = std::make_shared<ASInst>(
+                    InstOp::ADD, offs, Operand::getRReg(RReg::SP), offs);
+                mov->m_params_offset = i->m_params_offset;
+                add->m_params_offset = i->m_params_offset;
+              }
+              ldr = std::make_shared<LDRInst>(newOp, offs,
+                                              std::make_shared<Operand>(0));
+            }
+            if (m_reg_type == RegType::R) newTemps.insert(offs);
+            updateDepth(b, offs);
+          }
+          ldr->m_params_offset = i->m_params_offset;
+          b->insertSpillLDR(iter, ldr, add, mov);
+          newTemps.insert(newOp);
+          updateDepth(b, newOp);
         }
       }
     }

@@ -110,8 +110,6 @@ void ASM_BasicBlock::fillMOV() {
   }
 }
 
-#include "asm/asm.h"
-
 // for MOV, ADD, SUB, RSB
 /*
   int type immediate check

@@ -736,10 +736,6 @@ void GenerateFunction(std::shared_ptr<Function> ir_func,
     GenerateBasicblock(b, builder);
   }
 
-#ifdef SP_FOR_PARAM
-  builder->fixedStackParams();
-#endif
-
   builder->m_cur_func->m_blocks.push_back(builder->m_cur_func->m_rblock);
   // insert MOV instruction(from PHI)
   for (auto &b : func->m_blocks) {

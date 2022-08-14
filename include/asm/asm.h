@@ -233,10 +233,11 @@ public:
   std::unique_ptr<PInst> m_push, m_pop;
   std::unique_ptr<PInst> m_f_push, m_f_pop;
   std::list<std::shared_ptr<ASM_Instruction>> m_params_set_list;
+  std::unordered_map<std::shared_ptr<Operand>, int> m_stack_params_offs;
   std::unordered_map<std::shared_ptr<ASM_Instruction>,
                      std::list<std::shared_ptr<ASM_Instruction>>::iterator>
       m_params_pos_map;
-  int m_params;
+  int m_params_size;
   int m_local_alloc;
   std::stack<int> m_sp_alloc_size;
 
