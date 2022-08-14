@@ -193,7 +193,9 @@ void Shift::exportASM(std::ofstream& ofs) {
 }
 
 void ASM_Instruction::exportInstHead(std::ofstream& ofs) {
-  ofs << "\t" << getOpName() << getCondName() << getOpSuffixName() << " ";
+  ofs << "\t" << getOpName();
+  if (m_set_flag) ofs << "S";
+  ofs << getCondName() << getOpSuffixName() << " ";
 }
 
 void LDRInst::exportASM(std::ofstream& ofs) {
@@ -262,13 +264,7 @@ void PInst::exportASM(std::ofstream& ofs) {
          else
            assert(false);
        });
-  if (regs.size() > 16) {
-    exportBody(ofs, regs, 0, 16);
-    exportInstHead(ofs);
-    exportBody(ofs, regs, 16, regs.size());
-  } else {
-    exportBody(ofs, regs, 0, regs.size());
-  }
+  exportBody(ofs, regs, 0, regs.size());
 }
 
 void PInst::exportBody(std::ofstream& ofs,

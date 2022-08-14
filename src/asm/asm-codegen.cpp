@@ -5,17 +5,33 @@ std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
     std::shared_ptr<Constant> value, bool genimm, bool checkimm,
     std::shared_ptr<ASM_BasicBlock> phi_block) {
   assert(value->m_type.IsConst());
+  assert(!phi_block || phi_block && genimm && !checkimm);
   std::shared_ptr<Operand> ret;
   if (value->m_type.IsBasicFloat()) {
-    ret = std::make_shared<Operand>(OperandType::VREG, true);
-    appendMOV(ret, value->m_float_val, phi_block);
+    float imm = value->m_float_val;
+    if (phi_block) {
+      if (Operand::immCheck(imm))
+        return std::make_shared<Operand>(imm);
+      else {
+        int temp = *(int *)&imm;
+        ret = std::make_shared<Operand>(OperandType::VREG, true);
+        auto mov_temp = std::make_shared<MOVInst>(
+            std::make_shared<Operand>(OperandType::VREG), temp);
+        auto mov = std::make_shared<MOVInst>(ret, mov_temp->m_dest);
+        phi_block->appendFilledMOV(mov_temp);
+        phi_block->appendFilledMOV(mov);
+      }
+    } else {
+      ret = std::make_shared<Operand>(OperandType::VREG, true);
+      appendMOV(ret, value->m_float_val);
+    }
   } else {
     int imm = value->m_int_val;
     if (genimm && (!checkimm || Operand::immCheck(imm))) {
       return std::make_shared<Operand>(imm);
     }
     ret = std::make_shared<Operand>(OperandType::VREG);
-    appendMOV(ret, imm, phi_block);
+    appendMOV(ret, imm);
   }
   return ret;
 }
@@ -157,20 +173,21 @@ std::shared_ptr<Operand> GenerateMod(std::shared_ptr<BinaryInstruction> inst,
   //   for (int i = 1; i < 32; i++) {
   //     if (temp == const_val->m_int_val) {
   //       int and_val = temp - 1;
+  //       std::shared_ptr<Operand> and_reg;
   //       if (Operand::immCheck(and_val)) {
-  //         builder->appendBIT(InstOp::AND, ret, devidend,
-  //                            std::make_shared<Operand>(and_val));
+  //         and_reg = std::make_shared<Operand>(and_val);
   //       } else {
-  //         auto mov_temp = std::make_shared<Operand>(OperandType::VREG);
-  //         builder->appendMOV(mov_temp, and_val);
-  //         builder->appendBIT(InstOp::AND, ret, devidend, mov_temp);
+  //         and_reg = std::make_shared<Operand>(OperandType::VREG);
+  //         builder->appendMOV(and_reg, and_val);
   //       }
-  //       // check if val1 is negative
-  //       builder->appendCT(InstOp::CMP, devidend,
-  //       std::make_shared<Operand>(0)); auto sub =
-  //       builder->appendAS(InstOp::SUB, ret, ret,
-  //                                    std::make_shared<Operand>(temp));
-  //       sub->m_cond = CondType::LT;
+  //       auto and_inst = builder->appendBIT(InstOp::AND, ret, devidend, and_reg);
+  //       and_inst->m_set_flag = true;
+  //       auto cmp_inst = builder->appendCT(InstOp::CMP, devidend,
+  //                                         std::make_shared<Operand>(0));
+  //       cmp_inst->m_cond = CondType::NE;
+  //       auto sub_inst = builder->appendAS(InstOp::SUB, ret, ret,
+  //                                         std::make_shared<Operand>(temp));
+  //       sub_inst->m_cond = CondType::MI;
   //       return ret;
   //     }
   //     temp <<= 1;
@@ -201,20 +218,19 @@ std::shared_ptr<Operand> GenerateCMP(std::shared_ptr<BinaryInstruction> inst,
   auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
   std::shared_ptr<Operand> operand2;
 
-  // vcmp allow op2 to be constant 0.0
-  if (!is_int) {
+  if (is_int) {
+    operand2 = builder->getOperand(inst->m_rhs_val_use->getValue(), is_int);
+    builder->appendCT(InstOp::CMP, operand1, operand2);
+  } else {
+    // vcmp allow op2 to be constant 0.0
     auto float_val
         = std::dynamic_pointer_cast<Constant>(inst->m_rhs_val_use->getValue());
     if (float_val && float_val->m_float_val == (float)0.0) {
       operand2 = std::make_shared<Operand>((float)0.0);
       builder->appendCT(InstOp::VCMP, operand1, operand2);
-      return nullptr;
     }
   }
 
-  operand2 = builder->getOperand(inst->m_rhs_val_use->getValue(), is_int);
-  InstOp op = is_int ? InstOp::CMP : InstOp::VCMP;
-  builder->appendCT(op, operand1, operand2);
   return nullptr;
 }
 
@@ -707,7 +723,6 @@ void GenerateBasicblock(std::shared_ptr<BasicBlock> ir_block,
                         std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<ASM_BasicBlock> block = builder->getBlock(ir_block);
   builder->appendBlock(block);
-  builder->m_block_map.insert(std::make_pair(ir_block, block));
   for (auto &i : ir_block->GetInstList()) {
     GenerateInstruction(i, builder);
   }

@@ -125,7 +125,23 @@ enum class InstOp {
 
 enum class OperandType { SPECIAL_REG, REG, VREG, IMM };
 
-enum class CondType { NONE, NE, LT, LE, GT, GE, EQ };
+enum class CondType { 
+  NONE,     //  Any
+  EQ,       //  Z == 1
+  NE,       //  Z == 0
+  CS,       //  C == 1
+  CC,       //  C == 0
+  MI,       //  N == 1
+  PL,       //  N == 0
+  VS,       //  V == 1
+  VC,       //  V == 0
+  HI,       //  C == 1 and Z == 0
+  LS,       //  C == 0 or Z == 1
+  GE,       //  N == V
+  LT,       //  N != V
+  GT,       //  Z == 0 and N == V
+  LE        //  Z == 1 or N != V
+};
 
 enum class MOVType { REG, IMM };
 
@@ -287,7 +303,7 @@ public:
       std::shared_ptr<ASM_Instruction> add,
       std::shared_ptr<ASM_Instruction> mov);
 
-  void insertPhiMOV(std::shared_ptr<ASM_Instruction> mov);
+  void insertBeforePhi(std::shared_ptr<ASM_Instruction> mov);
 
   void appendFilledMOV(std::shared_ptr<ASM_Instruction> mov);
 
@@ -320,6 +336,7 @@ class ASM_Instruction {
 public:
   InstOp m_op;
   CondType m_cond;
+  bool m_set_flag;
 
   int m_params_offset;
   bool m_is_mov;  // for register allocation
@@ -332,7 +349,7 @@ public:
   std::unordered_set<std::shared_ptr<Operand>> m_f_use;
 
   ASM_Instruction()
-      : m_params_offset(0), m_is_mov(false), m_is_deleted(false) {}
+      : m_set_flag(false), m_params_offset(0), m_is_mov(false), m_is_deleted(false) {}
 
   std::string getOpName();
 

@@ -22,6 +22,7 @@ public:
       m_block_map;
   std::unordered_map<std::shared_ptr<Value>, std::shared_ptr<Operand>>
       m_memory_map;
+  std::unordered_map<std::shared_ptr<Value>, int> m_stack_params_map;
 
   ASM_Builder(std::shared_ptr<ASM_Module> m);
 
@@ -70,13 +71,9 @@ public:
                                      std::shared_ptr<Operand> offs);
 
   // appendMOV
-  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, int imm,
-                                     std::shared_ptr<ASM_BasicBlock> phi_block
-                                     = nullptr);
+  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, int imm);
 
-  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, float imm,
-                                     std::shared_ptr<ASM_BasicBlock> phi_block
-                                     = nullptr);
+  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, float imm);
 
   std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest,
                                      std::shared_ptr<Operand> src);

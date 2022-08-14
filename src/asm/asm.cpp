@@ -94,7 +94,7 @@ void ASM_BasicBlock::insertSpillSTR(
   str->m_block = shared_from_this();
 }
 
-void ASM_BasicBlock::insertPhiMOV(std::shared_ptr<ASM_Instruction> mov) {
+void ASM_BasicBlock::insertBeforePhi(std::shared_ptr<ASM_Instruction> mov) {
   assert(m_branch_pos != m_insts.end());
   m_insts.insert(m_branch_pos, mov);
   mov->m_block = shared_from_this();
@@ -106,7 +106,7 @@ void ASM_BasicBlock::appendFilledMOV(std::shared_ptr<ASM_Instruction> mov) {
 
 void ASM_BasicBlock::fillMOV() {
   for (auto& mov : m_mov_filled_list) {
-    insertPhiMOV(mov);
+    insertBeforePhi(mov);
   }
 }
 
@@ -394,16 +394,32 @@ std::string ASM_Instruction::getCondName() {
       return "EQ";
     case CondType::NE:
       return "NE";
-    case CondType::LT:
-      return "LT";
-    case CondType::LE:
-      return "LE";
-    case CondType::GT:
-      return "GT";
+    case CondType::CS:
+      return "CS";
+    case CondType::CC:
+      return "CC";
+    case CondType::MI:
+      return "MI";
+    case CondType::PL:
+      return "PL";
+    case CondType::VS:
+      return "VS";
+    case CondType::VC:
+      return "VC";
+    case CondType::HI:
+      return "HI";
+    case CondType::LS:
+      return "LS";
     case CondType::GE:
       return "GE";
-    default:
-      break;
+    case CondType::LT:
+      return "LT";
+    case CondType::GT:
+      return "GT";
+    case CondType::LE:
+      return "LE";
+    case CondType::NONE:
+      return "";
   }
   return "";
 }
@@ -414,14 +430,30 @@ CondType ASM_Instruction::getOppositeCond(CondType cond) {
       return CondType::NE;
     case CondType::NE:
       return CondType::EQ;
-    case CondType::LT:
-      return CondType::GE;
-    case CondType::LE:
-      return CondType::GT;
-    case CondType::GT:
-      return CondType::LE;
+    case CondType::CS:
+      return CondType::CC;
+    case CondType::CC:
+      return CondType::CS;
+    case CondType::MI:
+      return CondType::PL;
+    case CondType::PL:
+      return CondType::MI;
+    case CondType::VS:
+      return CondType::VC;
+    case CondType::VC:
+      return CondType::VS;
+    case CondType::HI:
+      return CondType::LS;
+    case CondType::LS:
+      return CondType::HI;
     case CondType::GE:
       return CondType::LT;
+    case CondType::LT:
+      return CondType::GE;
+    case CondType::GT:
+      return CondType::LE;
+    case CondType::LE:
+      return CondType::GT;
     case CondType::NONE:
       return CondType::NONE;
   }

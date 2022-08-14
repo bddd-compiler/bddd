@@ -6,6 +6,8 @@ void ASM_Builder::init() {
   m_value_map.clear();
   m_addr_map.clear();
   m_block_map.clear();
+  m_memory_map.clear();
+  m_stack_params_map.clear();
 }
 
 void ASM_Builder::setIrModule(std::shared_ptr<Module> ir_module) {
@@ -44,6 +46,7 @@ void ASM_Builder::setParams() {
     auto value = m_cur_func->m_ir_func->m_args[i];
     bool is_float = value->m_type.IsBasicFloat();
     int fp_offs = (i - 4) * 4;
+    m_stack_params_map[value] = fp_offs;
     auto ret = std::make_shared<Operand>(OperandType::VREG, is_float);
     auto ldr = std::make_shared<LDRInst>(ret, Operand::getRReg(RReg::SP),
                                          std::make_shared<Operand>(fp_offs));
@@ -129,6 +132,18 @@ std::shared_ptr<Operand> ASM_Builder::getOperand(
   if (auto val = std::dynamic_pointer_cast<Constant>(value)) {
     return GenerateConstant(val, genimm, checkimm, phi_block);
   }
+  // if (m_stack_params_map.find(value) != m_stack_params_map.end()) {
+  //   int fp_offs = m_stack_params_map[value];
+  //   bool is_float = value->m_type.IsBasicFloat();
+  //   auto ret = std::make_shared<Operand>(OperandType::VREG, is_float);
+  //   auto ldr = std::make_shared<LDRInst>(ret, Operand::getRReg(RReg::SP),
+  //                                        std::make_shared<Operand>(fp_offs));
+  //   if (phi_block) {
+  //     phi_block->insertPhiMOV
+  //   }
+  //   m_cur_func->m_params_set_list.push_back(ldr);
+  //   m_value_map.insert(std::make_pair(value, ret));
+  // }
   return createOperand(value);
 }
 
@@ -179,39 +194,26 @@ std::shared_ptr<STRInst> ASM_Builder::appendSTR(std::shared_ptr<Operand> src,
 }
 
 // appendMOV
-std::shared_ptr<MOVInst> ASM_Builder::appendMOV(
-    std::shared_ptr<Operand> dest, int imm,
-    std::shared_ptr<ASM_BasicBlock> phi_block) {
+std::shared_ptr<MOVInst> ASM_Builder::appendMOV(std::shared_ptr<Operand> dest,
+                                                int imm) {
   auto mov = std::make_shared<MOVInst>(dest, imm);
-  if (phi_block)
-    phi_block->insertPhiMOV(mov);
-  else
-    m_cur_block->insert(mov);
+  m_cur_block->insert(mov);
   return mov;
 }
 
-std::shared_ptr<MOVInst> ASM_Builder::appendMOV(
-    std::shared_ptr<Operand> dest, float imm,
-    std::shared_ptr<ASM_BasicBlock> phi_block) {
+std::shared_ptr<MOVInst> ASM_Builder::appendMOV(std::shared_ptr<Operand> dest,
+                                                float imm) {
   std::shared_ptr<MOVInst> mov;
   if (Operand::immCheck(imm)) {
     mov = std::make_shared<MOVInst>(dest, imm);
-    if (phi_block)
-      phi_block->insertPhiMOV(mov);
-    else
-      m_cur_block->insert(mov);
+    m_cur_block->insert(mov);
   } else {
     int temp = *(int*)&imm;
     auto mov_temp = std::make_shared<MOVInst>(
         std::make_shared<Operand>(OperandType::VREG), temp);
     auto mov = std::make_shared<MOVInst>(dest, mov_temp->m_dest);
-    if (phi_block) {
-      phi_block->insertPhiMOV(mov_temp);
-      phi_block->insertPhiMOV(mov);
-    } else {
-      m_cur_block->insert(mov_temp);
-      m_cur_block->insert(mov);
-    }
+    m_cur_block->insert(mov_temp);
+    m_cur_block->insert(mov);
   }
   return mov;
 }
@@ -327,7 +329,8 @@ std::shared_ptr<CTInst> ASM_Builder::appendCT(
   if (op == InstOp::VCMP) {
     auto temp_reg = std::make_shared<Operand>(OperandType::VREG);
     appendMRS(temp_reg, "FPSCR");
-    m_cur_block->m_status_load_inst = std::make_shared<MRSInst>("APSR", temp_reg);
+    m_cur_block->m_status_load_inst
+        = std::make_shared<MRSInst>("APSR", temp_reg);
   }
   return ct;
 }
