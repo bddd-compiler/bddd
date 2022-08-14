@@ -684,7 +684,8 @@ void RegisterAllocator::RewriteProgram() {
           std::shared_ptr<MOVInst> mov = nullptr;
           std::shared_ptr<ASInst> add = nullptr;
           std::shared_ptr<LDRInst> ldr;
-          if (is_stack_param || Operand::addrOffsCheck(fixed_offs, newOp->m_is_float)) {
+          if (is_stack_param
+              || Operand::addrOffsCheck(fixed_offs, newOp->m_is_float)) {
             offs = std::make_shared<Operand>(fixed_offs);
             ldr = std::make_shared<LDRInst>(newOp, Operand::getRReg(RReg::SP),
                                             offs);
@@ -718,6 +719,8 @@ void RegisterAllocator::RewriteProgram() {
           }
           ldr->m_params_offset = i->m_params_offset;
           b->insertSpillLDR(iter, ldr, add, mov);
+          if (is_stack_param)
+            m_cur_func->m_params_pos_map[ldr] = std::prev(iter);
           newTemps.insert(newOp);
           updateDepth(b, newOp);
         }
