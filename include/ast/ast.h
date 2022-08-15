@@ -268,6 +268,7 @@ public:
   void TypeCheck(SymbolTable &symbol_table) override;
 
   EvalValue Evaluate(SymbolTable &symbol_table);
+  EvalValue EvaluateInitVal();  // no need for a symbol table
 
   std::shared_ptr<Value> CodeGen(std::shared_ptr<IRBuilder> builder) override;
   std::shared_ptr<Value> CodeGenAnd(std::shared_ptr<IRBuilder> builder);

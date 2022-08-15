@@ -21,8 +21,7 @@ int main(int argc, char **argv) {
     // std::cout << "input source code file: >";
     // std::cin >> filename;
     // filename = "../testSource/custom_test/loop_unroll2.c";
-    // filename = "../testSource/buaa/part11/test2.c";
-    filename = "../testSource/functional/05_arr_defn4.c";
+    filename = "../testSource/hidden_functional/13_LCA.c";
   } else {
     std::cerr << "???";
     return 1;
@@ -81,8 +80,8 @@ int main(int argc, char **argv) {
   // pass_manager->TailRecursionPass();
   // pass_manager->FunctionInliningPass();
   // pass_manager->LoopUnrollingPass();
-  // pass_manager->GVNPass();
-  // pass_manager->GCMPass();
+  pass_manager->GVNPass();
+  pass_manager->GCMPass();
 
   std::ofstream ofs3(filename.substr(0, filename.rfind('.')) + "_ir.out");
   builder->m_module->ExportIR(ofs3, 0);
