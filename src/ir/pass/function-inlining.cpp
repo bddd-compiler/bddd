@@ -5,7 +5,7 @@
 #include "ir/ir.h"
 
 bool FunctionInlining(std::shared_ptr<Function> inline_func) {
-  // first identify whether a inline_func can be inlined
+  // first identify whether an inline_func can be inlined
   if (inline_func->FuncName() == "main") return false;  // obviously
   int cnt = 0;
   for (auto &bb : inline_func->m_bb_list) {
@@ -17,11 +17,16 @@ bool FunctionInlining(std::shared_ptr<Function> inline_func) {
       }
     }
   }
-  if (cnt >= 100)
+  auto func_name = inline_func->FuncName();
+  std::cerr << "[debug] # of instrs: " << cnt << std::endl;
+  if (cnt >= 50)
     return false;  // inlined inline_func cannot have too many instructions
 
+  std::cerr << "[debug] inlining function " << inline_func->FuncName()
+            << std::endl;
+
   for (auto &[call, original_func] : inline_func->m_calls) {
-    // now start inlining a inline_func into call's basic block
+    // now start inlining an inline_func into call's basic block
     auto original_bb = call->m_bb;
     auto call_it = std::find(original_bb->m_instr_list.begin(),
                              original_bb->m_instr_list.end(), call);
@@ -270,8 +275,10 @@ void IRPassManager::FunctionInliningPass() {
     return a->m_called_depth < b->m_called_depth;
   });
   for (auto &func : funcs) {
-    FunctionInlining(func);
-    ComputeDominanceRelationship(func);
+    bool inlined = FunctionInlining(func);
+    if (inlined) {
+      ComputeDominanceRelationship(func);
+    }
     // bool inlined = FunctionInlining(func);
     // if (inlined) {
     //   for (auto &[call_instr, caller_func] : func->m_calls) {

@@ -136,7 +136,7 @@ void ComputeDominanceRelationship(std::shared_ptr<Function> function) {
     bbs[i]->m_idom = bbs[idom[i]];
   }
 
-  dfs(function->m_bb_list.front(), 0);
+  dfs(function->m_bb_list.front(), 1);
 }
 
 // must be called after ComputeDominanceRelationship
