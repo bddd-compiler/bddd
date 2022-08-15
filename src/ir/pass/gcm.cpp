@@ -343,6 +343,7 @@ void MovePhiFirst(std::shared_ptr<BasicBlock> bb) {
   }
 }
 
+// cmp + (xor) + br
 void MoveTerminatorLast(std::shared_ptr<BasicBlock> bb) {
   std::shared_ptr<Instruction> terminator = nullptr;
   for (auto &instr : bb->m_instr_list) {
@@ -354,9 +355,40 @@ void MoveTerminatorLast(std::shared_ptr<BasicBlock> bb) {
     }
   }
   assert(terminator != nullptr);
-  // no need to remove all uses
-  bb->m_instr_list.remove(terminator);
-  bb->m_instr_list.push_back(terminator);
+
+  if (auto br = std::dynamic_pointer_cast<BranchInstruction>(terminator)) {
+    std::stack<std::shared_ptr<Instruction>> instrs;
+    instrs.push(br);
+    std::shared_ptr<Value> now = br->m_cond->getValue();
+    while (now) {
+      if (auto cmp = std::dynamic_pointer_cast<BinaryInstruction>(now)) {
+        if (cmp->m_op == IROp::XOR) {
+          auto rhs = std::dynamic_pointer_cast<Constant>(
+              cmp->m_rhs_val_use->getValue());
+          assert(rhs->Evaluate().IntVal() == 1);
+          instrs.push(cmp);
+          now = cmp->m_lhs_val_use->getValue();
+        } else if (cmp->IsICmp() || cmp->IsFCmp()) {
+          instrs.push(cmp);
+          break;
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    while (!instrs.empty()) {
+      std::shared_ptr<Instruction> instr = instrs.top();
+      instrs.pop();
+      bb->m_instr_list.remove(instr);
+      bb->m_instr_list.push_back(instr);
+    }
+  } else {
+    // no need to remove all uses
+    bb->m_instr_list.remove(terminator);
+    bb->m_instr_list.push_back(terminator);
+  }
 }
 
 void RunGCM(std::shared_ptr<Function> function,
@@ -763,6 +795,14 @@ void RunGCM(std::shared_ptr<Function> function,
     // check if all instructions are placed (important for later use!)
     for (auto &instr : bb->m_instr_list) {
       assert(instr->m_placed);
+    }
+    if (auto br
+        = std::dynamic_pointer_cast<BranchInstruction>(bb->LastInstruction())) {
+      if (bb->m_instr_list.size() >= 2
+          && !br->m_cond->getValue()->m_type.IsConst()) {
+        auto last_two_instr = *std::next(bb->m_instr_list.rbegin());
+        assert(last_two_instr == br->m_cond->getValue());
+      }
     }
 
     // expand worklist
