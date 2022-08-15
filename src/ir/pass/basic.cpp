@@ -307,7 +307,7 @@ void RemoveUnusedFunctions(std::unique_ptr<Module> &module) {
     // manually ++it
     auto func = *it;
     if (!func->m_visited) {
-      std::cerr << "removing function " << func->FuncName() << "..."
+      std::cerr << "[debug] removing function " << func->FuncName() << "..."
                 << std::endl;
       it = module->m_function_list.erase(it);
     } else {

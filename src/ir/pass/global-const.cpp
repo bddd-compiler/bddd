@@ -68,6 +68,7 @@ void IRPassManager::EliminateGlobalConstArrayAccess() {
   }
 
   for (auto &var : const_singles) {
+    std::cerr << "[debug] marking global const single" << std::endl;
     for (auto it = var->m_use_list.begin(); it != var->m_use_list.end(); ++it) {
       auto user = it->get()->getUser();
       auto val = var->GetFlattenVal(0);
@@ -85,6 +86,7 @@ void IRPassManager::EliminateGlobalConstArrayAccess() {
   }
 
   for (auto &var : const_gvs) {
+    std::cerr << "[debug] marking global const array" << std::endl;
     for (auto it = var->m_use_list.begin(); it != var->m_use_list.end(); ++it) {
       auto user = it->get()->getUser();
       if (auto gep
