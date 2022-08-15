@@ -1,22 +1,6 @@
 #include "asm/asm-register.h"
 #include "asm/asm.h"
 
-void ASM_BasicBlock::appendSuccessor(std::shared_ptr<ASM_BasicBlock> succ) {
-  m_successors.push_back(succ);
-}
-
-void ASM_BasicBlock::appendPredecessor(std::shared_ptr<ASM_BasicBlock> pred) {
-  m_predecessors.push_back(pred);
-}
-
-std::vector<std::shared_ptr<ASM_BasicBlock>> ASM_BasicBlock::getSuccessors() {
-  return m_successors;
-}
-
-std::vector<std::shared_ptr<ASM_BasicBlock>> ASM_BasicBlock::getPredecessors() {
-  return m_predecessors;
-}
-
 void RegisterAllocator::LivenessAnalysis() {
   // calculate def and use set of all blocks
   for (auto& b : m_cur_func->m_blocks) {

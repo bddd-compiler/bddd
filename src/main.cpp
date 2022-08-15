@@ -28,7 +28,8 @@ int main(int argc, char *argv[]) {
   const char *asm_path = nullptr;
   const char *ir_path = nullptr;
   const char *tmp_asm_path = nullptr;
-  while ((ch = getopt_long(argc, argv, "So:O:i:t:", long_options, NULL)) != -1) {
+  while ((ch = getopt_long(argc, argv, "So:O:i:t:", long_options, NULL))
+         != -1) {
     switch (ch) {
       case 'S':
       case 'O':
@@ -117,6 +118,8 @@ int main(int argc, char *argv[]) {
     asm_module->exportASM(ofs);
     ofs.close();
   }
+  // optimize for temp asm
+  optimizeTemp(asm_module);
 
   std::cout << "allocating..." << std::endl;
 

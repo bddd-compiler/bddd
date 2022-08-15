@@ -314,6 +314,10 @@ public:
 
   void appendPredecessor(std::shared_ptr<ASM_BasicBlock> pred);
 
+  void removeSuccessor(std::shared_ptr<ASM_BasicBlock> succ);
+
+  void removePredecessor(std::shared_ptr<ASM_BasicBlock> pred);
+
   std::vector<std::shared_ptr<ASM_BasicBlock>> getSuccessors();
 
   std::vector<std::shared_ptr<ASM_BasicBlock>> getPredecessors();

@@ -12,68 +12,6 @@ void ASM_Module::exportGlobalVar(std::ofstream& ofs) {
       exportVarBody(ofs, std::dynamic_pointer_cast<FloatGlobalVariable>(var));
     else
       exportVarBody(ofs, std::dynamic_pointer_cast<IntGlobalVariable>(var));
-
-#if 0
-    if (var->m_is_float) {
-      auto float_val = std::dynamic_pointer_cast<FloatGlobalVariable>(var);
-      int init_size = float_val->m_init_vals.size();
-      ofs << std::to_string(init_size * 4) << std::endl;
-      ofs << var->m_name << ":" << std::endl;
-      int i = 0;
-      while (i < init_size) {
-        if (float_val->m_init_vals[i] == 0) {
-          ofs << "\t.space ";
-          int left = i;
-          while (i < init_size && float_val->m_init_vals[i] == 0) {
-            i++;
-          }
-          ofs << std::to_string((i - left) * 4) << std::endl;
-        } else {
-          ofs << "\t.float ";
-          int first = true;
-          while (i < init_size && float_val->m_init_vals[i] != 0) {
-            if (!first) {
-              first = false;
-            } else {
-              ofs << ",";
-            }
-            ofs << std::to_string(float_val->m_init_vals[i]);
-            i++;
-          }
-          ofs << std::endl;
-        }
-      }
-    } else {
-      auto int_val = std::dynamic_pointer_cast<IntGlobalVariable>(var);
-      int init_size = int_val->m_init_vals.size();
-      ofs << std::to_string(init_size * 4) << std::endl;
-      ofs << var->m_name << ":" << std::endl;
-      int i = 0;
-      while (i < init_size) {
-        if (int_val->m_init_vals[i] == 0) {
-          ofs << "\t.space ";
-          int left = i;
-          while (i < init_size && int_val->m_init_vals[i] == 0) {
-            i++;
-          }
-          ofs << std::to_string((i - left) * 4) << std::endl;
-        } else {
-          ofs << "\t.word ";
-          bool first = true;
-          while (i < init_size && int_val->m_init_vals[i] != 0) {
-            if (first) {
-              first = false;
-            } else {
-              ofs << ",";
-            }
-            ofs << std::to_string(int_val->m_init_vals[i]);
-            i++;
-          }
-          ofs << std::endl;
-        }
-      }
-    }
-#endif
   }
 }
 

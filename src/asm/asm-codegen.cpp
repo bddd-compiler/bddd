@@ -146,37 +146,37 @@ std::shared_ptr<Operand> GenerateMod(std::shared_ptr<BinaryInstruction> inst,
   auto ret = builder->getOperand(inst);
   auto devidend = builder->getOperand(val1);
 
-  // if (val2->m_type.IsConst()) {
-  //   assert(val2->m_type.IsBasicInt());
-  //   auto const_val = std::dynamic_pointer_cast<Constant>(val2);
-  //   if (const_val->m_int_val == 1) {
-  //     builder->appendMOV(ret, 0);
-  //     return ret;
-  //   }
-  //   int temp = 2;
-  //   for (int i = 1; i < 32; i++) {
-  //     if (temp == const_val->m_int_val) {
-  //       int and_val = temp - 1;
-  //       std::shared_ptr<Operand> and_reg;
-  //       if (Operand::immCheck(and_val)) {
-  //         and_reg = std::make_shared<Operand>(and_val);
-  //       } else {
-  //         and_reg = std::make_shared<Operand>(OperandType::VREG);
-  //         builder->appendMOV(and_reg, and_val);
-  //       }
-  //       auto and_inst = builder->appendBIT(InstOp::AND, ret, devidend, and_reg);
-  //       and_inst->m_set_flag = true;
-  //       auto cmp_inst = builder->appendCT(InstOp::CMP, devidend,
-  //                                         std::make_shared<Operand>(0));
-  //       cmp_inst->m_cond = CondType::NE;
-  //       auto sub_inst = builder->appendAS(InstOp::SUB, ret, ret,
-  //                                         std::make_shared<Operand>(temp));
-  //       sub_inst->m_cond = CondType::MI;
-  //       return ret;
-  //     }
-  //     temp <<= 1;
-  //   }
-  // }
+  if (val2->m_type.IsConst()) {
+    assert(val2->m_type.IsBasicInt());
+    auto const_val = std::dynamic_pointer_cast<Constant>(val2);
+    if (const_val->m_int_val == 1) {
+      builder->appendMOV(ret, 0);
+      return ret;
+    }
+    int temp = 2;
+    for (int i = 1; i < 32; i++) {
+      if (temp == const_val->m_int_val) {
+        int and_val = temp - 1;
+        std::shared_ptr<Operand> and_reg;
+        if (Operand::immCheck(and_val)) {
+          and_reg = std::make_shared<Operand>(and_val);
+        } else {
+          and_reg = std::make_shared<Operand>(OperandType::VREG);
+          builder->appendMOV(and_reg, and_val);
+        }
+        auto and_inst = builder->appendBIT(InstOp::AND, ret, devidend, and_reg);
+        and_inst->m_set_flag = true;
+        auto cmp_inst = builder->appendCT(InstOp::CMP, devidend,
+                                          std::make_shared<Operand>(0));
+        cmp_inst->m_cond = CondType::NE;
+        auto sub_inst = builder->appendAS(InstOp::SUB, ret, ret,
+                                          std::make_shared<Operand>(temp));
+        sub_inst->m_cond = CondType::MI;
+        return ret;
+      }
+      temp <<= 1;
+    }
+  }
 
   auto devisor = builder->getOperand(val2);
 
