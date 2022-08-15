@@ -548,6 +548,384 @@ EvalValue ExprAST::EvaluateInner(SymbolTable& symbol_table) {
       assert(false);  // unreachable
   }
 }
+EvalValue ExprAST::EvaluateInitVal() {
+  EvalValue lhs_res, rhs_res;
+  switch (m_op) {
+    case Op::POSITIVE:
+      return m_lhs->EvaluateInitVal();
+    case Op::NEGATIVE:
+      lhs_res = m_lhs->EvaluateInitVal();
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          return EvalValue(-lhs_res.IntVal());
+        case EvalType::CONST_FLOAT:
+          return EvalValue(-lhs_res.FloatVal());
+        case EvalType::VAR_INT:
+          return EvalValue(EvalType::VAR_INT);
+        case EvalType::VAR_FLOAT:
+          return EvalValue(EvalType::VAR_FLOAT);
+        default:
+          return EvalValue(EvalType::ERROR);
+      }
+    case Op::PLUS:
+      lhs_res = m_lhs->EvaluateInitVal();
+      rhs_res = m_rhs->EvaluateInitVal();
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              return EvalValue(lhs_res.IntVal() + rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              return EvalValue(lhs_res.IntVal() + rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::CONST_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              // rhs_res int->float
+              m_rhs->SetFloatVal(rhs_res.IntVal());
+              return EvalValue(lhs_res.FloatVal() + rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              return EvalValue(lhs_res.FloatVal() + rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        default:
+          return EvalValue(EvalType::ERROR);
+      }
+    case Op::MINUS:
+      lhs_res = m_lhs->EvaluateInitVal();
+      rhs_res = m_rhs->EvaluateInitVal();
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              return EvalValue(lhs_res.IntVal() - rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              m_lhs->SetFloatVal(lhs_res.IntVal());
+              return EvalValue(lhs_res.IntVal() - rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::CONST_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              m_rhs->SetFloatVal(rhs_res.IntVal());
+              return EvalValue(lhs_res.FloatVal() - rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              return EvalValue(lhs_res.FloatVal() - rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        default:
+          return EvalValue(EvalType::ERROR);
+      }
+    case Op::MULTI:
+      lhs_res = m_lhs->EvaluateInitVal();
+      rhs_res = m_rhs->EvaluateInitVal();
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              return EvalValue(lhs_res.IntVal() * rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              m_lhs->SetFloatVal(lhs_res.IntVal());
+              return EvalValue(lhs_res.IntVal() * rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::CONST_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              m_rhs->SetFloatVal(rhs_res.IntVal());
+              return EvalValue(lhs_res.FloatVal() * rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              return EvalValue(lhs_res.FloatVal() * rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        default:
+          return EvalValue(EvalType::ERROR);
+      }
+    case Op::DIV:
+      lhs_res = m_lhs->EvaluateInitVal();
+      rhs_res = m_rhs->EvaluateInitVal();
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              if (rhs_res.IntVal() == 0) return EvalValue(EvalType::ERROR);
+              return EvalValue(lhs_res.IntVal() / rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              if (rhs_res.FloatVal() == 0) return EvalValue(EvalType::ERROR);
+              m_lhs->SetFloatVal(lhs_res.IntVal());
+              return EvalValue(lhs_res.IntVal() / rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::CONST_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              if (rhs_res.IntVal() == 0) return EvalValue(EvalType::ERROR);
+              m_rhs->SetFloatVal(rhs_res.IntVal());
+              return EvalValue(lhs_res.FloatVal() / rhs_res.IntVal());
+            case EvalType::CONST_FLOAT:
+              if (rhs_res.FloatVal() == 0) return EvalValue(EvalType::ERROR);
+              return EvalValue(lhs_res.FloatVal() / rhs_res.FloatVal());
+            case EvalType::VAR_INT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_FLOAT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+            case EvalType::CONST_FLOAT:
+            case EvalType::VAR_FLOAT:
+              return EvalValue(EvalType::VAR_FLOAT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        default:
+          return EvalValue(EvalType::ERROR);
+      }
+    case Op::MOD:
+      lhs_res = m_lhs->EvaluateInitVal();
+      rhs_res = m_rhs->EvaluateInitVal();
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+              if (rhs_res.IntVal() == 0) return EvalValue(EvalType::ERROR);
+              return EvalValue(lhs_res.IntVal() % rhs_res.IntVal());
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        case EvalType::VAR_INT:
+          switch (rhs_res.m_eval_type) {
+            case EvalType::CONST_INT:
+            case EvalType::VAR_INT:
+              return EvalValue(EvalType::VAR_INT);
+            default:
+              return EvalValue(EvalType::ERROR);
+          }
+        default:
+          return EvalValue(EvalType::ERROR);
+      }
+    case Op::LE:
+    case Op::LEQ:
+    case Op::GE:
+    case Op::GEQ:
+    case Op::EQ:
+    case Op::NEQ:
+      lhs_res = m_lhs->EvaluateInitVal();
+      rhs_res = m_rhs->EvaluateInitVal();
+      if (lhs_res.IsConst() && rhs_res.IsConst()) {
+        // lhs and rhs are constant, then the result is also constant
+        float lhs_num, rhs_num;
+        if (lhs_res.IsConstInt())
+          lhs_num = static_cast<float>(lhs_res.IntVal());
+        else
+          lhs_num = lhs_res.FloatVal();
+        if (rhs_res.IsConstInt())
+          rhs_num = static_cast<float>(rhs_res.IntVal());
+        else
+          rhs_num = rhs_res.FloatVal();
+
+        switch (m_op) {
+          case Op::LE:
+            return EvalValue(lhs_num < rhs_num);
+          case Op::LEQ:
+            return EvalValue(lhs_num <= rhs_num);
+          case Op::GE:
+            return EvalValue(lhs_num > rhs_num);
+          case Op::GEQ:
+            return EvalValue(lhs_num >= rhs_num);
+          case Op::EQ:
+            return EvalValue(lhs_num == rhs_num);
+          case Op::NEQ:
+            return EvalValue(lhs_num != rhs_num);
+          default:
+            assert(false);  // impossible
+        }
+      } else if (lhs_res.IsSingle() && rhs_res.IsSingle()) {
+        // either one of them is not constant, then may be 1 or 0
+        if (!lhs_res.IsInt() || !rhs_res.IsInt()) {
+          if (lhs_res.IsConstInt()) m_lhs->SetFloatVal(lhs_res.IntVal());
+          if (rhs_res.IsConstInt()) m_rhs->SetFloatVal(rhs_res.IntVal());
+        }
+        return EvalValue(EvalType::VAR_INT);
+      } else {
+        return EvalValue(EvalType::ERROR);
+      }
+    case Op::AND:
+    case Op::OR:
+      lhs_res = m_lhs->EvaluateInitVal();
+      rhs_res = m_rhs->EvaluateInitVal();
+      if (lhs_res.IsConst() && rhs_res.IsConst()) {
+        // either 1 or 0
+        float lhs_num, rhs_num;
+        if (lhs_res.IsConstInt())
+          lhs_num = static_cast<float>(lhs_res.IntVal());
+        else
+          lhs_num = lhs_res.FloatVal();
+        if (rhs_res.IsConstInt())
+          rhs_num = static_cast<float>(rhs_res.IntVal());
+        else
+          rhs_num = rhs_res.FloatVal();
+
+        if (m_op == Op::AND)
+          return EvalValue(lhs_num && rhs_num);
+        else
+          return EvalValue(lhs_num || rhs_num);
+      } else if (lhs_res.IsSingle() && rhs_res.IsSingle()) {
+        return EvalValue(EvalType::VAR_INT);
+      } else {
+        return EvalValue(EvalType::ERROR);
+      }
+    case Op::NOT:
+      lhs_res = m_lhs->EvaluateInitVal();
+      switch (lhs_res.m_eval_type) {
+        case EvalType::CONST_INT:
+          return EvalValue(!lhs_res.IntVal());
+        case EvalType::CONST_FLOAT:
+          return EvalValue(!lhs_res.FloatVal());
+        case EvalType::VAR_INT:
+        case EvalType::VAR_FLOAT:
+          return EvalValue(EvalType::VAR_INT);
+        default:
+          return EvalValue(EvalType::ERROR);
+      }
+    case Op::CONST_INT:
+      return EvalValue(m_int_val);
+    case Op::CONST_FLOAT:
+      return EvalValue(m_float_val);
+    case Op::LVAL:
+      // m_lval->TypeCheck(symbol_table);
+      assert(m_lval->m_decl != nullptr);
+
+      // can we handle lval array?
+      // yes, just give a new enum variant ARR
+      if (m_lval->IsArray()) return EvalValue(EvalType::ARR);
+
+      // get init val of lval
+      switch (m_lval->m_decl->GetVarType()) {
+        case VarType::INT:
+          return EvalValue(m_lval->m_decl->m_flatten_vals[0]->IntVal());
+        case VarType::FLOAT:
+          // return EvalValue(m_lval->Evaluate(symbol_table).FloatVal());
+          return EvalValue(m_lval->m_decl->m_flatten_vals[0]->FloatVal());
+        default:
+          return EvalValue(EvalType::ERROR);
+      }
+    default:
+      assert(false);  // unreachable
+  }
+}
 void DeclAST::TypeCheck(SymbolTable& symbol_table) {
   if (m_var_type != VarType::INT && m_var_type != VarType::FLOAT)
     throw MyException("unexpected var_type in DeclAST");

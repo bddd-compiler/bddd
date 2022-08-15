@@ -147,14 +147,146 @@ std::shared_ptr<BasicBlock> FindLCA(std::shared_ptr<BasicBlock> a,
   return a;
 }
 
-void ScheduleLate(std::shared_ptr<Instruction> instr) {
+void CombineInstruction(std::shared_ptr<BinaryInstruction> binary_instr,
+                        std::shared_ptr<BinaryInstruction> user_instr,
+                        std::shared_ptr<IRBuilder> builder) {
+  // example:
+  // x1 = add x0, 1
+  // x2 = add x1, 2
+  // target:
+  // x2 = add x0, 3
+  if (binary_instr->m_lhs_val_use->getValue()->m_type.IsConst()) {
+    std::swap(binary_instr->m_lhs_val_use, binary_instr->m_rhs_val_use);
+  }
+  if (user_instr->m_lhs_val_use->getValue()->m_type.IsConst()) {
+    std::swap(user_instr->m_lhs_val_use, user_instr->m_rhs_val_use);
+  }
+  if (user_instr->m_lhs_val_use->getValue() != binary_instr) return;
+  auto binary_const = std::dynamic_pointer_cast<Constant>(
+      binary_instr->m_rhs_val_use->getValue());
+  auto user_const = std::dynamic_pointer_cast<Constant>(
+      user_instr->m_rhs_val_use->getValue());
+  if (binary_const == nullptr || user_const == nullptr) return;
+
+  auto first_val = binary_const->Evaluate();
+  auto second_val = user_const->Evaluate();
+  auto first_op = binary_instr->m_op;
+  auto second_op = user_instr->m_op;
+  if ((first_op == IROp::ADD && second_op == IROp::ADD)
+      || (first_op == IROp::SUB && second_op == IROp::SUB)) {
+    // x + 1 + 2
+    // x + (1 + 2)
+
+    // x - 1 - 2
+    // x - (1 + 2)
+    int temp = first_val.IntVal() + second_val.IntVal();
+    if (first_val.IntVal() > 0 && second_val.IntVal() > 0 && temp < 0) {
+      return;
+    } else if (first_val.IntVal() < 0 && second_val.IntVal() < 0 && temp > 0) {
+      return;
+    }
+    user_instr->m_lhs_val_use->getValue()->KillUse(user_instr->m_lhs_val_use);
+    user_instr->m_rhs_val_use->getValue()->KillUse(user_instr->m_rhs_val_use);
+    user_instr->m_lhs_val_use
+        = binary_instr->m_lhs_val_use->getValue()->AddUse(user_instr);
+    user_instr->m_rhs_val_use
+        = builder->GetIntConstant(temp)->AddUse(user_instr);
+  } else if ((first_op == IROp::MUL && second_op == IROp::MUL)
+             || (first_op == IROp::SDIV && second_op == IROp::SDIV)) {
+    // x * 2 * 3
+    // x * (2 * 3)
+
+    // x / 2 / 3
+    // x / (2 * 3)
+    int temp = first_val.IntVal() * second_val.IntVal();
+    if (first_val.IntVal() > 0 && second_val.IntVal() > 0 && temp < 0) {
+      return;
+    } else if (first_val.IntVal() < 0 && second_val.IntVal() < 0 && temp < 0) {
+      return;
+    } else if (first_val.IntVal() > 0 && second_val.IntVal() < 0 && temp > 0) {
+      return;
+    } else if (first_val.IntVal() < 0 && second_val.IntVal() > 0 && temp > 0) {
+      return;
+    }
+    user_instr->m_lhs_val_use->getValue()->KillUse(user_instr->m_lhs_val_use);
+    user_instr->m_rhs_val_use->getValue()->KillUse(user_instr->m_rhs_val_use);
+    user_instr->m_lhs_val_use
+        = binary_instr->m_lhs_val_use->getValue()->AddUse(user_instr);
+    user_instr->m_rhs_val_use
+        = builder->GetIntConstant(temp)->AddUse(user_instr);
+  } else if ((first_op == IROp::ADD && second_op == IROp::SUB)
+             || (first_op == IROp::SUB && second_op == IROp::ADD)) {
+    // x + a - b
+    // x - (b - a)
+
+    // x - a + b
+    // x + (b - a)
+    int temp = second_val.IntVal() - first_val.IntVal();
+    if (second_val.IntVal() > 0 && first_val.IntVal() < 0 && temp < 0) {
+      return;
+    } else if (second_val.IntVal() < 0 && first_val.IntVal() > 0 && temp > 0) {
+      return;
+    }
+    user_instr->m_lhs_val_use->getValue()->KillUse(user_instr->m_lhs_val_use);
+    user_instr->m_rhs_val_use->getValue()->KillUse(user_instr->m_rhs_val_use);
+    user_instr->m_lhs_val_use
+        = binary_instr->m_lhs_val_use->getValue()->AddUse(user_instr);
+    if (temp >= 0) {
+      user_instr->m_rhs_val_use
+          = builder->GetIntConstant(temp)->AddUse(user_instr);
+    } else {
+      if (user_instr->m_op == IROp::ADD) {
+        user_instr->m_op = IROp::SUB;
+      } else {
+        assert(user_instr->m_op == IROp::SUB);
+        user_instr->m_op = IROp::ADD;
+      }
+      user_instr->m_rhs_val_use
+          = builder->GetIntConstant(-temp)->AddUse(user_instr);
+    }
+  } else if ((first_op == IROp::MUL && second_op == IROp::SDIV)
+             || (first_op == IROp::SDIV && second_op == IROp::MUL)) {
+    // x * a / b
+    // x / (b / a)
+
+    // x / a * b
+    // x * (b / a)
+    if (first_val.IntVal() == 0) return;
+    if (second_val.IntVal() % first_val.IntVal() != 0) return;
+    int temp = second_val.IntVal() / first_val.IntVal();
+    user_instr->m_lhs_val_use->getValue()->KillUse(user_instr->m_lhs_val_use);
+    user_instr->m_rhs_val_use->getValue()->KillUse(user_instr->m_rhs_val_use);
+    user_instr->m_lhs_val_use
+        = binary_instr->m_lhs_val_use->getValue()->AddUse(user_instr);
+    user_instr->m_rhs_val_use
+        = builder->GetIntConstant(temp)->AddUse(user_instr);
+  } else {
+    return;  // not considered yet
+  }
+}
+
+void ScheduleLate(std::shared_ptr<Instruction> instr,
+                  std::shared_ptr<IRBuilder> builder) {
   if (instr->m_visited) return;
   instr->m_visited = true;
+
+  if (auto binary_instr = std::dynamic_pointer_cast<BinaryInstruction>(instr)) {
+    std::vector<Use *> uses;
+    for (auto &use : instr->m_use_list) {
+      uses.push_back(use.get());
+    }
+    for (auto &use : uses) {
+      if (auto user_instr
+          = std::dynamic_pointer_cast<BinaryInstruction>(use->getUser())) {
+        CombineInstruction(binary_instr, user_instr, builder);
+      }
+    }
+  }
 
   std::shared_ptr<BasicBlock> lca = nullptr;
   for (auto &y_use : instr->m_use_list) {
     if (auto y = std::dynamic_pointer_cast<Instruction>(y_use->getUser())) {
-      ScheduleLate(y);
+      ScheduleLate(y, builder);
       if (IsPinned(instr)) continue;
       auto use = y->m_bb;
       if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(y)) {
@@ -248,7 +380,7 @@ void RunGCM(std::shared_ptr<Function> function,
     instr->m_visited = false;
   }
   for (auto &instr : instrs) {
-    ScheduleLate(instr);
+    ScheduleLate(instr, builder);
   }
 
   for (auto &bb : function->m_bb_list) {

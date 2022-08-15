@@ -361,11 +361,13 @@ public:
 
   explicit IntGlobalVariable(const std::shared_ptr<DeclAST> &decl)
       : GlobalVariable(decl), m_flatten_vals(), m_is_array(decl->IsArray()) {
-    for (const auto &init_val : decl->m_flatten_vals) {
-      if (init_val == nullptr)
+    for (const auto &expr : decl->m_flatten_vals) {
+      if (expr == nullptr) {
         m_flatten_vals.push_back(0);
-      else
-        m_flatten_vals.push_back(init_val->IntVal());
+      } else {
+        m_flatten_vals.push_back(expr->IntVal());
+        // m_flatten_vals.push_back(expr->EvaluateInitVal().IntVal());
+      }
     }
 
     std::vector<int> dimensions;
@@ -387,11 +389,13 @@ public:
 
   explicit FloatGlobalVariable(const std::shared_ptr<DeclAST> &decl)
       : GlobalVariable(decl), m_flatten_vals(), m_is_array(decl->IsArray()) {
-    for (const auto &init_val : decl->m_flatten_vals) {
-      if (init_val == nullptr)
+    for (const auto &expr : decl->m_flatten_vals) {
+      if (expr == nullptr) {
         m_flatten_vals.push_back(0);
-      else
-        m_flatten_vals.push_back(init_val->FloatVal());
+      } else {
+        // m_flatten_vals.push_back(expr->EvaluateInitVal().FloatVal());
+        m_flatten_vals.push_back(expr->FloatVal());
+      }
     }
 
     std::vector<int> dimensions;
