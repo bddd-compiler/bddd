@@ -422,12 +422,61 @@ std::shared_ptr<Value> GetValue(std::shared_ptr<Value> val,
   return g_vns[idx].second;
 }
 
+bool CanGVN(std::shared_ptr<Instruction> instr) {
+  switch (instr->m_op) {
+    case IROp::ADD:
+    case IROp::F_ADD:
+    case IROp::SUB:
+    case IROp::F_SUB:
+    case IROp::MUL:
+    case IROp::F_MUL:
+    case IROp::SDIV:
+    case IROp::F_DIV:
+    case IROp::SREM:
+    case IROp::F_NEG:
+    case IROp::I_SGE:
+    case IROp::I_SGT:
+    case IROp::I_SLE:
+    case IROp::I_SLT:
+    case IROp::I_EQ:
+    case IROp::I_NE:
+    case IROp::F_EQ:
+    case IROp::F_NE:
+    case IROp::F_GT:
+    case IROp::F_GE:
+    case IROp::F_LT:
+    case IROp::F_LE:
+    case IROp::ZEXT:
+    case IROp::SITOFP:
+    case IROp::FPTOSI:
+    case IROp::GET_ELEMENT_PTR:
+    case IROp::XOR:  // TODO
+    case IROp::CALL:
+      return true;
+    case IROp::BRANCH:
+    case IROp::JUMP:
+    case IROp::RETURN:
+    case IROp::ALLOCA:
+    case IROp::LOAD:
+    case IROp::STORE:
+    case IROp::PHI:
+    case IROp::BITCAST:
+      return false;
+    default:
+      assert(false);
+  }
+}
+
 void RunGVN(std::shared_ptr<Function> function,
             std::shared_ptr<IRBuilder> builder) {
   for (auto &bb : function->m_bb_list) {
     // manually ++it
     for (auto it = bb->m_instr_list.begin(); it != bb->m_instr_list.end();) {
       auto instr = *it;
+      if (!CanGVN(instr)) {
+        ++it;
+        continue;
+      }
       auto instr_val = GetValue(instr, builder);
       // std::cerr << "[debug] idx: " << g_idx[instr_val] << std::endl;
 

@@ -24,35 +24,57 @@ void TailRecursionOptimization(std::shared_ptr<Function> func) {
                   || (func->ReturnType() == VarType::VOID
                       && ret_instr->m_ret == nullptr))) {
             // 具体就是把原来的参数的使用换成了函数entry里面的phi nodes
-            param_phis.clear();
-            for (auto& param : func->m_args) {
-              auto phi
-                  = std::make_shared<PhiInstruction>(param->m_type, old_entry);
-              old_entry->PushFrontInstruction(phi);
-              param->ReplaceUseBy(phi);
-              param_phis.push_back(phi);
-            }
-            auto new_entry
-                = std::make_shared<BasicBlock>("tail_recursion_entry");
-            func->m_bb_list.push_front(new_entry);
-            auto jump_instr
-                = std::make_shared<JumpInstruction>(old_entry, new_entry);
-            new_entry->PushBackInstruction(jump_instr);
+            bool first
+                = func->m_bb_list.front()->Name() != "tail_recursion_entry";
+            if (first) {
+              for (auto& param : func->m_args) {
+                auto phi = std::make_shared<PhiInstruction>(param->m_type,
+                                                            old_entry);
+                old_entry->PushFrontInstruction(phi);
+                param->ReplaceUseBy(phi);
+                param_phis.push_back(phi);
+              }
 
-            assert(param_phis.size() == func->m_args.size());
-            for (int i = 0; i < param_phis.size(); ++i) {
-              param_phis[i]->AddPhiOperand(new_entry, func->m_args[i]);
+              auto new_entry
+                  = std::make_shared<BasicBlock>("tail_recursion_entry");
+              func->m_bb_list.push_front(new_entry);
+              auto jump_instr
+                  = std::make_shared<JumpInstruction>(old_entry, new_entry);
+              new_entry->PushBackInstruction(jump_instr);
+              old_entry->AddPredecessor(new_entry);
+
+              assert(param_phis.size() == func->m_args.size());
+              for (int i = 0; i < param_phis.size(); ++i) {
+                param_phis[i]->AddPhiOperand(new_entry, func->m_args[i]);
+                assert(!func->m_args[i]->m_use_list.empty());
+              }
+              auto new_jump_instr
+                  = std::make_shared<JumpInstruction>(old_entry, bb);
+              bb->PushBackInstruction(new_jump_instr);
+              old_entry->AddPredecessor(bb);
+
+              assert(call_instr->m_params.size() == param_phis.size());
+              for (int i = 0; i < param_phis.size(); ++i) {
+                param_phis[i]->AddPhiOperand(
+                    bb, call_instr->m_params[i]->getValue());
+              }
+              bb->RemoveInstruction(ret_instr);
+              bb->RemoveInstruction(call_instr);
+            } else {
+              assert(func->m_args.size() == param_phis.size());
+              auto new_jump_instr
+                  = std::make_shared<JumpInstruction>(old_entry, bb);
+              bb->PushBackInstruction(new_jump_instr);
+              old_entry->AddPredecessor(bb);
+
+              assert(call_instr->m_params.size() == param_phis.size());
+              for (int i = 0; i < param_phis.size(); ++i) {
+                param_phis[i]->AddPhiOperand(
+                    bb, call_instr->m_params[i]->getValue());
+              }
+              bb->RemoveInstruction(ret_instr);
+              bb->RemoveInstruction(call_instr);
             }
-            auto new_jump_instr
-                = std::make_shared<JumpInstruction>(old_entry, bb);
-            bb->PushBackInstruction(new_jump_instr);
-            assert(call_instr->m_params.size() == param_phis.size());
-            for (int i = 0; i < param_phis.size(); ++i) {
-              param_phis[i]->AddPhiOperand(bb,
-                                           call_instr->m_params[i]->getValue());
-            }
-            bb->RemoveInstruction(ret_instr);
-            bb->RemoveInstruction(call_instr);
           }
         }
       }
