@@ -20,9 +20,13 @@ CondType GetCondFromIR(IROp op) {
     case IROp::I_NE:
     case IROp::F_NE:
       return CondType::NE;
+    default:
+      break;
   }
   return CondType::NONE;
 }
+
+int ASM_BasicBlock::block_id = 0;
 
 int Operand::vrreg_cnt = 0;
 int Operand::vsreg_cnt = 0;
@@ -30,20 +34,27 @@ std::unordered_map<std::shared_ptr<Operand>, std::string> Operand::vreg_map;
 std::unordered_map<RReg, std::shared_ptr<Operand>> Operand::rreg_map;
 std::unordered_map<SReg, std::shared_ptr<Operand>> Operand::sreg_map;
 
-unsigned int ASM_Function::getStackSize() { return m_local_alloc; }
+int ASM_Function::getPushSize() {
+  return m_push->m_regs.size() + m_f_push->m_regs.size();
+}
 
-void ASM_Function::allocateStack(unsigned int size) { m_local_alloc += size; }
+int ASM_Function::getStackSize() { return m_local_alloc; }
+
+void ASM_Function::allocateStack(int size) { m_local_alloc += size; }
 
 void ASM_Function::appendPush(std::shared_ptr<Operand> reg) {
-  if (m_push->m_regs.find(reg) == m_push->m_regs.end())
+  if (reg->m_is_float)
+    m_f_push->m_regs.insert(reg);
+  else
     m_push->m_regs.insert(reg);
 }
 
 void ASM_Function::appendPop(std::shared_ptr<Operand> reg) {
-  if (m_pop->m_regs.find(reg) == m_pop->m_regs.end()) m_pop->m_regs.insert(reg);
+  if (reg->m_is_float)
+    m_f_pop->m_regs.insert(reg);
+  else
+    m_pop->m_regs.insert(reg);
 }
-
-int ASM_BasicBlock::block_cnt = 0;
 
 void ASM_BasicBlock::insert(std::shared_ptr<ASM_Instruction> inst) {
   m_insts.push_back(inst);
@@ -52,11 +63,15 @@ void ASM_BasicBlock::insert(std::shared_ptr<ASM_Instruction> inst) {
 
 void ASM_BasicBlock::insertSpillLDR(
     std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
-    std::shared_ptr<ASM_Instruction> ldr,
+    std::shared_ptr<ASM_Instruction> ldr, std::shared_ptr<ASM_Instruction> add,
     std::shared_ptr<ASM_Instruction> mov) {
   if (mov) {
     m_insts.insert(iter, mov);
     mov->m_block = shared_from_this();
+  }
+  if (add) {
+    m_insts.insert(iter, add);
+    add->m_block = shared_from_this();
   }
   m_insts.insert(iter, ldr);
   ldr->m_block = shared_from_this();
@@ -64,12 +79,16 @@ void ASM_BasicBlock::insertSpillLDR(
 
 void ASM_BasicBlock::insertSpillSTR(
     std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
-    std::shared_ptr<ASM_Instruction> str,
+    std::shared_ptr<ASM_Instruction> str, std::shared_ptr<ASM_Instruction> add,
     std::shared_ptr<ASM_Instruction> mov) {
   auto next = std::next(iter);
   if (mov) {
     m_insts.insert(next, mov);
     mov->m_block = shared_from_this();
+  }
+  if (add) {
+    m_insts.insert(next, add);
+    add->m_block = shared_from_this();
   }
   m_insts.insert(next, str);
   str->m_block = shared_from_this();
@@ -90,8 +109,6 @@ void ASM_BasicBlock::fillMOV() {
     insertPhiMOV(mov);
   }
 }
-
-#include "asm/asm.h"
 
 // for MOV, ADD, SUB, RSB
 /*
@@ -143,6 +160,19 @@ bool Operand::immCheck(float imm) {
   return false;
 }
 
+// check if the offset value is valid
+bool Operand::addrOffsCheck(int offs, bool is_float) {
+  if (is_float) {
+    // VLDR and VSTR
+    // Values are multiples of 4 in the range 0-1020.(+/-)
+    return -1020 <= offs && offs <= 1020 && offs % 4 == 0;
+  } else {
+    // LDR and STR
+    // Any value in the range 0-4095 is permitted.(+/-)
+    return -4095 <= offs && offs <= 4095;
+  }
+}
+
 std::string Operand::getName() {
   switch (m_op_type) {
     case OperandType::IMM:
@@ -152,6 +182,8 @@ std::string Operand::getName() {
       return getRegName();
     case OperandType::VREG:
       return getVRegName();
+    case OperandType::SPECIAL_REG:
+      return m_special_reg;
   }
   return "";  // unreachable, just write to avoid warning
 }
@@ -186,6 +218,13 @@ std::string Operand::getVRegName() {
   return name;
 }
 
+RegType Operand::getRegType() {
+  if (m_is_float)
+    return RegType::S;
+  else
+    return RegType::R;
+}
+
 std::shared_ptr<Operand> Operand::getRReg(RReg r) {
   if (Operand::rreg_map.find(r) != Operand::rreg_map.end()) {
     return Operand::rreg_map[r];
@@ -203,6 +242,7 @@ std::shared_ptr<Operand> Operand::getSReg(SReg s) {
   auto ret = std::make_shared<Operand>(OperandType::REG);
   ret->m_sreg = s;
   Operand::sreg_map[s] = ret;
+  ret->m_is_float = true;
   return ret;
 }
 
@@ -241,6 +281,10 @@ std::string ASM_Instruction::getOpName() {
       return "ADR";
     case InstOp::MOV:
       return "MOV";
+    case InstOp::MSR:
+      return "MSR";
+    case InstOp::MRS:
+      return "MRS";
     case InstOp::PUSH:
       return "PUSH";
     case InstOp::POP:
@@ -305,10 +349,18 @@ std::string ASM_Instruction::getOpName() {
       return "VNEG";
     case InstOp::VCMP:
       return "VCMP";
+    case InstOp::VMSR:
+      return "VMSR";
+    case InstOp::VMRS:
+      return "VMRS";
     case InstOp::VLDR:
       return "VLDR";
     case InstOp::VSTR:
       return "VSTR";
+    case InstOp::VPUSH:
+      return "VPUSH";
+    case InstOp::VPOP:
+      return "VPOP";
   }
   return "";
 }
@@ -328,6 +380,8 @@ std::string ASM_Instruction::getOpSuffixName() {
     case InstOp::VLDR:
     case InstOp::VSTR:
       return ".32";
+    default:
+      break;
   }
   return "";
 }
@@ -338,20 +392,77 @@ std::string ASM_Instruction::getCondName() {
       return "EQ";
     case CondType::NE:
       return "NE";
-    case CondType::LT:
-      return "LT";
-    case CondType::LE:
-      return "LE";
-    case CondType::GT:
-      return "GT";
+    case CondType::CS:
+      return "CS";
+    case CondType::CC:
+      return "CC";
+    case CondType::MI:
+      return "MI";
+    case CondType::PL:
+      return "PL";
+    case CondType::VS:
+      return "VS";
+    case CondType::VC:
+      return "VC";
+    case CondType::HI:
+      return "HI";
+    case CondType::LS:
+      return "LS";
     case CondType::GE:
       return "GE";
+    case CondType::LT:
+      return "LT";
+    case CondType::GT:
+      return "GT";
+    case CondType::LE:
+      return "LE";
+    case CondType::NONE:
+      return "";
   }
   return "";
 }
 
+CondType ASM_Instruction::getOppositeCond(CondType cond) {
+  switch (cond) {
+    case CondType::EQ:
+      return CondType::NE;
+    case CondType::NE:
+      return CondType::EQ;
+    case CondType::CS:
+      return CondType::CC;
+    case CondType::CC:
+      return CondType::CS;
+    case CondType::MI:
+      return CondType::PL;
+    case CondType::PL:
+      return CondType::MI;
+    case CondType::VS:
+      return CondType::VC;
+    case CondType::VC:
+      return CondType::VS;
+    case CondType::HI:
+      return CondType::LS;
+    case CondType::LS:
+      return CondType::HI;
+    case CondType::GE:
+      return CondType::LT;
+    case CondType::LT:
+      return CondType::GE;
+    case CondType::GT:
+      return CondType::LE;
+    case CondType::LE:
+      return CondType::GT;
+    case CondType::NONE:
+      return CondType::NONE;
+  }
+  return CondType::NONE;
+}
+
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
-  m_op = InstOp::LDR;
+  if (dest->m_is_float)
+    m_op = InstOp::VLDR;
+  else
+    m_op = InstOp::LDR;
   m_cond = CondType::NONE;
   m_type = Type::LABEL;
   m_dest = dest;
@@ -362,7 +473,10 @@ LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {
 
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
                  std::shared_ptr<Operand> offs) {
-  m_op = InstOp::LDR;
+  if (dest->m_is_float)
+    m_op = InstOp::VLDR;
+  else
+    m_op = InstOp::LDR;
   m_cond = CondType::NONE;
   m_type = Type::REG;
   m_dest = dest;
@@ -376,7 +490,10 @@ LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src,
 
 STRInst::STRInst(std::shared_ptr<Operand> src, std::shared_ptr<Operand> dest,
                  std::shared_ptr<Operand> offs) {
-  m_op = InstOp::STR;
+  if (src->m_is_float)
+    m_op = InstOp::VSTR;
+  else
+    m_op = InstOp::STR;
   m_cond = CondType::NONE;
   m_dest = dest;
   m_src = src;
@@ -417,8 +534,42 @@ MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
   m_dest = dest;
   m_src = src;
 
+  if (m_type == MOVType::REG) m_is_mov = true;
+
   addDef(dest);
   addUse(src);
+}
+
+MRSInst::MRSInst(std::string reg, std::shared_ptr<Operand> src) {
+  if (reg == "APSR") {
+    m_op = InstOp::MSR;
+    m_dest = std::make_shared<Operand>("APSR_NZCVQG");
+  } else if (reg == "FPSCR") {
+    m_op = InstOp::VMSR;
+    m_dest = std::make_shared<Operand>("FPSCR");
+  } else
+    assert(false);
+
+  m_cond = CondType::NONE;
+  m_src = src;
+
+  addUse(m_src);
+}
+
+MRSInst::MRSInst(std::shared_ptr<Operand> dest, std::string reg) {
+  if (reg == "APSR") {
+    m_op = InstOp::MRS;
+    m_src = std::make_shared<Operand>("APSR");
+  } else if (reg == "FPSCR") {
+    m_op = InstOp::VMRS;
+    m_src = std::make_shared<Operand>("FPSCR");
+  } else
+    assert(false);
+
+  m_cond = CondType::NONE;
+  m_dest = dest;
+
+  addDef(m_dest);
 }
 
 PInst::PInst(InstOp op) {
@@ -428,7 +579,7 @@ PInst::PInst(InstOp op) {
     m_regs.insert(Operand::getRReg(RReg::LR));
   else if (op == InstOp::POP)
     m_regs.insert(Operand::getRReg(RReg::PC));
-  else
+  else if (op != InstOp::VPUSH && op != InstOp::VPOP)
     assert(false);
 }
 
@@ -445,13 +596,27 @@ CALLInst::CALLInst(VarType type, std::string label, int n) {
   m_label = label;
   m_params = n;
 
+  // BL instruction will change LR and R12
+  addDef(Operand::getRReg(RReg::R0));
+  addDef(Operand::getRReg(RReg::R1));
+  addDef(Operand::getRReg(RReg::R2));
+  addDef(Operand::getRReg(RReg::R3));
+  addDef(Operand::getRReg(RReg::R12));
+  addDef(Operand::getRReg(RReg::LR));
+
+  for (int i = 0; i < 16; i++) {
+    addDef(Operand::getSReg((SReg)i));
+  }
+
+  if (label == "putfloat") {
+    addUse(Operand::getSReg(SReg::S0));
+    return;
+  }
+
   int i = 0;
   while (i < 4 && i < n) {
     addUse(Operand::getRReg((RReg)i));
     i++;
-  }
-  if (type != VarType::VOID) {
-    addDef(Operand::getRReg(RReg::R0));
   }
 }
 

@@ -14,12 +14,11 @@ public:
 
   std::unordered_map<std::shared_ptr<Value>, std::shared_ptr<Operand>>
       m_value_map;
-  std::unordered_map<std::shared_ptr<Value>,
-                     std::pair<std::shared_ptr<Operand>, int>>
-      m_addr_map;
   std::unordered_map<std::shared_ptr<BasicBlock>,
                      std::shared_ptr<ASM_BasicBlock>>
       m_block_map;
+  std::unordered_map<std::shared_ptr<Value>, std::shared_ptr<Operand>>
+      m_memory_map;
 
   ASM_Builder(std::shared_ptr<ASM_Module> m);
 
@@ -44,8 +43,9 @@ public:
   void reclaimSP();
 
   std::shared_ptr<Operand> getOperand(std::shared_ptr<Value> value,
-                                      bool genimm = false,
-                                      bool checkimm = true);
+                                      bool genimm = false, bool checkimm = true,
+                                      std::shared_ptr<ASM_BasicBlock> phi_block
+                                      = nullptr);
 
   std::shared_ptr<Operand> createOperand(std::shared_ptr<Value> value);
 
@@ -67,12 +67,23 @@ public:
                                      std::shared_ptr<Operand> offs);
 
   // appendMOV
-  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, int imm);
+  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, int imm,
+                                     std::shared_ptr<ASM_BasicBlock> phi_block
+                                     = nullptr);
 
-  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, float imm);
+  std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest, float imm,
+                                     std::shared_ptr<ASM_BasicBlock> phi_block
+                                     = nullptr);
 
   std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest,
                                      std::shared_ptr<Operand> src);
+
+  // appendMRS
+  std::shared_ptr<MRSInst> appendMRS(std::string reg,
+                                     std::shared_ptr<Operand> src);
+
+  std::shared_ptr<MRSInst> appendMRS(std::shared_ptr<Operand> dest,
+                                     std::string reg);
 
   // appendB
   std::shared_ptr<BInst> appendB(std::shared_ptr<ASM_BasicBlock> block,
@@ -123,8 +134,9 @@ public:
   std::shared_ptr<VNEGInst> appendVNEG(std::shared_ptr<Operand> dest,
                                        std::shared_ptr<Operand> operand);
 
-  std::shared_ptr<Operand> GenerateConstant(std::shared_ptr<Constant> value,
-                                            bool genimm, bool checkimm);
+  std::shared_ptr<Operand> GenerateConstant(
+      std::shared_ptr<Constant> value, bool genimm, bool checkimm,
+      std::shared_ptr<ASM_BasicBlock> phi_block = nullptr);
 };
 
 void GenerateModule(std::shared_ptr<Module> ir_module,

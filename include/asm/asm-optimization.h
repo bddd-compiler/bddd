@@ -5,6 +5,8 @@
 
 void reduceRedundantMOV(std::shared_ptr<ASM_Module> module);
 
+void reduceAdjacentJump(std::shared_ptr<ASM_Module> module);
+
 void optimize(std::shared_ptr<ASM_Module> module);
 
 #endif  // BDDD_ASM_OPTIMIZATION_H

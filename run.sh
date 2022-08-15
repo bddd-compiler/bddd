@@ -1,7 +1,7 @@
 #!/bin/sh
 
-for filename in $(ls ./testSource/functional/*.c); do
-  ./build/bddd $filename
+for filename in $(ls ./testSource/functional/*.sy); do
+  ./build/bddd -S -o ${filename%.sy}.s $filename -O2
   ret=$?
   if [ $ret -ne 0 ]; then
     echo "GG in $filename"
@@ -10,4 +10,3 @@ for filename in $(ls ./testSource/functional/*.c); do
 done
 echo "NICE"
 exit 0
-

@@ -35,6 +35,7 @@ enum class RReg {
 };
 
 enum class SReg {
+  S0,
   S1,
   S2,
   S3,
@@ -74,6 +75,8 @@ enum class InstOp {
   STR,
   ADR,
   MOV,
+  MSR,
+  MRS,
   PUSH,
   POP,
   // branch instructions
@@ -112,13 +115,33 @@ enum class InstOp {
   VDIV,
   VNEG,
   VCMP,
+  VMSR,
+  VMRS,
   VLDR,
   VSTR,
+  VPUSH,
+  VPOP
 };
 
-enum class OperandType { REG, VREG, IMM };
+enum class OperandType { SPECIAL_REG, REG, VREG, IMM };
 
-enum class CondType { NONE, NE, LT, LE, GT, GE, EQ };
+enum class CondType { 
+  NONE,     //  Any
+  EQ,       //  Z == 1
+  NE,       //  Z == 0
+  CS,       //  C == 1
+  CC,       //  C == 0
+  MI,       //  N == 1
+  PL,       //  N == 0
+  VS,       //  V == 1
+  VC,       //  V == 0
+  HI,       //  C == 1 and Z == 0
+  LS,       //  C == 0 or Z == 1
+  GE,       //  N == V
+  LT,       //  N != V
+  GT,       //  Z == 0 and N == V
+  LE        //  Z == 1 or N != V
+};
 
 enum class MOVType { REG, IMM };
 
@@ -141,15 +164,18 @@ public:
   std::string m_name;
   RReg m_rreg;
   SReg m_sreg;
+  RegType m_reg_type;
+  std::string m_special_reg;
+
   bool m_is_float;
   int m_int_val;
   float m_float_val;
 
-  //
+  // taken from tinbaccc
   int lifespan = 0;
   bool rejected = false;
 
-  Operand(OperandType t, bool r = false) : m_op_type(t), m_is_float(r) {}
+  Operand(OperandType t, bool f = false) : m_op_type(t), m_is_float(f) {}
 
   Operand(int val)
       : m_op_type(OperandType::IMM), m_int_val(val), m_is_float(false) {}
@@ -157,11 +183,16 @@ public:
   Operand(float val)
       : m_op_type(OperandType::IMM), m_float_val(val), m_is_float(true) {}
 
+  Operand(std::string reg)
+      : m_op_type(OperandType::SPECIAL_REG), m_special_reg(reg) {}
+
   std::string getName();
 
   std::string getRegName();
 
   std::string getVRegName();
+
+  RegType getRegType();
 
   static std::shared_ptr<Operand> getRReg(RReg r);
 
@@ -170,6 +201,8 @@ public:
   static bool immCheck(int imm);
 
   static bool immCheck(float imm);
+
+  static bool addrOffsCheck(int offs, bool is_float);
 };
 
 class ASM_Instruction;
@@ -198,10 +231,15 @@ public:
   std::list<std::shared_ptr<ASM_BasicBlock>> m_blocks;
   std::shared_ptr<ASM_BasicBlock> m_rblock;
   std::unique_ptr<PInst> m_push, m_pop;
+  std::unique_ptr<PInst> m_f_push, m_f_pop;
   std::list<std::shared_ptr<ASM_Instruction>> m_params_set_list;
-  int m_params;
-  unsigned int m_local_alloc;
-  std::stack<std::shared_ptr<Operand>> m_sp_alloc_size;
+  std::unordered_map<std::shared_ptr<Operand>, int> m_stack_params_offs;
+  std::unordered_map<std::shared_ptr<ASM_Instruction>,
+                     std::list<std::shared_ptr<ASM_Instruction>>::iterator>
+      m_params_pos_map;
+  int m_params_size;
+  int m_local_alloc;
+  std::stack<int> m_sp_alloc_size;
 
   ASM_Function(std::shared_ptr<Function> ir_func)
       : m_ir_func(ir_func),
@@ -209,11 +247,15 @@ public:
         m_rblock(std::make_shared<ASM_BasicBlock>()),
         m_local_alloc(0),
         m_push(std::make_unique<PInst>(InstOp::PUSH)),
-        m_pop(std::make_unique<PInst>(InstOp::POP)) {}
+        m_pop(std::make_unique<PInst>(InstOp::POP)),
+        m_f_push(std::make_unique<PInst>(InstOp::VPUSH)),
+        m_f_pop(std::make_unique<PInst>(InstOp::VPOP)) {}
 
-  unsigned int getStackSize();
+  int getPushSize();
 
-  void allocateStack(unsigned int size);
+  int getStackSize();
+
+  void allocateStack(int size);
 
   void appendPush(std::shared_ptr<Operand> reg);
 
@@ -222,13 +264,16 @@ public:
   void exportASM(std::ofstream& ofs);
 };
 
+class MRSInst;
+
 class ASM_BasicBlock : public std::enable_shared_from_this<ASM_BasicBlock> {
 public:
-  static int block_cnt;
+  static int block_id;
   std::string m_label;
   std::list<std::shared_ptr<ASM_Instruction>> m_insts;
   std::list<std::shared_ptr<ASM_Instruction>>::iterator m_branch_pos;
   std::list<std::shared_ptr<ASM_Instruction>> m_mov_filled_list;
+  std::shared_ptr<MRSInst> m_status_load_inst;
 
   int m_loop_depth;
 
@@ -240,21 +285,24 @@ public:
   std::vector<std::shared_ptr<ASM_BasicBlock>> m_successors;
 
   ASM_BasicBlock(int depth = 0)
-      : m_label(".L" + std::to_string(block_cnt++)),
-        m_loop_depth(depth),
-        m_branch_pos(m_insts.end()) {}
+      : m_loop_depth(depth),
+        m_branch_pos(m_insts.end()),
+        m_label(".L" + std::to_string(block_id++)),
+        m_status_load_inst(nullptr) {}
 
   void insert(std::shared_ptr<ASM_Instruction> inst);
 
   void insertSpillLDR(
       std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
       std::shared_ptr<ASM_Instruction> ldr,
-      std::shared_ptr<ASM_Instruction> mov = nullptr);
+      std::shared_ptr<ASM_Instruction> add,
+      std::shared_ptr<ASM_Instruction> mov);
 
   void insertSpillSTR(
       std::list<std::shared_ptr<ASM_Instruction>>::iterator iter,
       std::shared_ptr<ASM_Instruction> str,
-      std::shared_ptr<ASM_Instruction> mov = nullptr);
+      std::shared_ptr<ASM_Instruction> add,
+      std::shared_ptr<ASM_Instruction> mov);
 
   void insertPhiMOV(std::shared_ptr<ASM_Instruction> mov);
 
@@ -289,6 +337,11 @@ class ASM_Instruction {
 public:
   InstOp m_op;
   CondType m_cond;
+  bool m_set_flag;
+
+  int m_params_offset;
+  bool m_is_mov;  // for register allocation
+  bool m_is_deleted;
 
   std::shared_ptr<ASM_BasicBlock> m_block;
   std::unordered_set<std::shared_ptr<Operand>> m_def;
@@ -296,11 +349,16 @@ public:
   std::unordered_set<std::shared_ptr<Operand>> m_f_def;
   std::unordered_set<std::shared_ptr<Operand>> m_f_use;
 
+  ASM_Instruction()
+      : m_set_flag(false), m_params_offset(0), m_is_mov(false), m_is_deleted(false) {}
+
   std::string getOpName();
 
   std::string getOpSuffixName();
 
   std::string getCondName();
+
+  static CondType getOppositeCond(CondType cond);
 
   void exportInstHead(std::ofstream& ofs);
 
@@ -382,6 +440,25 @@ public:
                   std::shared_ptr<Operand> oldOp) override;
 };
 
+// MRS MSR VMRS VMSR
+class MRSInst : public ASM_Instruction {
+public:
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_src;
+
+  MRSInst(std::string reg, std::shared_ptr<Operand> src);
+
+  MRSInst(std::shared_ptr<Operand> dest, std::string reg);
+
+  void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+};
+
 class PInst : public ASM_Instruction {
 public:
   std::set<std::shared_ptr<Operand>> m_regs;
@@ -389,6 +466,9 @@ public:
   PInst(InstOp op);
 
   void exportASM(std::ofstream& ofs) override;
+
+  void exportBody(std::ofstream& ofs,
+                  std::vector<std::shared_ptr<Operand>> regs, int l, int r);
 
   void replaceDef(std::shared_ptr<Operand> newOp,
                   std::shared_ptr<Operand> oldOp) override;

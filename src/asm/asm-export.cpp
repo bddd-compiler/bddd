@@ -134,25 +134,19 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
   ofs << "\t.type " << m_name << ", \%function" << std::endl;
   ofs << m_name << ":" << std::endl;
   m_push->exportASM(ofs);
-
-#ifndef SP_FOR_PARAM
-  if (m_params > 4) {
-    int sp_offs = (m_push->m_regs.size()) * 4;
-    if (sp_offs)
-      ofs << "\tADD R11, SP, #" << std::to_string(sp_offs) << std::endl;
-    else
-      ofs << "\tMOV R11, SP" << std::endl;
-  }
-#endif
+  m_f_push->exportASM(ofs);
 
   // allocate stack
   int size = m_local_alloc;
-  if (size) {
-    if (size & 7) {
-      size &= ~(unsigned int)7;
-      size += 8;
-    }
+  if (size & 7) {
+    size &= ~(unsigned int)7;
+    size += 8;
+  }
+  if (getPushSize() % 2) {
+    size += 4;
+  }
 
+  if (size) {
     // this part is taken from tinbaccc directly
     if (Operand::immCheck(size)) {
       ofs << "\tSUB SP, SP, #" << std::to_string(size) << std::endl;
@@ -180,6 +174,7 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
     }
   }
 
+  m_f_pop->exportASM(ofs);
   m_pop->exportASM(ofs);
   ofs << "\t.pool" << std::endl;
   ofs << "\t.size " << m_name << ", .-" << m_name << std::endl;
@@ -188,6 +183,7 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
 void ASM_BasicBlock::exportASM(std::ofstream& ofs) {
   ofs << m_label << ":" << std::endl;
   for (auto& i : m_insts) {
+    if (i->m_is_deleted) continue;
     i->exportASM(ofs);
   }
 }
@@ -197,7 +193,9 @@ void Shift::exportASM(std::ofstream& ofs) {
 }
 
 void ASM_Instruction::exportInstHead(std::ofstream& ofs) {
-  ofs << "\t" << getOpName() << getCondName() << getOpSuffixName() << " ";
+  ofs << "\t" << getOpName();
+  if (m_set_flag) ofs << "S";
+  ofs << getCondName() << getOpSuffixName() << " ";
 }
 
 void LDRInst::exportASM(std::ofstream& ofs) {
@@ -229,40 +227,58 @@ void STRInst::exportASM(std::ofstream& ofs) {
 void MOVInst::exportASM(std::ofstream& ofs) {
   if (m_src->m_op_type == OperandType::IMM && !m_src->m_is_float) {
     int imm = m_src->m_int_val;
-    if (!Operand::immCheck(imm)) {
-      if (Operand::immCheck(~imm)) {
-        ofs << "\tMVN" << getCondName() << " " << m_dest->getName() << ", #"
-            << std::to_string(~imm) << std::endl;
-      } else {
-        ofs << "\tMOVW" << getCondName() << " " << m_dest->getName() << ", #"
-            << std::to_string(imm & 65535) << std::endl;
+    if (Operand::immCheck(imm)) {
+      ofs << "\tMOV" << getCondName() << " " << m_dest->getName() << ", #"
+          << std::to_string(imm) << std::endl;
+    } else if (Operand::immCheck(~imm)) {
+      ofs << "\tMVN" << getCondName() << " " << m_dest->getName() << ", #"
+          << std::to_string(~imm) << std::endl;
+    } else {
+      ofs << "\tMOVW" << getCondName() << " " << m_dest->getName() << ", #"
+          << std::to_string(imm & 65535) << std::endl;
+      if (imm & 0xffff0000)
         ofs << "\tMOVT" << getCondName() << " " << m_dest->getName() << ", #"
             << std::to_string((unsigned int)imm >> 16) << std::endl;
-      }
-      return;
     }
+    return;
   }
   exportInstHead(ofs);
   ofs << m_dest->getName() << ", " << m_src->getName() << std::endl;
 }
 
-void PInst::exportASM(std::ofstream& ofs) {
+void MRSInst::exportASM(std::ofstream& ofs) {
   exportInstHead(ofs);
-  ofs << "{";
+  ofs << m_dest->getName() << ", " << m_src->getName() << std::endl;
+}
+
+void PInst::exportASM(std::ofstream& ofs) {
+  if (m_regs.empty()) return;
+  exportInstHead(ofs);
   std::vector<std::shared_ptr<Operand>> regs(m_regs.begin(), m_regs.end());
   sort(regs.begin(), regs.end(),
        [=](std::shared_ptr<Operand> a, std::shared_ptr<Operand> b) {
-         return a->m_rreg < b->m_rreg;
+         if (a->m_is_float && b->m_is_float)
+           return a->m_sreg < b->m_sreg;
+         else if (!a->m_is_float && !b->m_is_float)
+           return a->m_rreg < b->m_rreg;
+         else
+           assert(false);
        });
+  exportBody(ofs, regs, 0, regs.size());
+}
 
+void PInst::exportBody(std::ofstream& ofs,
+                       std::vector<std::shared_ptr<Operand>> regs, int l,
+                       int r) {
+  ofs << "{";
   bool first = true;
-  for (auto& reg : regs) {
+  for (int i = l; i < r; i++) {
     if (first) {
       first = false;
     } else {
       ofs << ", ";
     }
-    ofs << reg->getName();
+    ofs << regs[i]->getName();
   }
   ofs << "}" << std::endl;
 }

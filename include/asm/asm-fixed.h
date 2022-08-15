@@ -8,6 +8,8 @@
 
 void storeRegisters(std::shared_ptr<ASM_Function> function, std::shared_ptr<Operand> reg);
 
+void fixedParamsOffs(std::shared_ptr<ASM_Module> module);
+
 void generateLiteralPool(std::shared_ptr<ASM_Module> module);
 
 #endif  // BDDD_ASM_FIXED_H

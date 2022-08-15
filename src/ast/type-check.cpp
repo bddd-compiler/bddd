@@ -1014,7 +1014,7 @@ EvalValue DeclAST::GetFlattenVal(SymbolTable& symbol_table, int offset) {
 
 void FuncCallAST::TypeCheck(SymbolTable& symbol_table) {
   auto ptr = symbol_table.GetFuncDef(m_func_name);
-  if (!ptr) throw MyException("FuncCall call on undefined function");
+  if (!ptr) throw MyException("FuncCall call on undefined function:" + m_func_name);
 
   if (FuncName() != "putf" && ParamsSize() != ptr->ParamsSize())
     throw MyException("incorrect # of params");

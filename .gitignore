@@ -12,4 +12,4 @@ a.out
 *.in
 *.out
 *.s
-*.sy
+testSource

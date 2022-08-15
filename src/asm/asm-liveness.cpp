@@ -23,6 +23,7 @@ void RegisterAllocator::LivenessAnalysis() {
     b->m_def.clear();
     b->m_use.clear();
     for (auto& i : b->m_insts) {
+      if (i->m_is_deleted) continue;
       std::unordered_set<OpPtr> defs, uses;
       if (m_reg_type == RegType::R) {
         defs = i->m_def;
@@ -31,14 +32,14 @@ void RegisterAllocator::LivenessAnalysis() {
         defs = i->m_f_def;
         uses = i->m_f_use;
       }
-      for (auto& def : defs) {
-        if (b->m_use.find(def) == b->m_use.end()) {
-          b->m_def.insert(def);
-        }
-      }
       for (auto& use : uses) {
         if (b->m_def.find(use) == b->m_def.end()) {
           b->m_use.insert(use);
+        }
+      }
+      for (auto& def : defs) {
+        if (b->m_use.find(def) == b->m_use.end()) {
+          b->m_def.insert(def);
         }
       }
     }
@@ -54,6 +55,7 @@ void RegisterAllocator::LivenessAnalysis() {
     for (auto iter = m_cur_func->m_blocks.rbegin();
          iter != m_cur_func->m_blocks.rend(); iter++) {
       auto b = *iter;
+
       // record in'[b] and out'[b]
       auto temp_in = b->m_livein;
       auto temp_out = b->m_liveout;
@@ -163,9 +165,26 @@ void MOVInst::replaceDef(std::shared_ptr<Operand> newOp,
 void MOVInst::replaceUse(std::shared_ptr<Operand> newOp,
                          std::shared_ptr<Operand> oldOp) {
   assert(m_type == MOVType::REG);
-  assert(m_dest == oldOp || m_src == oldOp);
-  if (m_dest == oldOp) m_dest = newOp;
-  if (m_src == oldOp) m_src = newOp;
+  assert(m_src == oldOp);
+  m_src = newOp;
+  m_use.erase(oldOp);
+  m_f_use.erase(oldOp);
+  addUse(newOp);
+}
+
+void MRSInst::replaceDef(std::shared_ptr<Operand> newOp,
+                         std::shared_ptr<Operand> oldOp) {
+  assert(m_dest == oldOp);
+  m_dest = newOp;
+  m_def.erase(oldOp);
+  m_f_def.erase(oldOp);
+  addDef(newOp);
+}
+
+void MRSInst::replaceUse(std::shared_ptr<Operand> newOp,
+                         std::shared_ptr<Operand> oldOp) {
+  assert(m_src == oldOp);
+  m_src = newOp;
   m_use.erase(oldOp);
   m_f_use.erase(oldOp);
   addUse(newOp);
