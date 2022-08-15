@@ -68,9 +68,14 @@ void IRPassManager::EliminateGlobalConstArrayAccess() {
   }
 
   for (auto &var : const_singles) {
-    std::cerr << "[debug] marking global const single" << std::endl;
-    for (auto it = var->m_use_list.begin(); it != var->m_use_list.end(); ++it) {
-      auto user = it->get()->getUser();
+    std::cerr << "[debug] marking global const single: " << var->m_name
+              << std::endl;
+    std::vector<Use *> uses;
+    for (auto &use : var->m_use_list) {
+      uses.push_back(use.get());
+    }
+    for (auto &use : uses) {
+      auto user = use->getUser();
       auto val = var->GetFlattenVal(0);
       if (auto load = std::dynamic_pointer_cast<LoadInstruction>(user)) {
         assert(val.IsConstInt() || val.IsConstFloat());
@@ -81,14 +86,20 @@ void IRPassManager::EliminateGlobalConstArrayAccess() {
           new_val = m_builder->GetFloatConstant(val.FloatVal());
         }
         load->ReplaceUseBy(new_val);
+        load->m_bb->RemoveInstruction(load);
       }
     }
   }
 
   for (auto &var : const_gvs) {
-    std::cerr << "[debug] marking global const array" << std::endl;
-    for (auto it = var->m_use_list.begin(); it != var->m_use_list.end(); ++it) {
-      auto user = it->get()->getUser();
+    std::cerr << "[debug] marking global const array: " << var->m_name
+              << std::endl;
+    std::vector<Use *> uses;
+    for (auto &use : var->m_use_list) {
+      uses.push_back(use.get());
+    }
+    for (auto it : uses) {
+      auto user = it->getUser();
       if (auto gep
           = std::dynamic_pointer_cast<GetElementPtrInstruction>(user)) {
         std::vector<int> indices;

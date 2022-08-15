@@ -16,19 +16,20 @@
 #include "parser/driver.h"
 
 static const struct option long_options[]
-    = {{"generate-assembly", no_argument, NULL, 'S'},
-       {"output", required_argument, NULL, 'o'},
-       {"optimization", required_argument, NULL, 'O'},
-       {"output-ir", required_argument, NULL, 'i'},
-       {"output-tmp-asm", required_argument, NULL, 't'},
-       {NULL, no_argument, NULL, 0}};
+    = {{"generate-assembly", no_argument, nullptr, 'S'},
+       {"output", required_argument, nullptr, 'o'},
+       {"optimization", required_argument, nullptr, 'O'},
+       {"output-ir", required_argument, nullptr, 'i'},
+       {"output-tmp-asm", required_argument, nullptr, 't'},
+       {nullptr, no_argument, nullptr, 0}};
 
 int main(int argc, char *argv[]) {
   int ch;
   const char *asm_path = nullptr;
   const char *ir_path = nullptr;
   const char *tmp_asm_path = nullptr;
-  while ((ch = getopt_long(argc, argv, "So:O:i:t:", long_options, NULL)) != -1) {
+  while ((ch = getopt_long(argc, argv, "So:O:i:t:", long_options, nullptr))
+         != -1) {
     switch (ch) {
       case 'S':
       case 'O':
@@ -54,15 +55,16 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  std::cout << "compiling: " << argv[optind] << std::endl;
+  auto src_path = argv[optind];
+  std::cout << "compiling: " << src_path << std::endl;
   std::cout << "parsing..." << std::endl;
   /**
    * parse the source code into AST
    * ASTs can be accessed via driver.comp_unit
    */
-  int res = driver.parse(argv[optind]);
+  int res = driver.parse(src_path);
   if (res != 0) {
-    std::cerr << argv[optind] << " GG" << std::endl;
+    std::cerr << src_path << " GG" << std::endl;
     return 1;
   }
   InitBuiltinFunctions();
@@ -104,33 +106,32 @@ int main(int argc, char *argv[]) {
     builder->m_module->ExportIR(ofs, 0);
     ofs.close();
   }
-
-  std::cout << "generating asm..." << std::endl;
-
-  // generate assembly
-  auto asm_module = std::make_shared<ASM_Module>();
-  auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
-  GenerateModule(std::move(builder->m_module), asm_builder);
-
-  if (tmp_asm_path) {
-    std::ofstream ofs(tmp_asm_path);
-    asm_module->exportASM(ofs);
-    ofs.close();
-  }
-
-  std::cout << "allocating..." << std::endl;
-
-  // register allocator
-  RegisterAllocator(asm_module, RegType::S).Allocate();
-  RegisterAllocator(asm_module, RegType::R).Allocate();
-
-  // fixing and optimization
-  fixedParamsOffs(asm_module);
-  optimize(asm_module);
-  generateLiteralPool(asm_module);
-  std::ofstream ofs(asm_path);
-  asm_module->exportASM(ofs);
-  ofs.close();
+  // std::cout << "generating asm..." << std::endl;
+  //
+  // // generate assembly
+  // auto asm_module = std::make_shared<ASM_Module>();
+  // auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
+  // GenerateModule(std::move(builder->m_module), asm_builder);
+  //
+  // if (tmp_asm_path) {
+  //   std::ofstream ofs(tmp_asm_path);
+  //   asm_module->exportASM(ofs);
+  //   ofs.close();
+  // }
+  //
+  // std::cout << "allocating..." << std::endl;
+  //
+  // // register allocator
+  // RegisterAllocator(asm_module, RegType::S).Allocate();
+  // RegisterAllocator(asm_module, RegType::R).Allocate();
+  //
+  // // fixing and optimization
+  // fixedParamsOffs(asm_module);
+  // optimize(asm_module);
+  // generateLiteralPool(asm_module);
+  // std::ofstream ofs(asm_path);
+  // asm_module->exportASM(ofs);
+  // ofs.close();
 
   return 0;
 }

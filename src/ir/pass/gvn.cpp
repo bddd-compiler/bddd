@@ -50,7 +50,9 @@ size_t GetValueNumber(std::shared_ptr<Value> val,
 std::shared_ptr<Value> GetValueForGEPInstr(
     std::shared_ptr<GetElementPtrInstruction> instr,
     std::shared_ptr<IRBuilder> builder) {
-  for (auto [old_instr, new_val] : g_vns) {
+  int size = g_vns.size();
+  for (int idx = 0; idx < size; ++idx) {
+    auto [old_instr, new_val] = g_vns[idx];
     if (auto old_gep_instr
         = std::dynamic_pointer_cast<GetElementPtrInstruction>(old_instr)) {
       if (old_gep_instr != instr
@@ -79,9 +81,9 @@ std::shared_ptr<Value> GetValueForCallInstr(
     std::shared_ptr<CallInstruction> instr,
     std::shared_ptr<IRBuilder> builder) {
   if (instr->HasSideEffect()) return instr;  // cannot be replaced
-  // TODO(garen): load from address?
-
-  for (auto [old_instr, new_val] : g_vns) {
+  int size = g_vns.size();
+  for (int idx = 0; idx < size; ++idx) {
+    auto [old_instr, new_val] = g_vns[idx];
     if (auto old_call_instr
         = std::dynamic_pointer_cast<CallInstruction>(old_instr)) {
       if (old_call_instr != instr
@@ -315,6 +317,7 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
       == GetValueNumber(instr->m_rhs_val_use->getValue(), builder)) {
     switch (instr->m_op) {
       case IROp::SUB:
+      case IROp::SREM:
         return builder->GetIntConstant(0);
       case IROp::SDIV:
         return builder->GetIntConstant(1);
@@ -344,7 +347,9 @@ std::shared_ptr<Value> GetValueForBinaryInstr(
   if (instr->IsICmp() || instr->IsFCmp()) return instr;
 
   // find previous computed values from cloud
-  for (auto [old_instr, new_val] : g_vns) {
+  int size = g_vns.size();
+  for (int idx = 0; idx < size; ++idx) {
+    auto [old_instr, new_val] = g_vns[idx];
     if (auto old_binary_instr
         = std::dynamic_pointer_cast<BinaryInstruction>(old_instr)) {
       if (old_binary_instr != instr && old_binary_instr->m_op == instr->m_op) {
@@ -450,7 +455,7 @@ bool CanGVN(std::shared_ptr<Instruction> instr) {
     case IROp::SITOFP:
     case IROp::FPTOSI:
     case IROp::GET_ELEMENT_PTR:
-    case IROp::XOR:  // TODO
+    case IROp::XOR:
     case IROp::CALL:
       return true;
     case IROp::BRANCH:
@@ -503,7 +508,7 @@ void IRPassManager::GVNPass() {
   SideEffectPass();
   for (auto &func : m_builder->m_module->m_function_list) {
     if (func->m_bb_list.empty()) continue;
-    DeadCodeElimination(func);
+    // DeadCodeElimination(func);
     ComputeDominanceRelationship(func);
     g_vns.clear();
     g_idx.clear();
