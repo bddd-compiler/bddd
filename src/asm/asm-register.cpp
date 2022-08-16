@@ -81,7 +81,7 @@ void RegisterAllocator::initialColors() {
   if (m_reg_type == RegType::R) {
     rreg_avaliable = {RReg::R0,  RReg::R1,  RReg::R2,  RReg::R3, RReg::R4,
                       RReg::R5,  RReg::R6,  RReg::R7,  RReg::R8, RReg::R9,
-                      RReg::R10, RReg::R11, RReg::R12, RReg::LR};
+                      RReg::R10, RReg::R11, RReg::LR};
     K = rreg_avaliable.size();
   } else {
     for (int i = 0; i < 32; i++) {
