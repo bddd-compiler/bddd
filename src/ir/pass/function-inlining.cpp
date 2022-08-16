@@ -17,8 +17,12 @@ bool FunctionInlining(std::shared_ptr<Function> inline_func) {
       }
     }
   }
+  if (inline_func->ReturnType() == VarType::FLOAT) return false;
+  for (auto &arg : inline_func->m_args) {
+    if (arg->m_type.m_base_type == BasicType::FLOAT) return false;
+  }
   auto func_name = inline_func->FuncName();
-  std::cerr << "[debug] # of instrs: " << cnt << std::endl;
+  // std::cerr << "[debug] # of instrs: " << cnt << std::endl;
   if (cnt >= 50)
     return false;  // inlined inline_func cannot have too many instructions
 
@@ -260,7 +264,7 @@ bool FunctionInlining(std::shared_ptr<Function> inline_func) {
 
     // at last, remember to remove the call instruction itself from m_instr_list
     assert(call->m_use_list.empty());
-    original_bb->m_instr_list.erase(call_it);
+    original_bb->RemoveInstruction(call_it);
   }
   return true;
 }
