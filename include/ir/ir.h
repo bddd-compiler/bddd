@@ -716,6 +716,17 @@ public:
     }
     m_indices.clear();
   }
+
+  friend bool operator==(const std::shared_ptr<GetElementPtrInstruction> gep1,
+                         const std::shared_ptr<GetElementPtrInstruction> gep2) {
+    if (gep1->m_addr->getValue() != gep2->m_addr->getValue()) return false;
+    if (gep1->m_indices.size() != gep2->m_indices.size()) return false;
+    for (int i = 0; i < gep2->m_indices.size(); ++i) {
+      if (gep1->m_indices[i]->getValue() != gep2->m_indices[i]->getValue())
+        return false;
+    }
+    return true;
+  }
 };
 
 // must set m_addr after constructor is called

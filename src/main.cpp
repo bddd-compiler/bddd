@@ -96,6 +96,8 @@ int main(int argc, char *argv[]) {
   pass_manager->EliminateGlobalConstArrayAccess();
   pass_manager->TailRecursionPass();
   pass_manager->FunctionInliningPass();
+  pass_manager->LoadStoreOptimizationPass();
+  // pass_manager->InstrCombiningPass();
   pass_manager->LoopUnrollingPass();
   pass_manager->GVNPass();
   pass_manager->GCMPass();

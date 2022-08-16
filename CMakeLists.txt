@@ -55,7 +55,7 @@ set(IR_PASSES
   src/ir/pass/strength-reduction.cpp
   src/ir/pass/loop-unrolling.cpp
   src/ir/pass/loop-analysis.cpp
-  src/ir/pass/global-const.cpp src/ir/pass/load.cpp)
+  src/ir/pass/global-const.cpp src/ir/pass/load.cpp src/ir/pass/instr-combine.cpp)
 
 set(ASM_SOURCE
   src/asm/asm.cpp
