@@ -81,7 +81,7 @@ void RegisterAllocator::initialColors() {
   if (m_reg_type == RegType::R) {
     rreg_avaliable = {RReg::R0,  RReg::R1,  RReg::R2,  RReg::R3, RReg::R4,
                       RReg::R5,  RReg::R6,  RReg::R7,  RReg::R8, RReg::R9,
-                      RReg::R10, RReg::R11, RReg::LR};
+                      RReg::R10, RReg::R11, RReg::R12, RReg::LR};
     K = rreg_avaliable.size();
   } else {
     for (int i = 0; i < 32; i++) {
@@ -598,6 +598,7 @@ void RegisterAllocator::RewriteProgram() {
     for (auto& b : m_cur_func->m_blocks) {
       for (auto iter = b->m_insts.begin(); iter != b->m_insts.end(); iter++) {
         auto& i = *iter;
+        auto next = std::next(iter);
         if (i->m_is_deleted) {
           continue;
         }
@@ -666,6 +667,13 @@ void RegisterAllocator::RewriteProgram() {
           b->insertSpillSTR(iter, str, add, mov);
           newTemps.insert(newOp);
           updateDepth(b, newOp);
+          if (next != b->m_insts.end()) {
+            auto& next_inst = *next;
+            if (next_inst->m_use.find(v) != next_inst->m_use.end()
+                || next_inst->m_f_use.find(v) != next_inst->m_f_use.end()) {
+              next_inst->replaceUse(newOp, v);
+            }
+          }
         }
 
         // replace use
@@ -689,7 +697,10 @@ void RegisterAllocator::RewriteProgram() {
             offs = std::make_shared<Operand>(fixed_offs);
             ldr = std::make_shared<LDRInst>(newOp, Operand::getRReg(RReg::SP),
                                             offs);
-            if (is_stack_param) m_cur_func->m_params_set_list.push_back(ldr);
+            if (is_stack_param) {
+              ldr->addDef(Operand::getRReg(RReg::R12));
+              m_cur_func->m_params_set_list.push_back(ldr);
+            }
           } else {
             if (!newOp->m_is_float) {
               offs = std::make_shared<Operand>(OperandType::VREG);

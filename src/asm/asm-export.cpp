@@ -89,10 +89,10 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
     if (Operand::immCheck(size)) {
       ofs << "\tSUB SP, SP, #" << std::to_string(size) << std::endl;
     } else {
-      ofs << "\tMOVW r12, #" << (size & 0xffff) << std::endl;
+      ofs << "\tMOVW R12, #" << (size & 0xffff) << std::endl;
       if (size & 0xffff0000)
-        ofs << "\tMOVT r12, #" << ((unsigned int)size >> 16) << std::endl;
-      ofs << "\tSUB sp, sp, r12" << std::endl;
+        ofs << "\tMOVT R12, #" << ((unsigned int)size >> 16) << std::endl;
+      ofs << "\tSUB SP, SP, R12" << std::endl;
     }
   }
 
@@ -105,10 +105,10 @@ void ASM_Function::exportASM(std::ofstream& ofs) {
     if (Operand::immCheck(size)) {
       ofs << "\tADD SP, SP, #" << std::to_string(size) << std::endl;
     } else {
-      ofs << "\tMOVW r12, #" << (size & 0xffff) << std::endl;
+      ofs << "\tMOVW R12, #" << (size & 0xffff) << std::endl;
       if (size & 0xffff0000)
-        ofs << "\tMOVT r12, #" << ((unsigned int)size >> 16) << std::endl;
-      ofs << "\tADD sp, sp, r12" << std::endl;
+        ofs << "\tMOVT R12, #" << ((unsigned int)size >> 16) << std::endl;
+      ofs << "\tADD SP, SP, R12" << std::endl;
     }
   }
 
