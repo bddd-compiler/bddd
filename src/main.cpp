@@ -1,6 +1,5 @@
 #include <getopt.h>
 
-#include <ctime>
 #include <iostream>
 #include <memory>
 
@@ -97,7 +96,7 @@ int main(int argc, char *argv[]) {
   pass_manager->EliminateGlobalConstArrayAccess();
   pass_manager->TailRecursionPass();
   pass_manager->FunctionInliningPass();
-  // pass_manager->LoopUnrollingPass();
+  pass_manager->LoopUnrollingPass();
   pass_manager->GVNPass();
   pass_manager->GCMPass();
 
@@ -106,32 +105,34 @@ int main(int argc, char *argv[]) {
     builder->m_module->ExportIR(ofs, 0);
     ofs.close();
   }
-  // std::cout << "generating asm..." << std::endl;
-  //
-  // // generate assembly
-  // auto asm_module = std::make_shared<ASM_Module>();
-  // auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
-  // GenerateModule(std::move(builder->m_module), asm_builder);
-  //
-  // if (tmp_asm_path) {
-  //   std::ofstream ofs(tmp_asm_path);
-  //   asm_module->exportASM(ofs);
-  //   ofs.close();
-  // }
-  //
-  // std::cout << "allocating..." << std::endl;
-  //
-  // // register allocator
-  // RegisterAllocator(asm_module, RegType::S).Allocate();
-  // RegisterAllocator(asm_module, RegType::R).Allocate();
-  //
-  // // fixing and optimization
-  // fixedParamsOffs(asm_module);
-  // optimize(asm_module);
-  // generateLiteralPool(asm_module);
-  // std::ofstream ofs(asm_path);
-  // asm_module->exportASM(ofs);
-  // ofs.close();
+
+  if (tmp_asm_path == nullptr && asm_path == nullptr) return 0;
+  std::cout << "generating asm..." << std::endl;
+
+  // generate assembly
+  auto asm_module = std::make_shared<ASM_Module>();
+  auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
+  GenerateModule(std::move(builder->m_module), asm_builder);
+
+  if (tmp_asm_path) {
+    std::ofstream ofs(tmp_asm_path);
+    asm_module->exportASM(ofs);
+    ofs.close();
+  }
+
+  std::cout << "allocating..." << std::endl;
+
+  // register allocator
+  RegisterAllocator(asm_module, RegType::S).Allocate();
+  RegisterAllocator(asm_module, RegType::R).Allocate();
+
+  // fixing and optimization
+  fixedParamsOffs(asm_module);
+  optimize(asm_module);
+  generateLiteralPool(asm_module);
+  std::ofstream ofs(asm_path);
+  asm_module->exportASM(ofs);
+  ofs.close();
 
   return 0;
 }
