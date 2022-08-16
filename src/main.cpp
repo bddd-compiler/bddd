@@ -1,6 +1,5 @@
 #include <getopt.h>
 
-#include <ctime>
 #include <iostream>
 #include <memory>
 
@@ -97,7 +96,9 @@ int main(int argc, char *argv[]) {
   pass_manager->EliminateGlobalConstArrayAccess();
   pass_manager->TailRecursionPass();
   pass_manager->FunctionInliningPass();
-  // pass_manager->LoopUnrollingPass();
+  // pass_manager->LoadStoreOptimizationPass();
+  // pass_manager->InstrCombiningPass();
+  pass_manager->LoopUnrollingPass();
   pass_manager->GVNPass();
   pass_manager->GCMPass();
 
@@ -107,6 +108,7 @@ int main(int argc, char *argv[]) {
     ofs.close();
   }
 
+  if (tmp_asm_path == nullptr && asm_path == nullptr) return 0;
   std::cout << "generating asm..." << std::endl;
 
   // generate assembly
@@ -119,6 +121,7 @@ int main(int argc, char *argv[]) {
     asm_module->exportASM(ofs);
     ofs.close();
   }
+
   // optimize for temp asm
   optimizeTemp(asm_module);
 

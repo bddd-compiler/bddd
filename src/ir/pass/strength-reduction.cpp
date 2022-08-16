@@ -20,7 +20,7 @@ void StrengthReduction(std::shared_ptr<Loop> loop,
 
   for (auto &instr : loop->m_header->m_instr_list) {
     if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
-      for (auto &end : loop->m_ends) {
+      for (auto &end : loop->m_latches) {
         auto updated_val = phi->GetValue(end);
         if (auto binary
             = std::dynamic_pointer_cast<BinaryInstruction>(updated_val)) {
@@ -146,7 +146,7 @@ void StrengthReduction(std::shared_ptr<Loop> loop,
     assert(strides.find(i) != strides.end());
     strides[j] = strides[i] * a + b;
     std::cerr << "stride of " << j << " is " << strides[j] << std::endl;
-    for (auto &end : loop->m_ends) {
+    for (auto &end : loop->m_latches) {
       auto add_instr = std::make_shared<BinaryInstruction>(IROp::ADD, end);
       add_instr->m_lhs_val_use = phi->AddUse(add_instr);
       add_instr->m_rhs_val_use

@@ -39,6 +39,10 @@ public:
   void LoopUnrollingPass();
 
   void EliminateGlobalConstArrayAccess();
+
+  void LoadStoreOptimizationPass();
+
+  void InstrCombiningPass();
 };
 
 #endif  // BDDD_IR_PASS_MANAGER_H
