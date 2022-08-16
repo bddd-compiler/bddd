@@ -15,7 +15,7 @@ public:
   std::set<std::shared_ptr<Loop>> m_sub_loops;
   std::shared_ptr<Loop> m_fa_loop;
   std::vector<std::shared_ptr<BasicBlock>>
-      m_ends;  // it seems a non-natural loop have many ends
+      m_latches;  // it seems a non-natural loop have many ends
   int m_loop_depth;
 
   explicit Loop() : m_loop_depth(-1) {}
@@ -57,7 +57,8 @@ public:
 
   std::map<std::shared_ptr<Value>, std::shared_ptr<LoopVar>> m_loop_vars_by_phi;
   std::map<std::shared_ptr<Value>, std::vector<std::shared_ptr<LoopVar>>>
-      m_loop_vars_by_val;
+      m_loop_vars_by_val;  // a value in body bb may be used by some loop vars
+                           // in the header bb, so record them
   int m_stride;
   int m_cnt;
 

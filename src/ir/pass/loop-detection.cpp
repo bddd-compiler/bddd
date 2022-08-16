@@ -36,7 +36,7 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
         loop->m_preheader = pred;
         ++temp;
       } else {
-        loop->m_ends.push_back(pred);
+        loop->m_latches.push_back(pred);
         --temp;
       }
     }
@@ -141,7 +141,7 @@ void ComputeLoopRelationship(std::shared_ptr<Function> func) {
   //   std::cerr << "preheader: " << loop->m_preheader->m_id << std::endl;
   //   std::cerr << "header: " << loop->m_header->m_id << std::endl;
   //   std::cerr << "end: ";
-  //   for (auto &end : loop->m_ends) {
+  //   for (auto &end : loop->m_latches) {
   //     std::cerr << end->m_id << " ";
   //   }
   //   std::cerr << std::endl;

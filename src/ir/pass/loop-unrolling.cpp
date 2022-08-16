@@ -121,6 +121,8 @@ void CopyInstructions(
       // return, jump, branch, phi cannot appear here
       assert(false);
     }
+
+    // if instr is used as result of loop vars
     if (original_easy_loop->m_loop_vars_by_val.count(instr)) {
       if (easy_loop == original_easy_loop) {
         for (auto &loop_var : easy_loop->m_loop_vars_by_val[instr]) {
@@ -153,8 +155,10 @@ void InsertResetLoop(
 
   reset_easy_loop->m_loop = reset_loop;
 
-  reset_easy_loop->m_cond_bb = std::make_shared<BasicBlock>("unroll_reset_1");
-  reset_easy_loop->m_body_bb = std::make_shared<BasicBlock>("unroll_reset_2");
+  reset_easy_loop->m_cond_bb
+      = std::make_shared<BasicBlock>("unroll_reset_cond");
+  reset_easy_loop->m_body_bb
+      = std::make_shared<BasicBlock>("unroll_reset_body");
 
   for (auto &phi : easy_loop->m_phis) {
     auto new_phi = std::make_shared<PhiInstruction>(phi->m_type,
@@ -411,6 +415,23 @@ bool unroll(std::shared_ptr<Function> func, std::shared_ptr<Loop> loop,
             std::shared_ptr<IRBuilder> builder) {
   // only consider the header and the unique body
   if (loop->m_bbs.size() != 2) return false;
+  std::shared_ptr<BasicBlock> loop_body;
+  int cnt = 0;
+  for (auto &bb : loop->m_bbs) {
+    if (bb == loop->m_header) {
+      ++cnt;
+    } else {
+      loop_body = bb;
+      --cnt;
+    }
+  }
+  assert(cnt == 0);
+  for (auto &instr : loop_body->m_instr_list) {
+    if (instr->m_op == IROp::RETURN || instr->m_op == IROp::PHI) return false;
+  }
+  for (auto &instr : loop->m_header->m_instr_list) {
+    if (instr->m_type.IsBasicFloat()) return false;
+  }
 
   auto easy_loop = std::make_shared<EasyLoop>(loop);
   if (easy_loop->m_cmp_instr == nullptr) return false;
@@ -488,38 +509,13 @@ bool unroll(std::shared_ptr<Function> func, std::shared_ptr<Loop> loop,
   }
 }
 
-bool CanBeUnrolled(std::shared_ptr<Loop> loop) {
-  // bbs.size() == 2
-  if (loop->m_bbs.size() != 2) return false;
-  std::shared_ptr<BasicBlock> loop_body;
-  int cnt = 0;
-  for (auto &bb : loop->m_bbs) {
-    if (bb == loop->m_header) {
-      ++cnt;
-    } else {
-      loop_body = bb;
-      --cnt;
-    }
-  }
-  assert(cnt == 0);
-  for (auto &instr : loop_body->m_instr_list) {
-    if (instr->m_op == IROp::RETURN || instr->m_op == IROp::PHI) return false;
-  }
-  for (auto &instr : loop->m_header->m_instr_list) {
-    if (instr->m_type.IsBasicFloat()) return false;
-  }
-  return true;
-}
-
 void IRPassManager::LoopUnrollingPass() {
   RemoveUnusedFunctions(m_builder->m_module);
   for (auto &func : m_builder->m_module->m_function_list) {
     ComputeLoopRelationship(func);
     auto deepest_loops = func->m_deepest_loops;
     for (auto &loop : deepest_loops) {
-      if (CanBeUnrolled(loop)) {
-        unroll(func, loop, m_builder);
-      }
+      unroll(func, loop, m_builder);
     }
     DeadCodeElimination(func);
   }
