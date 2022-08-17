@@ -289,7 +289,7 @@ void InsertResetLoop(
 }
 
 void MakeRunOnce(std::shared_ptr<EasyLoop> easy_loop) {
-  // the easy loop will be not a loop
+  // the easy loop will be no longer a loop
   // choice 1: update loop info manually
   // choice 2: delete all of its info
   for (auto &phi : easy_loop->m_phis) {

@@ -4,18 +4,18 @@
 
 #include "ir/ir-pass-manager.h"
 
-void CombineInstruction(std::shared_ptr<BinaryInstruction> binary_instr,
+bool CombineBinaryInstr(std::shared_ptr<BinaryInstruction> binary_instr,
                         std::shared_ptr<BinaryInstruction> user_instr,
                         std::shared_ptr<IRBuilder> builder) {
   // example:
   // x1 = add x0, 1 (binary_instr)
   // x2 = add x1, 2 (user_instr)
   // user_use: the use of x1
-  // binary_val : the value of x0
+  // binary_val : the value of x0 (can be constant too)
   // user_const : the value of 2
   // binary_const : the value of 1
   // target:
-  // x2 = add x0, 3
+  // x2 = add x0, 3 (user_instr)
 
   // not really remove binary_instr or user_instr
   // but the uses of them will change
@@ -26,54 +26,36 @@ void CombineInstruction(std::shared_ptr<BinaryInstruction> binary_instr,
   auto user_rhs = user_instr->m_rhs_val_use->getValue();
   auto Check = [&](std::shared_ptr<BinaryInstruction> binary_instr,
                    std::shared_ptr<BinaryInstruction> user_instr) {
-    return ((std::dynamic_pointer_cast<Constant>(binary_lhs)
-             && !std::dynamic_pointer_cast<Constant>(binary_rhs))
-            || (!std::dynamic_pointer_cast<Constant>(binary_lhs)
-                && std::dynamic_pointer_cast<Constant>(binary_rhs)))
+    return (std::dynamic_pointer_cast<Constant>(binary_lhs)
+            || std::dynamic_pointer_cast<Constant>(binary_rhs))
            && ((std::dynamic_pointer_cast<Constant>(user_lhs)
                 && !std::dynamic_pointer_cast<Constant>(user_rhs))
                || (!std::dynamic_pointer_cast<Constant>(user_lhs)
                    && std::dynamic_pointer_cast<Constant>(user_rhs)));
   };
-  if (!Check(binary_instr, user_instr)) return;
-  std::cerr << "[debug] combining instruction..." << std::endl;
+  if (!Check(binary_instr, user_instr)) return false;
+  // std::cerr << "[debug] combining instruction..." << std::endl;
 
+  if (user_lhs != binary_instr) return false;
   auto &user_use = user_instr->m_lhs_val_use;
-  if (user_lhs == binary_instr) {
-    // user_use = user_instr->m_lhs_val_use;
-  } else if (user_rhs == binary_instr) {
-    user_use = user_instr->m_rhs_val_use;
-  } else {
-    return;
-  }
-
-  std::shared_ptr<Value> binary_val = nullptr;
-  if (!std::dynamic_pointer_cast<Constant>(binary_lhs)) {
-    binary_val = binary_lhs;
-  } else {
-    assert(!std::dynamic_pointer_cast<Constant>(binary_rhs));
-    binary_val = binary_rhs;
-  }
-
-  auto &binary_const_use = binary_instr->m_lhs_val_use;
-  auto binary_const
-      = std::dynamic_pointer_cast<Constant>(binary_const_use->getValue());
-  if (binary_const == nullptr) {
-    binary_const_use = binary_instr->m_rhs_val_use;
-    binary_const
-        = std::dynamic_pointer_cast<Constant>(binary_const_use->getValue());
-  }
-  if (binary_const == nullptr) return;
-
-  auto &user_const_use = user_instr->m_lhs_val_use;
+  auto &user_const_use = user_instr->m_rhs_val_use;
   auto user_const
       = std::dynamic_pointer_cast<Constant>(user_const_use->getValue());
-  if (user_const == nullptr) {
-    user_const_use = user_instr->m_rhs_val_use;
-    user_const
-        = std::dynamic_pointer_cast<Constant>(user_const_use->getValue());
-  }
-  if (user_const == nullptr) return;
+  assert(user_const != nullptr);
+  assert(user_const_use && user_use && user_const_use != user_use);
+
+  // std::shared_ptr<Value> binary_val;
+  // if (!std::dynamic_pointer_cast<Constant>(binary_lhs)) {
+  //   binary_val = binary_lhs;
+  // } else {
+  //   // assert(!std::dynamic_pointer_cast<Constant>(binary_rhs));
+  //   binary_val = binary_rhs;
+  // }
+
+  auto binary_const = std::dynamic_pointer_cast<Constant>(binary_rhs);
+  auto binary_val = binary_lhs;
+  if (binary_const == nullptr) return false;
+  // assert(binary_const != binary_val);
 
   auto first_val = binary_const->Evaluate();
   auto second_val = user_const->Evaluate();
@@ -88,14 +70,15 @@ void CombineInstruction(std::shared_ptr<BinaryInstruction> binary_instr,
     // x - (1 + 2)
     int temp = first_val.IntVal() + second_val.IntVal();
     if (first_val.IntVal() > 0 && second_val.IntVal() > 0 && temp < 0) {
-      return;
+      return false;
     } else if (first_val.IntVal() < 0 && second_val.IntVal() < 0 && temp > 0) {
-      return;
+      return false;
     }
     user_use->getValue()->KillUse(user_use);
-    user_const_use->getValue()->KillUse(user_const_use);
+    user_const->KillUse(user_const_use);
     user_use = binary_val->AddUse(user_instr);
     user_const_use = builder->GetIntConstant(temp)->AddUse(user_instr);
+    return true;
   } else if ((first_op == IROp::MUL && second_op == IROp::MUL)
              || (first_op == IROp::SDIV && second_op == IROp::SDIV)) {
     // x * 2 * 3
@@ -105,18 +88,19 @@ void CombineInstruction(std::shared_ptr<BinaryInstruction> binary_instr,
     // x / (2 * 3)
     int temp = first_val.IntVal() * second_val.IntVal();
     if (first_val.IntVal() > 0 && second_val.IntVal() > 0 && temp < 0) {
-      return;
+      return false;
     } else if (first_val.IntVal() < 0 && second_val.IntVal() < 0 && temp < 0) {
-      return;
+      return false;
     } else if (first_val.IntVal() > 0 && second_val.IntVal() < 0 && temp > 0) {
-      return;
+      return false;
     } else if (first_val.IntVal() < 0 && second_val.IntVal() > 0 && temp > 0) {
-      return;
+      return false;
     }
     user_use->getValue()->KillUse(user_use);
     user_const->KillUse(user_const_use);
     user_use = binary_val->AddUse(user_instr);
     user_const_use = builder->GetIntConstant(temp)->AddUse(user_instr);
+    return true;
   } else if ((first_op == IROp::ADD && second_op == IROp::SUB)
              || (first_op == IROp::SUB && second_op == IROp::ADD)) {
     // x + a - b
@@ -126,9 +110,9 @@ void CombineInstruction(std::shared_ptr<BinaryInstruction> binary_instr,
     // x + (b - a)
     int temp = second_val.IntVal() - first_val.IntVal();
     if (second_val.IntVal() > 0 && first_val.IntVal() < 0 && temp < 0) {
-      return;
+      return false;
     } else if (second_val.IntVal() < 0 && first_val.IntVal() > 0 && temp > 0) {
-      return;
+      return false;
     }
     user_use->getValue()->KillUse(user_use);
     user_const->KillUse(user_const_use);
@@ -142,8 +126,9 @@ void CombineInstruction(std::shared_ptr<BinaryInstruction> binary_instr,
         assert(user_instr->m_op == IROp::SUB);
         user_instr->m_op = IROp::ADD;
       }
-      user_use = builder->GetIntConstant(-temp)->AddUse(user_instr);
+      user_const_use = builder->GetIntConstant(-temp)->AddUse(user_instr);
     }
+    return true;
   } else if ((first_op == IROp::MUL && second_op == IROp::SDIV)
              || (first_op == IROp::SDIV && second_op == IROp::MUL)) {
     // x * a / b
@@ -151,20 +136,22 @@ void CombineInstruction(std::shared_ptr<BinaryInstruction> binary_instr,
 
     // x / a * b
     // x * (b / a)
-    if (first_val.IntVal() == 0) return;
-    if (second_val.IntVal() % first_val.IntVal() != 0) return;
+    if (first_val.IntVal() == 0) return false;
+    if (second_val.IntVal() % first_val.IntVal() != 0) return false;
     int temp = second_val.IntVal() / first_val.IntVal();
     user_use->getValue()->KillUse(user_use);
     user_const->KillUse(user_const_use);
     user_use = binary_val->AddUse(user_instr);
     user_const_use = builder->GetIntConstant(temp)->AddUse(user_instr);
+    return true;
   } else {
-    return;  // not considered yet
+    return false;  // not considered yet
   }
 }
 
 void IRPassManager::InstrCombiningPass() {
   for (auto &func : m_builder->m_module->m_function_list) {
+    int cnt = 0;
     for (auto &bb : func->m_bb_list) {
       assert(!bb->m_instr_list.empty());
       for (auto &instr : bb->m_instr_list) {
@@ -175,12 +162,15 @@ void IRPassManager::InstrCombiningPass() {
           for (auto use : uses) {
             if (auto user_instr = std::dynamic_pointer_cast<BinaryInstruction>(
                     use->getUser())) {
-              CombineInstruction(binary_instr, user_instr, m_builder);
+              bool temp
+                  = CombineBinaryInstr(binary_instr, user_instr, m_builder);
+              if (temp) cnt++;
             }
           }
         }
       }
     }
+    std::cerr << "[debug] instr combine x" << cnt << std::endl;
     DeadCodeElimination(func);
   }
 }

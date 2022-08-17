@@ -152,20 +152,6 @@ void ScheduleLate(std::shared_ptr<Instruction> instr,
   if (instr->m_visited) return;
   instr->m_visited = true;
 
-  // if (auto binary_instr =
-  // std::dynamic_pointer_cast<BinaryInstruction>(instr)) {
-  //   std::vector<Use *> uses;
-  //   for (auto &use : instr->m_use_list) {
-  //     uses.push_back(use.get());
-  //   }
-  //   for (auto &use : uses) {
-  //     if (auto user_instr
-  //         = std::dynamic_pointer_cast<BinaryInstruction>(use->getUser())) {
-  //       CombineInstruction(binary_instr, user_instr, builder);
-  //     }
-  //   }
-  // }
-
   std::shared_ptr<BasicBlock> lca = nullptr;
   for (auto &y_use : instr->m_use_list) {
     if (auto y = std::dynamic_pointer_cast<Instruction>(y_use->getUser())) {

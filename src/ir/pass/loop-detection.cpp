@@ -127,6 +127,10 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
 }
 
 void ComputeLoopRelationship(std::shared_ptr<Function> func) {
+  //  For basic blocks that are not reachable from the function’s entry, the
+  //  concept of loops is undefined.
+  RemoveUnusedBasicBlocks(func);
+
   func->m_deepest_loops.clear();
   for (auto &bb : func->m_bb_list) {
     bb->m_loops.clear();
