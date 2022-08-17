@@ -100,11 +100,11 @@ int main(int argc, char *argv[]) {
   pass_manager->TailRecursionPass();
   pass_manager->FunctionInliningPass();
   pass_manager->LoadStoreOptimizationPass();
-  pass_manager->InstrCombiningPass();
   pass_manager->LoopUnrollingPass();
   pass_manager->GVNPass();
   pass_manager->GCMPass();
-
+  if (optimization) pass_manager->InstrCombiningPass();
+  
   if (ir_path) {
     std::ofstream ofs(ir_path);
     builder->m_module->ExportIR(ofs, 0);
