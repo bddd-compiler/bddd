@@ -126,9 +126,49 @@ void removeUnreachableBlock(std::shared_ptr<ASM_Module> module) {
   }
 }
 
+void eliminateDeadInstruction(std::shared_ptr<ASM_Module> module) {
+  for (auto& func : module->m_funcs) {
+    func->LivenessAnalysis(RegType::R);
+    for (auto& block : func->m_blocks) {
+      auto live = block->m_liveout;
+      for (auto iter = block->m_insts.rbegin(); iter != block->m_insts.rend();
+           iter++) {
+        auto inst = *iter;
+        if (inst->m_is_deleted) continue;
+        if (inst->m_op == InstOp::BL) {
+          for (auto& use : inst->m_use) {
+            live.insert(use);
+          }
+          continue;
+        }
+        bool is_used = inst->m_def.empty();
+        for (auto& def : inst->m_def) {
+          if (live.find(def) != live.end()
+              || def->m_op_type != OperandType::VREG) {
+            is_used = true;
+          }
+          live.erase(def);
+        }
+        if (!is_used) {
+          inst->m_is_deleted = true;
+          std::cerr << "[debug] remove dead instruction, defs: ";
+          for (auto& def : inst->m_def) std::cerr << def->getName() << " ";
+          std::cerr << std::endl;
+          continue;
+        }
+        for (auto& use : inst->m_use) {
+          live.insert(use);
+        }
+      }
+    }
+  }
+}
+
 void optimizeTemp(std::shared_ptr<ASM_Module> module) {
   eliminateRedundantJump(module);
   removeUnreachableBlock(module);
+
+  eliminateDeadInstruction(module);
 }
 
 void optimize(std::shared_ptr<ASM_Module> module) {

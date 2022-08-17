@@ -11,6 +11,8 @@ bool switchTargetBlock(std::shared_ptr<ASM_BasicBlock> block, std::shared_ptr<BI
 
 void removeUnreachableBlock(std::shared_ptr<ASM_Module> module);
 
+void eliminateDeadInstruction(std::shared_ptr<ASM_Module> module);
+
 void optimizeTemp(std::shared_ptr<ASM_Module> module);
 
 void optimize(std::shared_ptr<ASM_Module> module);

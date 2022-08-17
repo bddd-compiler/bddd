@@ -134,7 +134,7 @@ void RegisterAllocator::AllocateCurFunc() {
 #ifdef REG_ALLOC_DEBUG
   debug("AllocateCurFunc");
 #endif
-  LivenessAnalysis();
+  m_cur_func->LivenessAnalysis(m_reg_type);
   Build();
   MkWorklist();
   isSelectSpill = false;

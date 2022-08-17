@@ -7,7 +7,7 @@ std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
   assert(value->m_type.IsConst());
   std::shared_ptr<Operand> ret;
   if (value->m_type.IsBasicFloat()) {
-        ret = std::make_shared<Operand>(OperandType::VREG, true);
+    ret = std::make_shared<Operand>(OperandType::VREG, true);
     appendMOV(ret, value->m_float_val, phi_block);
   } else {
     int imm = value->m_int_val;
@@ -202,7 +202,7 @@ std::shared_ptr<Operand> GenerateCMP(std::shared_ptr<BinaryInstruction> inst,
   auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
   std::shared_ptr<Operand> operand2;
 
-    // vcmp allow op2 to be constant 0.0
+  // vcmp allow op2 to be constant 0.0
   if (!is_int) {
     auto float_val
         = std::dynamic_pointer_cast<Constant>(inst->m_rhs_val_use->getValue());
@@ -462,9 +462,13 @@ std::shared_ptr<Operand> GenerateGetElementPtr(
       if (first) {
         first = false;
         var_offs_op = std::make_shared<Operand>(OperandType::VREG);
-        auto mov = builder->appendMOV(
-            std::make_shared<Operand>(OperandType::VREG), attribute);
-        builder->appendMUL(InstOp::MUL, var_offs_op, var_offs, mov->m_dest);
+        if (attribute == 1) {
+          builder->appendMOV(var_offs_op, var_offs);
+        } else {
+          auto mov = builder->appendMOV(
+              std::make_shared<Operand>(OperandType::VREG), attribute);
+          builder->appendMUL(InstOp::MUL, var_offs_op, var_offs, mov->m_dest);
+        }
       } else {
         auto mov = builder->appendMOV(
             std::make_shared<Operand>(OperandType::VREG), attribute);

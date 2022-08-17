@@ -1,15 +1,14 @@
-#include "asm/asm-register.h"
 #include "asm/asm.h"
 
-void RegisterAllocator::LivenessAnalysis() {
+void ASM_Function::LivenessAnalysis(RegType reg_type) {
   // calculate def and use set of all blocks
-  for (auto& b : m_cur_func->m_blocks) {
+  for (auto& b : m_blocks) {
     b->m_def.clear();
     b->m_use.clear();
     for (auto& i : b->m_insts) {
       if (i->m_is_deleted) continue;
-      std::unordered_set<OpPtr> defs, uses;
-      if (m_reg_type == RegType::R) {
+      std::unordered_set<std::shared_ptr<Operand>> defs, uses;
+      if (reg_type == RegType::R) {
         defs = i->m_def;
         uses = i->m_use;
       } else {
@@ -36,8 +35,7 @@ void RegisterAllocator::LivenessAnalysis() {
   bool end;
   do {
     end = true;
-    for (auto iter = m_cur_func->m_blocks.rbegin();
-         iter != m_cur_func->m_blocks.rend(); iter++) {
+    for (auto iter = m_blocks.rbegin(); iter != m_blocks.rend(); iter++) {
       auto b = *iter;
 
       // record in'[b] and out'[b]
@@ -66,7 +64,7 @@ void RegisterAllocator::LivenessAnalysis() {
       if (b->m_livein != temp_in || b->m_liveout != temp_out) end = false;
     }
   } while (!end);
-
+  
   // print
   // for (auto& b : m_cur_func->m_blocks) {
   //   std::cout << b->m_label << ":" << std::endl;

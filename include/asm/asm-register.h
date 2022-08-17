@@ -116,8 +116,6 @@ private:
 
   bool ConservativeAdj(OpPtr u, OpPtr v);
 
-  void LivenessAnalysis();
-
   void init();
 
   void initialColors();

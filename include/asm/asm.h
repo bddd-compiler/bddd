@@ -251,6 +251,8 @@ public:
         m_f_push(std::make_unique<PInst>(InstOp::VPUSH)),
         m_f_pop(std::make_unique<PInst>(InstOp::VPOP)) {}
 
+  void LivenessAnalysis(RegType reg_type);
+
   int getPushSize();
 
   int getStackSize();
