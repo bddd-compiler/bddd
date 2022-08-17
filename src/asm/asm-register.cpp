@@ -180,6 +180,7 @@ void RegisterAllocator::Build() {
 #ifdef REG_ALLOC_DEBUG
   debug("Build");
 #endif
+  OpPtr temp;
   for (auto& b : m_cur_func->m_blocks) {
     std::unordered_set<OpPtr> live = b->m_liveout;
     std::unordered_map<OpPtr, int> lifespan_map;
@@ -228,6 +229,9 @@ void RegisterAllocator::Build() {
       }
       // live := use(I) ∪ (live\def(I))
       for (auto& def : defs) {
+        if (def->getName() == "VR264") {
+          temp = def;
+        }
         live.erase(def);
         if (lifespan_map.find(def) != lifespan_map.end()) {
           def->lifespan = cnt - lifespan_map[def];
@@ -261,9 +265,11 @@ std::unordered_set<OpPtr> RegisterAllocator::Adjacent(OpPtr n) {
   }
   auto ret = adjList[n];
   for (auto& op : selectStack) {
+    if (op->m_op_type == OperandType::REG) continue;
     ret.erase(op);
   }
   for (auto& op : coalescedNodes) {
+    if (op->m_op_type == OperandType::REG) continue;
     ret.erase(op);
   }
   return ret;
@@ -574,7 +580,6 @@ void RegisterAllocator::RewriteProgram() {
   // In the program (instructions), insert a store after each
   // definition of a vi, a fetch before each use of a vi.
   // Put all the vi into a set newTemps.
-
   std::unordered_set<OpPtr> newTemps;
   for (auto& v : spilledNodes) {
     if (v->lifespan <= 1 && !v->rejected) {

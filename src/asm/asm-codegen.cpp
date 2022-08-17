@@ -514,17 +514,6 @@ std::shared_ptr<Operand> GenerateLoad(std::shared_ptr<LoadInstruction> inst,
                                       std::shared_ptr<ASM_Builder> builder) {
   auto addr = inst->m_addr->getValue();
   std::shared_ptr<Operand> ret;
-
-  // check if addr is in the memory map
-  // but we have to check value map in case the ret is already used
-  // in a phi instruction before the cur block
-  if (builder->m_memory_map.find(addr) != builder->m_memory_map.end()
-      && builder->m_value_map.find(inst) == builder->m_value_map.end()) {
-    ret = builder->m_memory_map[addr];
-    builder->m_value_map.insert({inst, ret});
-    return ret;
-  }
-
   ret = builder->getOperand(inst);
   builder->appendLDR(ret, getAddr(addr, builder), std::make_shared<Operand>(0));
   return ret;
@@ -536,13 +525,6 @@ std::shared_ptr<Operand> GenerateStore(std::shared_ptr<StoreInstruction> inst,
   auto val = inst->m_val->getValue();
   auto src = builder->getOperand(val);
   builder->appendSTR(src, getAddr(addr, builder), std::make_shared<Operand>(0));
-
-  // record the last constant
-  if (val->m_type.IsConst())
-    builder->m_memory_map[addr] = src;
-  else
-    builder->m_memory_map.erase(addr);
-
   return nullptr;
 }
 
