@@ -27,7 +27,6 @@ void DeadCodeElimination(std::shared_ptr<Function> func) {
 
   int cnt = 0;
   while (true) {
-    ++cnt;
     bool changed = false;
     alive.clear();
     worklist.clear();
@@ -73,7 +72,7 @@ void DeadCodeElimination(std::shared_ptr<Function> func) {
           = std::find(bb->m_instr_list.begin(), bb->m_instr_list.end(), instr);
       // bb->m_instr_list.erase(it2);
       bb->RemoveInstruction(instr);
-      std::cerr << "[debug] dce" << std::endl;
+      cnt++;
     }
     if (!changed) break;
   }
