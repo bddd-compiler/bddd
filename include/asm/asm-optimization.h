@@ -13,7 +13,7 @@ void removeUnreachableBlock(std::shared_ptr<ASM_Module> module);
 
 void eliminateDeadInstruction(std::shared_ptr<ASM_Module> module);
 
-void optimizeTemp(std::shared_ptr<ASM_Module> module);
+void optimizeTemp(std::shared_ptr<ASM_Module> module, bool optimization);
 
 void optimize(std::shared_ptr<ASM_Module> module);
 

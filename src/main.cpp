@@ -24,6 +24,7 @@ static const struct option long_options[]
 
 int main(int argc, char *argv[]) {
   int ch;
+  bool optimization = false;
   const char *asm_path = nullptr;
   const char *ir_path = nullptr;
   const char *tmp_asm_path = nullptr;
@@ -31,7 +32,9 @@ int main(int argc, char *argv[]) {
          != -1) {
     switch (ch) {
       case 'S':
+        break;
       case 'O':
+        optimization = true;
         break;
       case 'o':
         asm_path = optarg;
@@ -123,7 +126,7 @@ int main(int argc, char *argv[]) {
   }
 
   // optimize for temp asm
-  optimizeTemp(asm_module);
+  optimizeTemp(asm_module, optimization);
 
   std::cout << "allocating..." << std::endl;
 

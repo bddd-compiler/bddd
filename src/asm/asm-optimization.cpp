@@ -164,11 +164,11 @@ void eliminateDeadInstruction(std::shared_ptr<ASM_Module> module) {
   }
 }
 
-void optimizeTemp(std::shared_ptr<ASM_Module> module) {
+void optimizeTemp(std::shared_ptr<ASM_Module> module, bool optimization) {
   eliminateRedundantJump(module);
   removeUnreachableBlock(module);
 
-  eliminateDeadInstruction(module);
+  if (optimization) eliminateDeadInstruction(module);
 }
 
 void optimize(std::shared_ptr<ASM_Module> module) {
