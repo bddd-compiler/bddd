@@ -351,6 +351,12 @@ std::string ASM_Instruction::getOpName() {
       return "MLS";
     case InstOp::MUL:
       return "MUL";
+    case InstOp::SMMLA:
+      return "SMMLA";
+    case InstOp::SMMLS:
+      return "SMMLS";
+    case InstOp::SMMUL:
+      return "SMMUL";
     case InstOp::SDIV:
       return "SDIV";
     case InstOp::AND:
