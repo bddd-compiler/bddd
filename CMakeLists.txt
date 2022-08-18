@@ -55,7 +55,7 @@ set(IR_PASSES
   src/ir/pass/strength-reduction.cpp
   src/ir/pass/loop-unrolling.cpp
   src/ir/pass/loop-analysis.cpp
-  src/ir/pass/global-const.cpp src/ir/pass/load.cpp src/ir/pass/instr-combine.cpp)
+  src/ir/pass/global-const.cpp src/ir/pass/load.cpp src/ir/pass/instr-combine.cpp src/ir/pass/lcssa.cpp)
 
 set(ASM_SOURCE
   src/asm/asm.cpp
@@ -66,7 +66,7 @@ set(ASM_SOURCE
   src/asm/asm-register.cpp
   src/asm/asm-fixed.cpp
   src/asm/asm-optimization.cpp
-  )
+  src/ir/pass/loop-simplify.cpp)
 
 add_executable(bddd
   src/main.cpp

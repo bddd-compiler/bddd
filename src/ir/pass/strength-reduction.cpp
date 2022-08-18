@@ -30,14 +30,14 @@ void StrengthReduction(std::shared_ptr<Loop> loop,
               auto c = std::dynamic_pointer_cast<Constant>(
                   binary->m_lhs_val_use->getValue());
               ivs[phi] = std::make_tuple(phi, 1, 0);
-              iv_init_vals[phi] = phi->GetValue(loop->m_preheader);
+              iv_init_vals[phi] = phi->GetValue(loop->Preheader());
               strides[phi] = c->Evaluate().IntVal();
             } else if (binary->m_rhs_val_use->getValue()->m_type.IsConst()
                        && binary->m_lhs_val_use->getValue() == phi) {
               auto c = std::dynamic_pointer_cast<Constant>(
                   binary->m_rhs_val_use->getValue());
               ivs[phi] = std::make_tuple(phi, 1, 0);
-              iv_init_vals[phi] = phi->GetValue(loop->m_preheader);
+              iv_init_vals[phi] = phi->GetValue(loop->Preheader());
               strides[phi] = c->Evaluate().IntVal();
             } else {
               std::cerr << "[debug] not basic induction variable" << std::endl;
@@ -121,26 +121,26 @@ void StrengthReduction(std::shared_ptr<Loop> loop,
     auto now = iv_init_vals[i];
     if (a != 1) {
       auto mul_instr
-          = std::make_shared<BinaryInstruction>(IROp::MUL, loop->m_preheader);
+          = std::make_shared<BinaryInstruction>(IROp::MUL, loop->Preheader());
       mul_instr->m_lhs_val_use = now->AddUse(mul_instr);
       mul_instr->m_rhs_val_use = builder->GetIntConstant(a)->AddUse(mul_instr);
-      loop->m_preheader->InsertFrontInstruction(
-          loop->m_preheader->LastInstruction(), mul_instr);
+      loop->Preheader()->InsertFrontInstruction(
+          loop->Preheader()->LastInstruction(), mul_instr);
       now = mul_instr;
     }
     if (b != 0) {
       auto add_instr
-          = std::make_shared<BinaryInstruction>(IROp::ADD, loop->m_preheader);
+          = std::make_shared<BinaryInstruction>(IROp::ADD, loop->Preheader());
       add_instr->m_lhs_val_use = now->AddUse(add_instr);
       add_instr->m_rhs_val_use = builder->GetIntConstant(b)->AddUse(add_instr);
-      loop->m_preheader->InsertFrontInstruction(
-          loop->m_preheader->LastInstruction(), add_instr);
+      loop->Preheader()->InsertFrontInstruction(
+          loop->Preheader()->LastInstruction(), add_instr);
       now = add_instr;
     }
     iv_init_vals[j] = now;
     // 先考虑只有一个出口的情况吧
     auto phi = std::make_shared<PhiInstruction>(now->m_type, loop->m_header);
-    phi->AddPhiOperand(loop->m_preheader, now);
+    phi->AddPhiOperand(loop->Preheader(), now);
     loop->m_header->PushFrontInstruction(phi);
 
     assert(strides.find(i) != strides.end());

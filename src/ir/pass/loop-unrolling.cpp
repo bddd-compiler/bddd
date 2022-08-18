@@ -249,7 +249,7 @@ void InsertResetLoop(
   reset_easy_loop->m_cond_bb->AddPredecessor(reset_easy_loop->m_body_bb);
   reset_easy_loop->m_body_bb->AddPredecessor(reset_easy_loop->m_cond_bb);
   out_block->AddPredecessor(reset_easy_loop->m_cond_bb);
-  reset_loop->m_preheader = easy_loop->m_cond_bb;
+  reset_loop->m_preheaders.insert(easy_loop->m_cond_bb);
   reset_loop->m_loop_depth = easy_loop->m_loop->m_loop_depth;
 
   func->m_deepest_loops.push_back(reset_loop);

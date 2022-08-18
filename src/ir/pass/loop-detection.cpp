@@ -25,22 +25,19 @@ void GetBackEdges(std::shared_ptr<Function> func) {
 
 void DetectNaturalLoops(std::shared_ptr<Function> func) {
   // reducible CFG: one back edge corresponds to a natural loop
-  for (auto [tail, head] : g_back_edges) {
+  for (auto &back_edge : g_back_edges) {
+    for (auto &bb : func->m_bb_list) bb->m_visited = false;
+    auto [tail, head] = back_edge;
     // std::cerr << "back edge: " << tail->m_id << "->" << head->m_id <<
     // std::endl;
     auto loop = std::make_shared<Loop>(head);
     auto preds = head->Predecessors();
-    int temp = 0;
     for (auto &pred : preds) {
       if (pred->m_id < head->m_id) {
-        loop->m_preheader = pred;
-        ++temp;
-      } else {
-        loop->m_latches.push_back(pred);
-        --temp;
+        loop->m_preheaders.insert(pred);
       }
     }
-    assert(temp <= 0);
+    assert(!loop->m_preheaders.empty());
 
     // populate nodes using predecessors
     std::stack<std::shared_ptr<BasicBlock>> stack;
@@ -48,17 +45,32 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
     while (!stack.empty()) {
       std::shared_ptr<BasicBlock> x = stack.top();
       stack.pop();
+      if (x->m_visited) continue;
+      x->m_visited = true;
       loop->m_bbs.insert(x);
       // std::cerr << x->m_id << " ";
       if (x == head) continue;
       for (auto &p : x->Predecessors()) {
-        if (std::find(loop->m_bbs.begin(), loop->m_bbs.end(), p)
-            == loop->m_bbs.end()) {
+        if (!p->m_visited) {
           stack.push(p);
         }
       }
     }
-    assert(loop->m_bbs.find(head) != loop->m_bbs.end());
+    assert(head->m_visited);
+    for (auto &bb : loop->m_bbs) {
+      // if (bb == loop->m_header) continue;
+      for (auto &s : bb->Successors()) {
+        if (!s->m_visited) {
+          // out-of-loop
+          loop->m_exit_bbs.insert(s);
+          loop->m_exiting_bbs.insert(bb);
+        } else if (s == head) {
+          // latch
+          // assert(bb == tail);
+          loop->m_latches.insert(bb);
+        }
+      }
+    }
     // std::cerr << std::endl;
 
     for (auto &bb : loop->m_bbs) {
@@ -74,6 +86,8 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
           for (auto &loop_bb : loop->m_bbs) {
             loop_bb->m_loops.insert(e_loop);
           }
+          e_loop->m_latches.insert(loop->m_latches.begin(),
+                                   loop->m_latches.end());
           func->m_loops.erase(loop);
           loop = nullptr;
           break;
@@ -141,20 +155,40 @@ void ComputeLoopRelationship(std::shared_ptr<Function> func) {
   GetBackEdges(func);
   DetectNaturalLoops(func);
 
-  // for (auto &loop : func->m_loops) {
-  //   std::cerr << "preheader: " << loop->m_preheader->m_id << std::endl;
-  //   std::cerr << "header: " << loop->m_header->m_id << std::endl;
-  //   std::cerr << "end: ";
-  //   for (auto &end : loop->m_latches) {
-  //     std::cerr << end->m_id << " ";
-  //   }
-  //   std::cerr << std::endl;
-  //   std::cerr << "bbs: ";
-  //   for (auto &bb : loop->m_bbs) {
-  //     std::cerr << bb->m_id << " ";
-  //   }
-  //   std::cerr << std::endl;
-  //   std::cerr << "depth: " << loop->m_loop_depth << std::endl;
-  //   std::cerr << std::endl;
-  // }
+  for (auto &loop : func->m_loops) {
+    std::cerr << "header: " << loop->m_header->m_id << std::endl;
+
+    std::cerr << "preheaders: ";
+    for (auto &bb : loop->m_preheaders) {
+      std::cerr << bb->m_id << " ";
+    }
+    std::cerr << std::endl;
+
+    std::cerr << "bbs: ";
+    for (auto &bb : loop->m_bbs) {
+      std::cerr << bb->m_id << " ";
+    }
+    std::cerr << std::endl;
+
+    std::cerr << "latches: ";
+    for (auto &end : loop->m_latches) {
+      std::cerr << end->m_id << " ";
+    }
+    std::cerr << std::endl;
+
+    std::cerr << "exiting bbs: ";
+    for (auto &end : loop->m_exiting_bbs) {
+      std::cerr << end->m_id << " ";
+    }
+    std::cerr << std::endl;
+
+    std::cerr << "exit bbs: ";
+    for (auto &end : loop->m_exit_bbs) {
+      std::cerr << end->m_id << " ";
+    }
+    std::cerr << std::endl;
+
+    std::cerr << "depth: " << loop->m_loop_depth << std::endl;
+    std::cerr << std::endl;
+  }
 }
