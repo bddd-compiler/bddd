@@ -67,6 +67,7 @@ bool SimplifyLoop(std::shared_ptr<Loop> loop, std::shared_ptr<Function> func) {
       assert(!l->m_preheaders.empty());
       if (l->m_preheaders.size() > 1) {
         // insert a new preheader
+        std::cerr << "[debug] inserting a new preheader" << std::endl;
         auto new_preheader = std::make_shared<BasicBlock>("new_preheader");
         auto it = std::find(func->m_bb_list.begin(), func->m_bb_list.end(),
                             l->m_header);
@@ -119,6 +120,7 @@ bool SimplifyLoop(std::shared_ptr<Loop> loop, std::shared_ptr<Function> func) {
         l->m_header->AddPredecessor(new_preheader);
         changed = true;
       }
+      assert(l->m_preheaders.size() == 1);
 
       assert(!l->m_exit_bbs.empty());
       // assert(l->m_exit_bbs.size() == 1);
@@ -134,6 +136,7 @@ bool SimplifyLoop(std::shared_ptr<Loop> loop, std::shared_ptr<Function> func) {
         }
       }
       if (!bad_exit_bbs.empty()) {
+        std::cerr << "[debug] inserting a new exit bb" << std::endl;
         l->m_exit_bbs.clear();
         for (auto &exit_bb : bad_exit_bbs) {
           // insert a new exit block
@@ -208,6 +211,7 @@ bool SimplifyLoop(std::shared_ptr<Loop> loop, std::shared_ptr<Function> func) {
 
       if (l->m_latches.size() != 1) {
         // insert a new latch
+        std::cerr << "[debug] inserting a new latch" << std::endl;
         auto new_latch = std::make_shared<BasicBlock>("new_latch");
         std::vector<std::shared_ptr<PhiInstruction>> old_phis, new_phis;
         for (auto &instr : l->m_header->m_instr_list) {
@@ -264,6 +268,8 @@ bool SimplifyLoop(std::shared_ptr<Loop> loop, std::shared_ptr<Function> func) {
         l->m_header->AddPredecessor(new_latch);
         changed = true;
       }
+      assert(l->m_latches.size() == 1);
+      assert(loop->m_header->Predecessors().size() == 2);
 
       // continue or break
       if (!changed) break;

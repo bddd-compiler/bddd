@@ -17,13 +17,15 @@ public:
 
   std::set<std::shared_ptr<BasicBlock>> m_latches;
   std::unordered_set<std::shared_ptr<BasicBlock>> m_exiting_bbs;  // 可能有多个
-  std::set<std::shared_ptr<BasicBlock>> m_exit_bbs;  // 可能有多个
-  int m_loop_depth;
+  std::unordered_set<std::shared_ptr<BasicBlock>> m_exit_bbs;  // 可能有多个
 
-  explicit Loop() : m_loop_depth(-1) {}
+  int m_loop_depth;
+  bool m_visited;
+
+  explicit Loop() : m_loop_depth(-1), m_visited(false) {}
 
   explicit Loop(std::shared_ptr<BasicBlock> header)
-      : m_header(std::move(header)), m_loop_depth(-1) {}
+      : m_header(std::move(header)), m_loop_depth(-1), m_visited(false) {}
 
   // not nullptr when have only one preheader (see LoopSimplifyPass)
   std::shared_ptr<BasicBlock> Preheader() const {

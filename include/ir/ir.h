@@ -800,9 +800,10 @@ public:
 class PhiInstruction : public Instruction {
 public:
   std::unordered_map<std::shared_ptr<BasicBlock>, Use *> m_contents;
+  bool m_is_lcssa;
 
   explicit PhiInstruction(ValueType type, std::shared_ptr<BasicBlock> bb)
-      : Instruction(IROp::PHI, std::move(bb)) {
+      : Instruction(IROp::PHI, std::move(bb)), m_is_lcssa(false) {
     m_type = std::move(type);
   }
 
@@ -815,6 +816,16 @@ public:
       return nullptr;
     else
       return it->second->m_value.lock();
+  }
+
+  // search basic block by use (not nullptr plz)
+  // nullptr if not found
+  std::shared_ptr<BasicBlock> GetBasicBlock(Use *use) {
+    assert(use != nullptr);
+    for (auto &[incoming_bb, incoming_use] : m_contents) {
+      if (use == incoming_use) return incoming_bb;
+    }
+    return nullptr;
   }
 
   void AddPhiOperand(std::shared_ptr<BasicBlock> bb,

@@ -170,7 +170,9 @@ void IRPassManager::InstrCombiningPass() {
         }
       }
     }
-    std::cerr << "[debug] instr combine x" << cnt << std::endl;
+    if (cnt) {
+      std::cerr << "[debug] instr combine x" << cnt << std::endl;
+    }
     DeadCodeElimination(func);
   }
 }

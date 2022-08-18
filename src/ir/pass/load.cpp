@@ -124,7 +124,9 @@ void LoadStoreOptimization(std::shared_ptr<BasicBlock> bb) {
     }
     if (!changed) break;
   }
-  std::cerr << "[debug] load opt: " << cnt << std::endl;
+  if (cnt) {
+    std::cerr << "[debug] load opt: " << cnt << std::endl;
+  }
 }
 
 void IRPassManager::LoadStoreOptimizationPass() {

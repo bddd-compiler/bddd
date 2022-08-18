@@ -76,5 +76,7 @@ void DeadCodeElimination(std::shared_ptr<Function> func) {
     }
     if (!changed) break;
   }
-  std::cerr << "[debug] dce x" << cnt << std::endl;
+  if (cnt) {
+    std::cerr << "[debug] dce x" << cnt << std::endl;
+  }
 }

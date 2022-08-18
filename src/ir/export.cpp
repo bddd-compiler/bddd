@@ -396,6 +396,7 @@ void PhiInstruction::ExportIR(std::ofstream& ofs, int depth) {
     }
     ofs << ", " << g_label_allocator.GetLabelName(bb) << " ]";
   }
+  if (m_is_lcssa) ofs << " ; (lcssa)";
   ofs << std::endl;
 }
 // NOT a complete instruction, cannot be invoked independently
