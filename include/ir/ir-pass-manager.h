@@ -43,6 +43,8 @@ public:
   void LoadStoreOptimizationPass();
 
   void InstrCombiningPass();
+
+  void LoopSimplifyPass();
 };
 
 #endif  // BDDD_IR_PASS_MANAGER_H

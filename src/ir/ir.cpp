@@ -185,7 +185,17 @@ bool BasicBlock::IsDominatedBy(std::shared_ptr<BasicBlock> bb) {
 }
 void BasicBlock::AddPredecessor(std::shared_ptr<BasicBlock> bb) {
   m_predecessors.insert(bb);
+  // for (auto& instr : m_instr_list) {
+  //   if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
+  //     if (phi->m_contents.find(bb) == phi->m_contents.end()) {
+  //       phi->AddPhiOperand(bb, nullptr);
+  //     }
+  //   } else {
+  //     break;
+  //   }
+  // }
 }
+// no need to remove the corresponding phi operands (removed here)
 void BasicBlock::RemovePredecessor(std::shared_ptr<BasicBlock> bb) {
   for (auto& instr : m_instr_list) {
     if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
@@ -206,6 +216,11 @@ void BasicBlock::ReplacePredecessorsBy(
       assert(it != phi_instr->m_contents.end());
       auto val = (it->second != nullptr ? it->second->getValue() : nullptr);
       for (auto& new_block : new_blocks) {
+        if (phi_instr->m_contents.find(new_block)
+            != phi_instr->m_contents.end()) {
+          phi_instr->RemoveByBasicBlock(new_block);
+          // assert(phi_instr->GetValue(new_block) == val);
+        }
         phi_instr->AddPhiOperand(new_block, val);
       }
       phi_instr->RemoveByBasicBlock(old_block);

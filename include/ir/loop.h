@@ -9,19 +9,36 @@
 
 class Loop {
 public:
-  std::shared_ptr<BasicBlock> m_preheader;
+  std::unordered_set<std::shared_ptr<BasicBlock>> m_preheaders;
   std::shared_ptr<BasicBlock> m_header;
   std::set<std::shared_ptr<BasicBlock>> m_bbs;
   std::set<std::shared_ptr<Loop>> m_sub_loops;
   std::shared_ptr<Loop> m_fa_loop;
-  std::vector<std::shared_ptr<BasicBlock>>
-      m_latches;  // it seems a non-natural loop have many ends
+
+  std::set<std::shared_ptr<BasicBlock>> m_latches;
+  std::unordered_set<std::shared_ptr<BasicBlock>> m_exiting_bbs;  // 可能有多个
+  std::set<std::shared_ptr<BasicBlock>> m_exit_bbs;  // 可能有多个
   int m_loop_depth;
 
   explicit Loop() : m_loop_depth(-1) {}
 
   explicit Loop(std::shared_ptr<BasicBlock> header)
       : m_header(std::move(header)), m_loop_depth(-1) {}
+
+  // not nullptr when have only one preheader (see LoopSimplifyPass)
+  std::shared_ptr<BasicBlock> Preheader() const {
+    if (m_preheaders.size() == 1)
+      return *m_preheaders.begin();
+    else
+      return nullptr;
+  }
+  // not nullptr when have only one latch (see LoopSimplifyPass)
+  std::shared_ptr<BasicBlock> Latch() const {
+    if (m_latches.size() == 1)
+      return *m_latches.begin();
+    else
+      return nullptr;
+  }
 };
 
 // loop var is a variable inside a easy loop
@@ -37,9 +54,10 @@ public:
   explicit LoopVar(std::shared_ptr<Loop> loop,
                    std::shared_ptr<PhiInstruction> phi,
                    std::shared_ptr<BasicBlock> body_bb) {
+    assert(loop->m_preheaders.size() == 1);
     m_loop = loop;
     m_def_instr = phi;
-    m_init_val = m_def_instr->GetValue(loop->m_preheader);
+    m_init_val = m_def_instr->GetValue(loop->Preheader());
     m_body_val = m_def_instr->GetValue(body_bb);
   }
 };
