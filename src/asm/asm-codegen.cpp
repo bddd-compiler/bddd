@@ -1,7 +1,7 @@
 #include "asm/asm-builder.h"
 #include "ir/ir.h"
 
-// #define DIV_CONST
+#define DIV_CONST
 
 std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
     std::shared_ptr<Constant> value, bool genimm, bool checkimm,
