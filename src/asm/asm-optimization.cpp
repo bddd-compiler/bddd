@@ -126,7 +126,77 @@ void removeUnreachableBlock(std::shared_ptr<ASM_Module> module) {
   }
 }
 
+void combineInstruction(std::shared_ptr<ASM_Module> module) {
+  int cnt = 0;
+  for (auto& func : module->m_funcs) {
+    for (auto& block : func->m_blocks) {
+      std::unordered_map<std::shared_ptr<Operand>,
+                         std::shared_ptr<ASM_Instruction>>
+          inst_map;
+      for (auto& inst : block->m_insts) {
+        if (inst->m_is_deleted) continue;
+        if (inst->m_op == InstOp::MUL) {
+          auto i = std::dynamic_pointer_cast<MULInst>(inst);
+          if (i->m_dest->m_op_type == OperandType::VREG)
+            inst_map[i->m_dest] = inst;
+        }
+        if (auto i = std::dynamic_pointer_cast<ShiftInst>(inst))
+          if (i->m_dest->m_op_type == OperandType::VREG)
+            inst_map[i->m_dest] = inst;
+        if (inst->m_op == InstOp::ADD) {
+          auto i = std::dynamic_pointer_cast<ASInst>(inst);
+          if (i->m_operand2->m_op_type == OperandType::VREG && !i->m_shift) {
+            std::shared_ptr<ASM_Instruction> def_inst;
+            if (inst_map.find(i->m_operand1) != inst_map.end())
+              def_inst = inst_map[i->m_operand1];
+            else if (inst_map.find(i->m_operand2) != inst_map.end())
+              def_inst = inst_map[i->m_operand2];
+            std::shared_ptr<ASM_Instruction> ret_inst;
+            if (auto mul = std::dynamic_pointer_cast<MULInst>(def_inst)) {
+              inst = combineMULToADD(mul, i);
+              inst->m_block = block;
+              cnt++;
+            }
+            if (auto shift = std::dynamic_pointer_cast<ShiftInst>(def_inst)) {
+              inst = combineShiftToADD(shift, i);
+              inst->m_block = block;
+              cnt++;
+            }
+          }
+        }
+      }
+    }
+  }
+  std::cerr << "[debug] combine shift/mul inst to add x" << cnt << std::endl;
+}
+
+std::shared_ptr<ASM_Instruction> combineMULToADD(std::shared_ptr<MULInst> mul,
+                                                 std::shared_ptr<ASInst> as) {
+  auto ret = as->m_dest;
+  auto op1 = as->m_operand1;
+  if (op1 == mul->m_dest) {
+    op1 = as->m_operand2;
+  }
+  return std::make_shared<MULInst>(InstOp::MLA, ret, mul->m_operand1,
+                                   mul->m_operand2, op1);
+}
+
+std::shared_ptr<ASM_Instruction> combineShiftToADD(
+    std::shared_ptr<ShiftInst> shift_inst, std::shared_ptr<ASInst> as) {
+  auto ret = as->m_dest;
+  auto op1 = as->m_operand1;
+  if (op1 == shift_inst->m_dest) {
+    op1 = as->m_operand2;
+  }
+  auto ret_inst
+      = std::make_shared<ASInst>(InstOp::ADD, ret, op1, shift_inst->m_src);
+  ret_inst->m_shift = std::make_unique<Shift>(shift_inst->m_op,
+                                              shift_inst->m_sval->m_int_val);
+  return ret_inst;
+}
+
 void eliminateDeadInstruction(std::shared_ptr<ASM_Module> module) {
+  int cnt = 0;
   for (auto& func : module->m_funcs) {
     func->LivenessAnalysis(RegType::R);
     for (auto& block : func->m_blocks) {
@@ -151,9 +221,7 @@ void eliminateDeadInstruction(std::shared_ptr<ASM_Module> module) {
         }
         if (!is_used) {
           inst->m_is_deleted = true;
-          std::cerr << "[debug] remove dead instruction, defs: ";
-          for (auto& def : inst->m_def) std::cerr << def->getName() << " ";
-          std::cerr << std::endl;
+          cnt++;
           continue;
         }
         for (auto& use : inst->m_use) {
@@ -162,13 +230,17 @@ void eliminateDeadInstruction(std::shared_ptr<ASM_Module> module) {
       }
     }
   }
+  std::cerr << "[debug] remove dead instruction x" << cnt << std::endl;
 }
 
 void optimizeTemp(std::shared_ptr<ASM_Module> module, bool optimization) {
   eliminateRedundantJump(module);
   removeUnreachableBlock(module);
 
-  if (optimization) eliminateDeadInstruction(module);
+  if (optimization) {
+    combineInstruction(module);
+    eliminateDeadInstruction(module);
+  }
 }
 
 void optimize(std::shared_ptr<ASM_Module> module) {

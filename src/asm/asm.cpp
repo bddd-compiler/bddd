@@ -290,6 +290,36 @@ Shift::Shift(ShiftType t, int v) : s_type(t), s_val(v) {
   }
 }
 
+Shift::Shift(InstOp t, int v) {
+  ShiftType type;
+  switch (t) {
+    case InstOp::LSL:
+      type = ShiftType::LSL;
+      break;
+    case InstOp::LSR:
+      type = ShiftType::LSR;
+      break;
+    case InstOp::ASR:
+      type = ShiftType::ASR;
+      break;
+    case InstOp::ROR:
+      type = ShiftType::ROR;
+      break;
+    case InstOp::RRX:
+      type = ShiftType::RRX;
+      break;
+    default:
+      assert(false);
+  }
+  if (type != ShiftType::RRX) {
+    int upbound = 31;
+    if (type == ShiftType::ASR || type == ShiftType::LSR) upbound++;
+    assert(1 <= v && v <= upbound);
+  }
+  s_type = type;
+  s_val = v;
+}
+
 std::string Shift::getShiftName() {
   switch (s_type) {
     case ShiftType::ASR:

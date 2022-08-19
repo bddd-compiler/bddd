@@ -5,7 +5,7 @@ ASM_Builder::ASM_Builder(std::shared_ptr<ASM_Module> m) : m_module(m) {}
 void ASM_Builder::init() {
   m_value_map.clear();
   m_block_map.clear();
-  m_memory_map.clear();
+  m_load_map.clear();
 }
 
 void ASM_Builder::setIrModule(std::shared_ptr<Module> ir_module) {
@@ -59,7 +59,7 @@ void ASM_Builder::setParams() {
 void ASM_Builder::appendBlock(std::shared_ptr<ASM_BasicBlock> block) {
   m_cur_func->m_blocks.push_back(block);
   setCurBlock(block);
-  m_memory_map.clear();
+  m_load_map.clear();
 }
 
 void ASM_Builder::setCurBlock(std::shared_ptr<ASM_BasicBlock> block) {

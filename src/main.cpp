@@ -121,14 +121,14 @@ int main(int argc, char *argv[]) {
   auto asm_builder = std::make_shared<ASM_Builder>(asm_module);
   GenerateModule(std::move(builder->m_module), asm_builder);
 
+  // optimize for temp asm
+  optimizeTemp(asm_module, optimization);
+
   if (tmp_asm_path) {
     std::ofstream ofs(tmp_asm_path);
     asm_module->exportASM(ofs);
     ofs.close();
   }
-
-  // optimize for temp asm
-  optimizeTemp(asm_module, optimization);
 
   std::cout << "allocating..." << std::endl;
 

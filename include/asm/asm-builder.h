@@ -18,7 +18,7 @@ public:
                      std::shared_ptr<ASM_BasicBlock>>
       m_block_map;
   std::unordered_map<std::shared_ptr<Value>, std::shared_ptr<Operand>>
-      m_memory_map;
+      m_load_map;
 
   ASM_Builder(std::shared_ptr<ASM_Module> m);
 
