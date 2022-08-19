@@ -24,6 +24,7 @@ static const struct option long_options[]
 
 int main(int argc, char *argv[]) {
   int ch;
+  bool optimization = false;
   const char *asm_path = nullptr;
   const char *ir_path = nullptr;
   const char *tmp_asm_path = nullptr;
@@ -31,7 +32,9 @@ int main(int argc, char *argv[]) {
          != -1) {
     switch (ch) {
       case 'S':
+        break;
       case 'O':
+        optimization = true;
         break;
       case 'o':
         asm_path = optarg;
@@ -92,17 +95,22 @@ int main(int argc, char *argv[]) {
   builder->m_module->RemoveInstrsAfterTerminator();
 
   auto pass_manager = std::make_unique<IRPassManager>(builder);
-  // pass_manager->Mem2RegPass();  // now no allocas for single variable
-  // pass_manager->EliminateGlobalConstArrayAccess();
-  // pass_manager->TailRecursionPass();
-  // pass_manager->FunctionInliningPass();
-  // pass_manager->LoadStoreOptimizationPass();
-  // pass_manager->InstrCombiningPass();
-  // pass_manager->LoopUnrollingPass();
-  // pass_manager->InstrCombiningPass();
+  pass_manager->Mem2RegPass();  // now no allocas for single variable
+  pass_manager->EliminateGlobalConstArrayAccess();
+  pass_manager->TailRecursionPass();
+  pass_manager->FunctionInliningPass();
+  pass_manager->LoadStoreOptimizationPass();
+  pass_manager->LoopUnrollingPass();
+  pass_manager->GVNPass();
+  pass_manager->GCMPass();
+  pass_manager->InstrCombiningPass();
+  pass_manager->StrengthReductionPass();
   // pass_manager->LoopSimplifyPass();
-  // pass_manager->GVNPass();
-  // pass_manager->GCMPass();
+
+  // if (optimization) {
+  //   pass_manager->InstrCombiningPass();
+  //   pass_manager->LoopSimplifyPass();
+  // }
 
   if (ir_path) {
     std::ofstream ofs(ir_path);
@@ -123,6 +131,9 @@ int main(int argc, char *argv[]) {
     asm_module->exportASM(ofs);
     ofs.close();
   }
+
+  // optimize for temp asm
+  optimizeTemp(asm_module, optimization);
 
   std::cout << "allocating..." << std::endl;
 

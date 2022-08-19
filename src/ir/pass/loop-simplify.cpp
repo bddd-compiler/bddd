@@ -9,28 +9,72 @@
 #include "ir/ir-pass-manager.h"
 #include "ir/loop.h"
 
-void ReplaceTargetBlock(std::shared_ptr<JumpInstruction> jmp_instr,
-                        std::shared_ptr<BasicBlock> old_block,
-                        std::shared_ptr<BasicBlock> new_block) {
-  assert(jmp_instr->m_target_block == old_block);
-  jmp_instr->m_target_block = new_block;
+void UpdateLoopDetails(std::shared_ptr<Loop> loop) {
+  loop->m_preheaders.clear();
+  loop->m_latches.clear();
+  for (auto &pred : loop->m_header->Predecessors()) {
+    if (loop->m_bbs.find(pred) == loop->m_bbs.end()) {
+      loop->m_preheaders.insert(pred);
+    } else {
+      loop->m_latches.insert(pred);
+    }
+  }
+  assert(!loop->m_preheaders.empty());
+  assert(!loop->m_latches.empty());
 }
-
-void ReplaceTargetBlock(std::shared_ptr<BranchInstruction> br_instr,
-                        std::shared_ptr<BasicBlock> old_block,
-                        std::shared_ptr<BasicBlock> new_block) {
-  if (br_instr->m_true_block == old_block) {
-    br_instr->m_true_block = new_block;
-  } else if (br_instr->m_false_block == old_block) {
-    br_instr->m_false_block = new_block;
-  } else {
-    assert(false);
+void UpdateLoopDetails(std::shared_ptr<BasicBlock> bb) {
+  for (auto &loop : bb->m_loops) {
+    UpdateLoopDetails(loop);
   }
 }
 
-bool SimplifyLoop(std::shared_ptr<Loop> loop, std::shared_ptr<Function> func) {
+std::shared_ptr<BasicBlock> AddMiddleBasicBlock(
+    std::shared_ptr<Loop> loop, std::shared_ptr<Function> func,
+    std::string bb_name, std::list<std::shared_ptr<BasicBlock>>::iterator it,
+    std::unordered_set<std::shared_ptr<BasicBlock>> old_preds,
+    std::shared_ptr<BasicBlock> succ, bool inside_bb) {
+  auto middle_bb = std::make_shared<BasicBlock>(bb_name);
+  func->m_bb_list.insert(it, middle_bb);
+  if (inside_bb) loop->m_bbs.insert(middle_bb);
+  for (auto now = loop->m_fa_loop; now; now = now->m_fa_loop) {
+    now->m_bbs.insert(middle_bb);
+  }
+  auto jmp = std::make_shared<JumpInstruction>(succ, middle_bb);
+  middle_bb->PushBackInstruction(jmp);
+  for (auto &old_pred : old_preds) {
+    auto term = old_pred->LastInstruction();
+    // old_pred -> succ
+    // old_pred -> middle_bb -> succ
+    if (auto jmp_instr = std::dynamic_pointer_cast<JumpInstruction>(term)) {
+      assert(jmp_instr->m_target_block == succ);
+      jmp_instr->m_target_block = middle_bb;
+      middle_bb->AddPredecessor(old_pred);
+    } else if (auto br_instr
+               = std::dynamic_pointer_cast<BranchInstruction>(term)) {
+      if (br_instr->m_true_block == succ) {
+        br_instr->m_true_block = middle_bb;
+        middle_bb->AddPredecessor(old_pred);
+      } else if (br_instr->m_false_block == succ) {
+        br_instr->m_false_block = middle_bb;
+        middle_bb->AddPredecessor(old_pred);
+      } else {
+        assert(false);
+      }
+    } else {
+      assert(false);
+    }
+  }
+  succ->ReplacePredecessorsBy(old_preds, middle_bb);
+  for (auto &old_pred : old_preds) {
+    UpdateLoopDetails(old_pred);
+  }
+  UpdateLoopDetails(succ);
+  return middle_bb;
+}
+
+bool SimplifyLoop(std::shared_ptr<Loop> lp, std::shared_ptr<Function> func) {
   std::vector<std::shared_ptr<Loop>> worklist;
-  worklist.push_back(loop);
+  worklist.push_back(lp);
   for (int i = 0; i < worklist.size(); ++i) {
     auto l = worklist[i];
     worklist.insert(worklist.end(), l->m_sub_loops.begin(),
@@ -42,21 +86,23 @@ bool SimplifyLoop(std::shared_ptr<Loop> loop, std::shared_ptr<Function> func) {
     //
     while (true) {
       bool changed = false;
-      std::set<std::shared_ptr<BasicBlock>> outside_preds;
-      for (auto &bb : l->m_bbs) {
-        if (bb == l->m_header) continue;
-        for (auto &pred : bb->Predecessors()) {
-          if (l->m_bbs.find(pred) == l->m_bbs.end()) {
-            outside_preds.insert(pred);
-          }
-        }
-      }
-      for (auto &pred : outside_preds) {
-        std::cerr << "[debug] out-of-loop predecessor?????" << std::endl;
-        auto terminator = pred->LastInstruction();
-        // return false;
-        assert(false);
-      }
+
+      // std::set<std::shared_ptr<BasicBlock>> outside_preds;
+      // for (auto &bb : l->m_bbs) {
+      //   if (bb == l->m_header) continue;
+      //   for (auto &pred : bb->Predecessors()) {
+      //     if (l->m_bbs.find(pred) == l->m_bbs.end()) {
+      //       outside_preds.insert(pred);
+      //       assert(false);
+      //     }
+      //   }
+      // }
+      // for (auto &pred : outside_preds) {
+      //   std::cerr << "[debug] out-of-loop predecessor?????" << std::endl;
+      //   // auto terminator = pred->LastInstruction();
+      //   // return false;
+      //   assert(false);
+      // }
 
       for (auto &exiting_bb : l->m_exiting_bbs) {
         if (auto br = std::dynamic_pointer_cast<BranchInstruction>(
@@ -67,67 +113,44 @@ bool SimplifyLoop(std::shared_ptr<Loop> loop, std::shared_ptr<Function> func) {
       assert(!l->m_preheaders.empty());
       if (l->m_preheaders.size() > 1) {
         // insert a new preheader
-        std::cerr << "[debug] inserting a new preheader" << std::endl;
-        auto new_preheader = std::make_shared<BasicBlock>("new_preheader");
+        // old_preheader ->
+        // old_preheader -> new_preheader -> header
+        // old_preheader ->
+
+        auto it = std::find(func->m_bb_list.begin(), func->m_bb_list.end(),
+                            l->m_header);
+        auto new_preheader = AddMiddleBasicBlock(
+            l, func, "new_preheader", it, l->m_preheaders, l->m_header, false);
+        l->m_preheaders.clear();
+        l->m_preheaders.insert(new_preheader);
+        std::cerr << "[debug] add a new preheader" << std::endl;
+        changed = true;
+      }
+
+      if (l->m_latches.size() != 1) {
+        // insert a new latch
+        // old_latch ->
+        // old_latch -> new_latch -> header
+        // old_latch ->
+
         auto it = std::find(func->m_bb_list.begin(), func->m_bb_list.end(),
                             l->m_header);
         assert(it != func->m_bb_list.end());
-        func->m_bb_list.insert(it, new_preheader);
-        for (auto now = l->m_fa_loop; now; now = now->m_fa_loop) {
-          now->m_bbs.insert(new_preheader);
-        }
-        auto jmp
-            = std::make_shared<JumpInstruction>(l->m_header, new_preheader);
-        bool flag = false;
-        for (auto &preheader : l->m_preheaders) {
-          new_preheader->AddPredecessor(preheader);
-          auto term = preheader->LastInstruction();
-          if (auto jmp_instr
-              = std::dynamic_pointer_cast<JumpInstruction>(term)) {
-            if (jmp_instr->m_target_block == l->m_header) {
-              ReplaceTargetBlock(jmp_instr, l->m_header, new_preheader);
-              l->m_header->ReplacePredecessorsBy(preheader, {new_preheader});
-              new_preheader->AddPredecessor(preheader);
-              flag = true;
-            }
-          } else if (auto br_instr
-                     = std::dynamic_pointer_cast<BranchInstruction>(term)) {
-            if (br_instr->m_true_block == l->m_header
-                || br_instr->m_false_block == l->m_header) {
-              ReplaceTargetBlock(br_instr, l->m_header, new_preheader);
-              l->m_header->ReplacePredecessorsBy(preheader, {new_preheader});
-              new_preheader->AddPredecessor(preheader);
-              flag = true;
-            }
-          } else {
-            assert(false);
-          }
-        }
-        if (!flag) {
-          for (auto &instr : l->m_header->m_instr_list) {
-            if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
-              phi->AddPhiOperand(new_preheader, nullptr);
-            } else {
-              break;
-            }
-          }
-        }
-        // l->m_header->ReplacePredecessorsBy(l->m_preheaders, new_preheader);
-        l->m_preheaders.clear();
-        l->m_preheaders.insert(new_preheader);
-        // 最后再来
-        new_preheader->PushBackInstruction(jmp);
-        l->m_header->AddPredecessor(new_preheader);
+        ++it;
+        auto new_latch = AddMiddleBasicBlock(l, func, "new_latch", it,
+                                             l->m_latches, l->m_header, true);
+
+        l->m_latches.clear();
+        l->m_latches.insert(new_latch);
+        std::cerr << "[debug] add a new latch" << std::endl;
         changed = true;
       }
-      assert(l->m_preheaders.size() == 1);
 
       assert(!l->m_exit_bbs.empty());
       // assert(l->m_exit_bbs.size() == 1);
       // 多个exit blocks是很正常的
       std::unordered_set<std::shared_ptr<BasicBlock>> bad_exit_bbs;
       for (auto &exit_bb : l->m_exit_bbs) {
-        bool need = false;
         // exit_bb cannot have any out-of-loop predecessors
         for (auto &p : exit_bb->Predecessors()) {
           if (l->m_bbs.find(p) == l->m_bbs.end()) {
@@ -136,69 +159,29 @@ bool SimplifyLoop(std::shared_ptr<Loop> loop, std::shared_ptr<Function> func) {
         }
       }
       if (!bad_exit_bbs.empty()) {
-        std::cerr << "[debug] inserting a new exit bb" << std::endl;
+        // exiting_bb     -> exit_bb
+        // exiting_bb     -> exit_bb
+        // out_of_loop_bb -> exit_bb
+        // out_of_loop_bb -> exit_bb
+        // target:
+        // exiting_bb -> good_exit_bb -> exit_bb
+        //             out_of_loop_bb -> exit_bb
         l->m_exit_bbs.clear();
         for (auto &exit_bb : bad_exit_bbs) {
           // insert a new exit block
-          auto new_exit_bb = std::make_shared<BasicBlock>("new_exit_bb");
+          std::unordered_set<std::shared_ptr<BasicBlock>> preds_in_bb;
+
           auto it = std::find(func->m_bb_list.begin(), func->m_bb_list.end(),
                               exit_bb);
-          assert(it != func->m_bb_list.end());
-          func->m_bb_list.insert(it, new_exit_bb);
-          for (auto now = l->m_fa_loop; now; now = now->m_fa_loop) {
-            now->m_bbs.insert(new_exit_bb);
-          }
-          auto jmp = std::make_shared<JumpInstruction>(exit_bb, new_exit_bb);
-          std::unordered_set<std::shared_ptr<BasicBlock>> preds_in_bb;
           for (auto &pred : exit_bb->Predecessors()) {
             if (l->m_bbs.find(pred) != l->m_bbs.end()) {
               preds_in_bb.insert(pred);
             }
           }
-          for (auto &exiting_bb : preds_in_bb) {
-            auto term = exiting_bb->LastInstruction();
-            if (auto jmp_instr
-                = std::dynamic_pointer_cast<JumpInstruction>(term)) {
-              ReplaceTargetBlock(jmp_instr, exit_bb, new_exit_bb);
-              exit_bb->ReplacePredecessorsBy(exiting_bb, {new_exit_bb});
-              new_exit_bb->AddPredecessor(exiting_bb);
-            } else if (auto br_instr
-                       = std::dynamic_pointer_cast<BranchInstruction>(term)) {
-              ReplaceTargetBlock(br_instr, exit_bb, new_exit_bb);
-              exit_bb->ReplacePredecessorsBy(exiting_bb, {new_exit_bb});
-              new_exit_bb->AddPredecessor(exiting_bb);
-            } else {
-              assert(false);
-            }
-          }
-          // exit_bb->ReplacePredecessorsBy(l->m_exiting_bbs, new_exit_bb);
-
-          // for (auto &preheader : l->m_preheaders) {
-          //   auto term = preheader->LastInstruction();
-          //   if (auto jmp_instr
-          //       = std::dynamic_pointer_cast<JumpInstruction>(term)) {
-          //     if (jmp_instr->m_target_block == exit_bb) {
-          //       ReplaceTargetBlock(jmp_instr, exit_bb, new_exit_bb);
-          //       exit_bb->ReplacePredecessorsBy(preheader, {new_exit_bb});
-          //       new_exit_bb->AddPredecessor(preheader);
-          //     }
-          //   } else if (auto br_instr
-          //              = std::dynamic_pointer_cast<BranchInstruction>(term))
-          //              {
-          //     if (br_instr->m_true_block == exit_bb
-          //         || br_instr->m_false_block == exit_bb) {
-          //       ReplaceTargetBlock(br_instr, exit_bb, new_exit_bb);
-          //       exit_bb->ReplacePredecessorsBy(preheader, {new_exit_bb});
-          //       new_exit_bb->AddPredecessor(preheader);
-          //     }
-          //   } else {
-          //     assert(false);
-          //   }
-          // }
+          auto new_exit_bb = AddMiddleBasicBlock(l, func, "new_exit_bb", it,
+                                                 preds_in_bb, exit_bb, false);
           l->m_exit_bbs.insert(new_exit_bb);
-          // 最后再来
-          new_exit_bb->PushBackInstruction(jmp);
-          exit_bb->AddPredecessor(new_exit_bb);
+          std::cerr << "[debug] add a new exit bb" << std::endl;
           changed = true;
         }
       }
@@ -209,69 +192,6 @@ bool SimplifyLoop(std::shared_ptr<Loop> loop, std::shared_ptr<Function> func) {
         }
       }
 
-      if (l->m_latches.size() != 1) {
-        // insert a new latch
-        std::cerr << "[debug] inserting a new latch" << std::endl;
-        auto new_latch = std::make_shared<BasicBlock>("new_latch");
-        std::vector<std::shared_ptr<PhiInstruction>> old_phis, new_phis;
-        for (auto &instr : l->m_header->m_instr_list) {
-          if (auto old_phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
-            old_phis.push_back(old_phi);
-            auto new_phi
-                = std::make_shared<PhiInstruction>(old_phi->m_type, new_latch);
-            new_phis.push_back(new_phi);
-            new_latch->PushBackInstruction(new_phi);
-            for (auto &[incoming_bb, use] : old_phi->m_contents) {
-              if (l->m_latches.find(incoming_bb) != l->m_latches.end()) {
-                new_phi->AddPhiOperand(incoming_bb,
-                                       use ? use->getValue() : nullptr);
-              }
-            }
-            old_phi->AddPhiOperand(new_latch, new_phi);
-          } else {
-            break;
-          }
-        }
-        for (auto &old_latch : l->m_latches) {
-          l->m_header->RemovePredecessor(old_latch);
-          new_latch->AddPredecessor(old_latch);
-          auto terminator = old_latch->LastInstruction();
-          if (auto jmp
-              = std::dynamic_pointer_cast<JumpInstruction>(terminator)) {
-            assert(jmp->m_target_block == l->m_header);
-            jmp->m_target_block = new_latch;
-          } else if (auto br = std::dynamic_pointer_cast<BranchInstruction>(
-                         terminator)) {
-            if (br->m_true_block == l->m_header) {
-              br->m_true_block = new_latch;
-            } else if (br->m_false_block == l->m_header) {
-              br->m_false_block = new_latch;
-            } else {
-              assert(false);  // impossible
-            }
-          }
-        }
-        l->m_latches.clear();
-        l->m_latches.insert(new_latch);
-        auto jmp = std::make_shared<JumpInstruction>(l->m_header, new_latch);
-        auto it = std::find(func->m_bb_list.begin(), func->m_bb_list.end(),
-                            l->m_header);
-        assert(it != func->m_bb_list.end());
-        ++it;
-        func->m_bb_list.insert(it, new_latch);
-        for (auto now = l->m_fa_loop; now; now = now->m_fa_loop) {
-          now->m_bbs.insert(new_latch);
-        }
-        l->m_bbs.insert(new_latch);
-        // 最后再来
-        new_latch->PushBackInstruction(jmp);
-        l->m_header->AddPredecessor(new_latch);
-        changed = true;
-      }
-      assert(l->m_latches.size() == 1);
-      assert(loop->m_header->Predecessors().size() == 2);
-
-      // continue or break
       if (!changed) break;
     }
     // if (l->m_header->Predecessors().size() != 2) return false;
@@ -280,15 +200,32 @@ bool SimplifyLoop(std::shared_ptr<Loop> loop, std::shared_ptr<Function> func) {
   return true;
 }
 
+bool SimplifyLoopRecursively(std::shared_ptr<Loop> loop,
+                             std::shared_ptr<Function> func) {
+  // depth first
+  for (auto &sub_loop : loop->m_sub_loops) {
+    SimplifyLoopRecursively(sub_loop, func);
+  }
+  SimplifyLoop(loop, func);
+  return false;
+}
+
 void IRPassManager::LoopSimplifyPass() {
   for (auto &func : m_builder->m_module->m_function_list) {
     RemoveTrivialBasicBlocks(func);
-  }
-  for (auto &func : m_builder->m_module->m_function_list) {
     ComputeLoopRelationship(func);
-    for (auto &loop : func->m_loops) {
-      bool flag = SimplifyLoop(loop, func);
-      if (!flag) break;
+    for (auto &loop : func->m_top_loops) {
+      SimplifyLoopRecursively(loop, func);
     }
   }
+  // for (auto &func : m_builder->m_module->m_function_list) {
+  //   RemoveTrivialBasicBlocks(func);
+  // }
+  // for (auto &func : m_builder->m_module->m_function_list) {
+  //   ComputeLoopRelationship(func);
+  //   for (auto &loop : func->m_loops) {
+  //     bool flag = SimplifyLoopRecursively(loop, func);
+  //     if (!flag) break;
+  //   }
+  // }
 }

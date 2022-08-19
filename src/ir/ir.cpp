@@ -210,17 +210,13 @@ void BasicBlock::ReplacePredecessorsBy(
     std::shared_ptr<BasicBlock> old_block,
     std::unordered_set<std::shared_ptr<BasicBlock>> new_blocks) {
   // only phi instructions matter the predecessor
+  assert(new_blocks.find(old_block) == new_blocks.end());
   for (auto& instr : m_instr_list) {
     if (auto phi_instr = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
       auto it = phi_instr->m_contents.find(old_block);
       assert(it != phi_instr->m_contents.end());
       auto val = (it->second != nullptr ? it->second->getValue() : nullptr);
       for (auto& new_block : new_blocks) {
-        if (phi_instr->m_contents.find(new_block)
-            != phi_instr->m_contents.end()) {
-          phi_instr->RemoveByBasicBlock(new_block);
-          // assert(phi_instr->GetValue(new_block) == val);
-        }
         phi_instr->AddPhiOperand(new_block, val);
       }
       phi_instr->RemoveByBasicBlock(old_block);
@@ -233,6 +229,58 @@ void BasicBlock::ReplacePredecessorsBy(
   assert(it != m_predecessors.end());
   m_predecessors.erase(it);
   m_predecessors.insert(new_blocks.begin(), new_blocks.end());
+}
+
+void BasicBlock::ReplacePredecessorsBy(
+    std::unordered_set<std::shared_ptr<BasicBlock>> old_blocks,
+    std::shared_ptr<BasicBlock> new_block) {
+  // if phi's incoming values from old_blocks are not unified, create a
+  // corresponding phi instruction in new_block, and use it instead
+  for (auto& old_block : old_blocks) {
+    m_predecessors.erase(old_block);
+  }
+  m_predecessors.insert(new_block);
+  for (auto& instr : m_instr_list) {
+    if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
+      bool same = true;
+      std::shared_ptr<Value> val = nullptr;
+      for (auto& old_block : old_blocks) {
+        auto use = phi->m_contents[old_block];
+        auto current_val = use ? use->getValue() : nullptr;
+        if (val == nullptr) {
+          val = current_val;
+        } else if (val != current_val) {
+          same = false;
+          break;
+        }
+      }
+      // assert(val != nullptr);
+      if (same) {
+        for (auto& old_block : old_blocks) {
+          phi->RemoveByBasicBlock(old_block);
+        }
+        phi->AddPhiOperand(new_block, val);
+      } else {
+        auto new_phi = std::make_shared<PhiInstruction>(phi->m_type, new_block);
+        auto it = new_block->m_instr_list.begin();
+        for (; it != new_block->m_instr_list.end(); ++it) {
+          if ((*it)->m_op != IROp::PHI) {
+            break;
+          }
+        }
+        new_block->m_instr_list.insert(it, new_phi);
+        for (auto& old_block : old_blocks) {
+          auto use = phi->m_contents[old_block];
+          auto val = use ? use->getValue() : nullptr;
+          phi->RemoveByBasicBlock(old_block);
+          new_phi->AddPhiOperand(old_block, val);
+        }
+        phi->AddPhiOperand(new_block, new_phi);
+      }
+    } else {
+      break;
+    }
+  }
 }
 
 void BasicBlock::ReplaceSuccessorBy(std::shared_ptr<BasicBlock> old_block,

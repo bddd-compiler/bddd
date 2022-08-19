@@ -1042,6 +1042,10 @@ public:
       std::shared_ptr<BasicBlock> old_block,
       std::unordered_set<std::shared_ptr<BasicBlock>> new_blocks);
 
+  void ReplacePredecessorsBy(
+      std::unordered_set<std::shared_ptr<BasicBlock>> old_blocks,
+      std::shared_ptr<BasicBlock> new_block);
+
   void ReplaceSuccessorBy(std::shared_ptr<BasicBlock> old_block,
                           std::shared_ptr<BasicBlock> new_block);
 
@@ -1120,7 +1124,8 @@ public:
   int m_called_depth;
 
   std::set<std::shared_ptr<Loop>> m_loops;
-  std::vector<std::shared_ptr<Loop>> m_deepest_loops;
+  std::set<std::shared_ptr<Loop>> m_top_loops;
+  std::set<std::shared_ptr<Loop>> m_deepest_loops;
 
   bool m_visited;      // first used in ComputeSideEffect
   bool m_side_effect;  // whether the function has side effect

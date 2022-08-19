@@ -15,7 +15,7 @@ public:
   std::set<std::shared_ptr<Loop>> m_sub_loops;
   std::shared_ptr<Loop> m_fa_loop;
 
-  std::set<std::shared_ptr<BasicBlock>> m_latches;
+  std::unordered_set<std::shared_ptr<BasicBlock>> m_latches;
   std::unordered_set<std::shared_ptr<BasicBlock>> m_exiting_bbs;  // 可能有多个
   std::unordered_set<std::shared_ptr<BasicBlock>> m_exit_bbs;  // 可能有多个
 

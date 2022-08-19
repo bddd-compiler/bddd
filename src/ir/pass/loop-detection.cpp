@@ -105,7 +105,7 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
   for (auto &loop : func->m_loops) {
     loop->m_loop_depth = 1;
     if (loop->m_sub_loops.empty()) {
-      func->m_deepest_loops.push_back(loop);
+      func->m_deepest_loops.insert(loop);
       for (auto &bb : loop->m_bbs) {
         bb->m_deepest_loop = loop;
       }
@@ -119,6 +119,10 @@ void DetectNaturalLoops(std::shared_ptr<Function> func) {
     }
   }
   for (auto &loop : func->m_loops) {
+    assert(loop->m_loop_depth >= 1);
+    if (loop->m_loop_depth == 1) {
+      func->m_top_loops.insert(loop);
+    }
     for (auto &bb : loop->m_bbs) {
       bb->m_loop_depth = std::max(bb->m_loop_depth, loop->m_loop_depth);
     }
@@ -145,16 +149,19 @@ void ComputeLoopRelationship(std::shared_ptr<Function> func) {
   //  concept of loops is undefined.
   RemoveUnusedBasicBlocks(func);
 
+  func->m_loops.clear();
   func->m_deepest_loops.clear();
+  func->m_top_loops.clear();
   for (auto &bb : func->m_bb_list) {
     bb->m_loops.clear();
     bb->m_loop_depth = 0;
+    bb->m_deepest_loop = nullptr;
   }
-  func->m_loops.clear();
   ComputeDominanceRelationship(func);
   GetBackEdges(func);
   DetectNaturalLoops(func);
 
+  // std::cerr << "[debug] loop info:" << std::endl;
   // for (auto &loop : func->m_loops) {
   //   std::cerr << "header: " << loop->m_header->m_id << std::endl;
   //

@@ -252,8 +252,11 @@ void InsertResetLoop(
   reset_loop->m_preheaders.insert(easy_loop->m_cond_bb);
   reset_loop->m_loop_depth = easy_loop->m_loop->m_loop_depth;
 
-  func->m_deepest_loops.push_back(reset_loop);
   func->m_loops.insert(reset_loop);
+  func->m_deepest_loops.insert(reset_loop);
+  if (reset_loop->m_loop_depth == 1) {
+    func->m_top_loops.insert(reset_loop);
+  }
   if (easy_loop->m_loop->m_fa_loop) {
     easy_loop->m_loop->m_fa_loop->m_sub_loops.insert(reset_loop);
   }
@@ -290,6 +293,8 @@ void InsertResetLoop(
 
 void MakeRunOnce(std::shared_ptr<EasyLoop> easy_loop) {
   // the easy loop will be no longer a loop
+  // therefore the loop info will be incorrect
+  // must update loop info before later passes
   // choice 1: update loop info manually
   // choice 2: delete all of its info
   for (auto &phi : easy_loop->m_phis) {
