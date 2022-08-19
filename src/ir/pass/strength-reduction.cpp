@@ -8,7 +8,7 @@
 #include "ir/ir-pass-manager.h"
 #include "ir/loop.h"
 
-void StrengthReduction(std::shared_ptr<Loop> loop,
+bool StrengthReduction(std::shared_ptr<Loop> loop,
                        std::shared_ptr<IRBuilder> builder) {
   // Value => (basic induction variable, multiplicative factor, additive factor)
   std::map<std::shared_ptr<Value>, std::tuple<std::shared_ptr<Value>, int, int>>
@@ -37,6 +37,9 @@ void StrengthReduction(std::shared_ptr<Loop> loop,
   // 首先找到basic induction variable
   for (auto &instr : loop->m_header->m_instr_list) {
     if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
+      if (!phi->m_type.IsBasicInt()) {
+        return false;
+      }
       auto updated_val = phi->GetValue(latch);
       if (auto binary
           = std::dynamic_pointer_cast<BinaryInstruction>(updated_val)) {
@@ -224,6 +227,7 @@ void StrengthReduction(std::shared_ptr<Loop> loop,
     auto j_bb = j_instr->m_bb;
     j_bb->RemoveInstruction(j_instr);
   }
+  return true;
 }
 
 void IRPassManager::StrengthReductionPass() {
