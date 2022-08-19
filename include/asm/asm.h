@@ -337,6 +337,8 @@ public:
 
   Shift(ShiftType t, int v);
 
+  Shift(InstOp t, int v);
+
   std::string getShiftName();
 
   void exportASM(std::ofstream& ofs);

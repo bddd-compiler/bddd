@@ -559,7 +559,13 @@ std::shared_ptr<Operand> GenerateLoad(std::shared_ptr<LoadInstruction> inst,
   auto addr = inst->m_addr->getValue();
   std::shared_ptr<Operand> ret;
   ret = builder->getOperand(inst);
-  builder->appendLDR(ret, getAddr(addr, builder), std::make_shared<Operand>(0));
+  if (builder->m_load_map.find(addr) == builder->m_load_map.end()) {
+    builder->appendLDR(ret, getAddr(addr, builder),
+                       std::make_shared<Operand>(0));
+    builder->m_load_map[addr] = ret;
+  } else {
+    builder->appendMOV(ret, builder->m_load_map[addr]);
+  }
   return ret;
 }
 
@@ -569,6 +575,7 @@ std::shared_ptr<Operand> GenerateStore(std::shared_ptr<StoreInstruction> inst,
   auto val = inst->m_val->getValue();
   auto src = builder->getOperand(val);
   builder->appendSTR(src, getAddr(addr, builder), std::make_shared<Operand>(0));
+  builder->m_load_map[addr] = src;
   return nullptr;
 }
 

@@ -17,6 +17,9 @@ void combineInstruction(std::shared_ptr<ASM_Module> module);
 std::shared_ptr<ASM_Instruction> combineMULToADD(std::shared_ptr<MULInst> mul,
                                                  std::shared_ptr<ASInst> as);
 
+std::shared_ptr<ASM_Instruction> combineShiftToADD(
+    std::shared_ptr<ShiftInst> shift_inst, std::shared_ptr<ASInst> as);
+
 void eliminateDeadInstruction(std::shared_ptr<ASM_Module> module);
 
 void optimizeTemp(std::shared_ptr<ASM_Module> module, bool optimization);
