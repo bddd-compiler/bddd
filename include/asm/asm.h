@@ -95,6 +95,9 @@ enum class InstOp {
   MLA,
   MLS,
   MUL,
+  SMMLA,
+  SMMLS,
+  SMMUL,
   SDIV,
   // bitwise instructions
   AND,

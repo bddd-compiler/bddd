@@ -1,6 +1,8 @@
 #include "asm/asm-builder.h"
 #include "ir/ir.h"
 
+// #define DIV_CONST
+
 std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
     std::shared_ptr<Constant> value, bool genimm, bool checkimm,
     std::shared_ptr<ASM_BasicBlock> phi_block) {
@@ -99,6 +101,30 @@ std::shared_ptr<Operand> GenerateMul(std::shared_ptr<BinaryInstruction> inst,
   return ret;
 }
 
+void divConst(std::shared_ptr<Operand> ret, std::shared_ptr<Operand> operand1,
+              int devisor, std::shared_ptr<ASM_Builder> builder) {
+  u_int32_t d = devisor;
+  u_int64_t n = (1 << 31) - ((1 << 31) % d) - 1;
+  u_int64_t p = 32;
+  while (((u_int64_t)1 << p) <= n * (d - ((u_int64_t)1 << p) % d)) {
+    p++;
+  }
+  u_int64_t m = (((u_int64_t)1 << p) + (u_int64_t)d - ((u_int64_t)1 << p) % d)
+                / (u_int64_t)d;
+  auto magic_num = std::make_shared<Operand>(OperandType::VREG);
+  builder->appendMOV(magic_num, (int)m);
+  auto mul_ret = std::make_shared<Operand>(OperandType::VREG);
+  if (m >= 0x80000000)
+    builder->appendMUL(InstOp::SMMLA, mul_ret, magic_num, operand1, operand1);
+  else
+    builder->appendMUL(InstOp::SMMUL, mul_ret, magic_num, operand1);
+  auto temp_reg = std::make_shared<Operand>(OperandType::VREG);
+  builder->appendShift(InstOp::ASR, temp_reg, mul_ret,
+                       std::make_shared<Operand>((int)(p - 32)));
+  auto ret_inst = builder->appendAS(InstOp::ADD, ret, temp_reg, operand1);
+  ret_inst->m_shift = std::make_unique<Shift>(Shift::ShiftType::LSR, 31);
+}
+
 std::shared_ptr<Operand> GenerateDiv(std::shared_ptr<BinaryInstruction> inst,
                                      std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<Value> val1 = inst->m_lhs_val_use->getValue();
@@ -106,21 +132,23 @@ std::shared_ptr<Operand> GenerateDiv(std::shared_ptr<BinaryInstruction> inst,
   bool is_int = inst->m_op == IROp::SDIV;
   InstOp op = is_int ? InstOp::SDIV : InstOp::VDIV;
   auto ret = builder->getOperand(inst);
+  auto operand1 = builder->getOperand(val1);
 
   if (val2->m_type.IsConst()) {
     auto const_val = std::dynamic_pointer_cast<Constant>(val2);
     if (const_val->m_int_val == 1 || const_val->m_float_val == 1) {
-      builder->appendMOV(ret, builder->getOperand(val1));
+      builder->appendMOV(ret, operand1);
       return ret;
     } else if (is_int) {
+      // check if the value of devisor is pow of 2
       int temp = 2;
       for (int i = 1; i < 32; i++) {
         if (temp == const_val->m_int_val) {
           auto ret_temp = std::make_shared<Operand>(OperandType::VREG);
-          builder->appendShift(InstOp::ASR, ret_temp, builder->getOperand(val1),
+          builder->appendShift(InstOp::ASR, ret_temp, operand1,
                                std::make_shared<Operand>(i - 1));
-          auto add = builder->appendAS(InstOp::ADD, ret_temp,
-                                       builder->getOperand(val1), ret_temp);
+          auto add
+              = builder->appendAS(InstOp::ADD, ret_temp, operand1, ret_temp);
           add->m_shift = std::make_unique<Shift>(Shift::ShiftType::LSR, 32 - i);
           builder->appendShift(InstOp::ASR, ret, ret_temp,
                                std::make_shared<Operand>(i));
@@ -128,10 +156,16 @@ std::shared_ptr<Operand> GenerateDiv(std::shared_ptr<BinaryInstruction> inst,
         }
         temp <<= 1;
       }
+
+      // div const
+      // seems to be a negative optimization?
+#ifdef DIV_CONST
+      divConst(ret, operand1, const_val->m_int_val, builder);
+      return ret;
+#endif
     }
   }
 
-  auto operand1 = builder->getOperand(val1);
   auto operand2 = builder->getOperand(val2);
 
   if (!is_int) ret->m_is_float = true;
@@ -145,6 +179,7 @@ std::shared_ptr<Operand> GenerateMod(std::shared_ptr<BinaryInstruction> inst,
   std::shared_ptr<Value> val2 = inst->m_rhs_val_use->getValue();
   auto ret = builder->getOperand(inst);
   auto devidend = builder->getOperand(val1);
+  std::shared_ptr<Operand> div_ret;
 
   if (val2->m_type.IsConst()) {
     assert(val2->m_type.IsBasicInt());
@@ -176,12 +211,17 @@ std::shared_ptr<Operand> GenerateMod(std::shared_ptr<BinaryInstruction> inst,
       }
       temp <<= 1;
     }
+#ifdef DIV_CONST
+    div_ret = std::make_shared<Operand>(OperandType::VREG);
+    divConst(div_ret, devidend, const_val->m_int_val, builder);
+#endif
   }
 
   auto devisor = builder->getOperand(val2);
-
-  auto div_ret = std::make_shared<Operand>(OperandType::VREG);
-  builder->appendSDIV(div_ret, devidend, devisor);
+  if (!div_ret) {
+    div_ret = std::make_shared<Operand>(OperandType::VREG);
+    builder->appendSDIV(div_ret, devidend, devisor);
+  }
   builder->appendMUL(InstOp::MLS, ret, div_ret, devisor, devidend);
   return ret;
 }
