@@ -270,14 +270,4 @@ void IRPassManager::LoopSimplifyPass() {
       SimplifyLoopRecursively(loop, func);
     }
   }
-  // for (auto &func : m_builder->m_module->m_function_list) {
-  //   RemoveTrivialBasicBlocks(func);
-  // }
-  // for (auto &func : m_builder->m_module->m_function_list) {
-  //   ComputeLoopRelationship(func);
-  //   for (auto &loop : func->m_loops) {
-  //     bool flag = SimplifyLoopRecursively(loop, func);
-  //     if (!flag) break;
-  //   }
-  // }
 }
