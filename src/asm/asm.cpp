@@ -110,6 +110,42 @@ void ASM_BasicBlock::fillMOV() {
   }
 }
 
+void ASM_BasicBlock::appendSuccessor(std::shared_ptr<ASM_BasicBlock> succ) {
+  m_successors.push_back(succ);
+}
+
+void ASM_BasicBlock::appendPredecessor(std::shared_ptr<ASM_BasicBlock> pred) {
+  m_predecessors.push_back(pred);
+}
+
+void ASM_BasicBlock::removeSuccessor(std::shared_ptr<ASM_BasicBlock> succ) {
+  auto iter = m_successors.begin();
+  while (iter != m_successors.end()) {
+    if (*iter == succ)
+      iter = m_successors.erase(iter);
+    else
+      iter++;
+  }
+}
+
+void ASM_BasicBlock::removePredecessor(std::shared_ptr<ASM_BasicBlock> pred) {
+  auto iter = m_predecessors.begin();
+  while (iter != m_predecessors.end()) {
+    if (*iter == pred)
+      iter = m_predecessors.erase(iter);
+    else
+      iter++;
+  }
+}
+
+std::vector<std::shared_ptr<ASM_BasicBlock>> ASM_BasicBlock::getSuccessors() {
+  return m_successors;
+}
+
+std::vector<std::shared_ptr<ASM_BasicBlock>> ASM_BasicBlock::getPredecessors() {
+  return m_predecessors;
+}
+
 // for MOV, ADD, SUB, RSB
 /*
   int type immediate check
@@ -315,6 +351,12 @@ std::string ASM_Instruction::getOpName() {
       return "MLS";
     case InstOp::MUL:
       return "MUL";
+    case InstOp::SMMLA:
+      return "SMMLA";
+    case InstOp::SMMLS:
+      return "SMMLS";
+    case InstOp::SMMUL:
+      return "SMMUL";
     case InstOp::SDIV:
       return "SDIV";
     case InstOp::AND:

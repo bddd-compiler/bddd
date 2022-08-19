@@ -134,7 +134,7 @@ void RegisterAllocator::AllocateCurFunc() {
 #ifdef REG_ALLOC_DEBUG
   debug("AllocateCurFunc");
 #endif
-  LivenessAnalysis();
+  m_cur_func->LivenessAnalysis(m_reg_type);
   Build();
   MkWorklist();
   isSelectSpill = false;
@@ -180,6 +180,7 @@ void RegisterAllocator::Build() {
 #ifdef REG_ALLOC_DEBUG
   debug("Build");
 #endif
+  OpPtr temp;
   for (auto& b : m_cur_func->m_blocks) {
     std::unordered_set<OpPtr> live = b->m_liveout;
     std::unordered_map<OpPtr, int> lifespan_map;
@@ -228,6 +229,9 @@ void RegisterAllocator::Build() {
       }
       // live := use(I) ∪ (live\def(I))
       for (auto& def : defs) {
+        if (def->getName() == "VR264") {
+          temp = def;
+        }
         live.erase(def);
         if (lifespan_map.find(def) != lifespan_map.end()) {
           def->lifespan = cnt - lifespan_map[def];
@@ -261,9 +265,11 @@ std::unordered_set<OpPtr> RegisterAllocator::Adjacent(OpPtr n) {
   }
   auto ret = adjList[n];
   for (auto& op : selectStack) {
+    if (op->m_op_type == OperandType::REG) continue;
     ret.erase(op);
   }
   for (auto& op : coalescedNodes) {
+    if (op->m_op_type == OperandType::REG) continue;
     ret.erase(op);
   }
   return ret;
@@ -574,7 +580,6 @@ void RegisterAllocator::RewriteProgram() {
   // In the program (instructions), insert a store after each
   // definition of a vi, a fetch before each use of a vi.
   // Put all the vi into a set newTemps.
-
   std::unordered_set<OpPtr> newTemps;
   for (auto& v : spilledNodes) {
     if (v->lifespan <= 1 && !v->rejected) {
@@ -598,6 +603,7 @@ void RegisterAllocator::RewriteProgram() {
     for (auto& b : m_cur_func->m_blocks) {
       for (auto iter = b->m_insts.begin(); iter != b->m_insts.end(); iter++) {
         auto& i = *iter;
+        auto next = std::next(iter);
         if (i->m_is_deleted) {
           continue;
         }
@@ -666,6 +672,13 @@ void RegisterAllocator::RewriteProgram() {
           b->insertSpillSTR(iter, str, add, mov);
           newTemps.insert(newOp);
           updateDepth(b, newOp);
+          if (next != b->m_insts.end()) {
+            auto& next_inst = *next;
+            if (next_inst->m_use.find(v) != next_inst->m_use.end()
+                || next_inst->m_f_use.find(v) != next_inst->m_f_use.end()) {
+              next_inst->replaceUse(newOp, v);
+            }
+          }
         }
 
         // replace use
@@ -689,7 +702,10 @@ void RegisterAllocator::RewriteProgram() {
             offs = std::make_shared<Operand>(fixed_offs);
             ldr = std::make_shared<LDRInst>(newOp, Operand::getRReg(RReg::SP),
                                             offs);
-            if (is_stack_param) m_cur_func->m_params_set_list.push_back(ldr);
+            if (is_stack_param) {
+              ldr->addDef(Operand::getRReg(RReg::R12));
+              m_cur_func->m_params_set_list.push_back(ldr);
+            }
           } else {
             if (!newOp->m_is_float) {
               offs = std::make_shared<Operand>(OperandType::VREG);

@@ -28,7 +28,7 @@ int main(int argc, char *argv[]) {
   const char *asm_path = nullptr;
   const char *ir_path = nullptr;
   const char *tmp_asm_path = nullptr;
-  while ((ch = getopt_long(argc, argv, "So:O:i:t:", long_options, nullptr))
+  while ((ch = getopt_long(argc, argv, "So:O:i:t:", long_options, NULL))
          != -1) {
     switch (ch) {
       case 'S':
@@ -103,14 +103,11 @@ int main(int argc, char *argv[]) {
   pass_manager->LoopUnrollingPass();
   pass_manager->GVNPass();
   pass_manager->GCMPass();
-  pass_manager->InstrCombiningPass();
-  pass_manager->StrengthReductionPass();
-  // pass_manager->LoopSimplifyPass();
 
-  // if (optimization) {
-  //   pass_manager->InstrCombiningPass();
-  //   pass_manager->LoopSimplifyPass();
-  // }
+  if (optimization) {
+    pass_manager->InstrCombiningPass();
+    pass_manager->LoopSimplifyPass();
+  }
 
   if (ir_path) {
     std::ofstream ofs(ir_path);

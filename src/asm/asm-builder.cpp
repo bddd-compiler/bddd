@@ -34,6 +34,7 @@ void ASM_Builder::setParams() {
     bool is_float = value->m_type.IsBasicFloat();
     auto ret = std::make_shared<Operand>(OperandType::VREG, is_float);
     auto mov = std::make_shared<MOVInst>(ret, Operand::getRReg((RReg)i));
+    mov->addDef(Operand::getRReg(RReg::R12));
     m_cur_func->m_params_set_list.push_back(mov);
     m_value_map.insert(std::make_pair(value, ret));
     i++;
@@ -47,6 +48,7 @@ void ASM_Builder::setParams() {
     auto ret = std::make_shared<Operand>(OperandType::VREG, is_float);
     auto ldr = std::make_shared<LDRInst>(ret, Operand::getRReg(RReg::SP),
                                          std::make_shared<Operand>(fp_offs));
+    ldr->addDef(Operand::getRReg(RReg::R12));
     m_cur_func->m_params_set_list.push_back(ldr);
     m_cur_func->m_stack_params_offs[ret] = fp_offs;
     m_value_map.insert(std::make_pair(value, ret));

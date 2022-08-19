@@ -95,6 +95,9 @@ enum class InstOp {
   MLA,
   MLS,
   MUL,
+  SMMLA,
+  SMMLS,
+  SMMUL,
   SDIV,
   // bitwise instructions
   AND,
@@ -251,6 +254,8 @@ public:
         m_f_push(std::make_unique<PInst>(InstOp::VPUSH)),
         m_f_pop(std::make_unique<PInst>(InstOp::VPOP)) {}
 
+  void LivenessAnalysis(RegType reg_type);
+
   int getPushSize();
 
   int getStackSize();
@@ -313,6 +318,10 @@ public:
   void appendSuccessor(std::shared_ptr<ASM_BasicBlock> succ);
 
   void appendPredecessor(std::shared_ptr<ASM_BasicBlock> pred);
+
+  void removeSuccessor(std::shared_ptr<ASM_BasicBlock> succ);
+
+  void removePredecessor(std::shared_ptr<ASM_BasicBlock> pred);
 
   std::vector<std::shared_ptr<ASM_BasicBlock>> getSuccessors();
 

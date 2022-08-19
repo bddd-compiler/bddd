@@ -7,7 +7,7 @@ std::shared_ptr<Operand> ASM_Builder::GenerateConstant(
   assert(value->m_type.IsConst());
   std::shared_ptr<Operand> ret;
   if (value->m_type.IsBasicFloat()) {
-        ret = std::make_shared<Operand>(OperandType::VREG, true);
+    ret = std::make_shared<Operand>(OperandType::VREG, true);
     appendMOV(ret, value->m_float_val, phi_block);
   } else {
     int imm = value->m_int_val;
@@ -106,21 +106,23 @@ std::shared_ptr<Operand> GenerateDiv(std::shared_ptr<BinaryInstruction> inst,
   bool is_int = inst->m_op == IROp::SDIV;
   InstOp op = is_int ? InstOp::SDIV : InstOp::VDIV;
   auto ret = builder->getOperand(inst);
+  auto operand1 = builder->getOperand(val1);
 
   if (val2->m_type.IsConst()) {
     auto const_val = std::dynamic_pointer_cast<Constant>(val2);
     if (const_val->m_int_val == 1 || const_val->m_float_val == 1) {
-      builder->appendMOV(ret, builder->getOperand(val1));
+      builder->appendMOV(ret, operand1);
       return ret;
     } else if (is_int) {
+      // check if the value of devisor is pow of 2
       int temp = 2;
       for (int i = 1; i < 32; i++) {
         if (temp == const_val->m_int_val) {
           auto ret_temp = std::make_shared<Operand>(OperandType::VREG);
-          builder->appendShift(InstOp::ASR, ret_temp, builder->getOperand(val1),
+          builder->appendShift(InstOp::ASR, ret_temp, operand1,
                                std::make_shared<Operand>(i - 1));
-          auto add = builder->appendAS(InstOp::ADD, ret_temp,
-                                       builder->getOperand(val1), ret_temp);
+          auto add
+              = builder->appendAS(InstOp::ADD, ret_temp, operand1, ret_temp);
           add->m_shift = std::make_unique<Shift>(Shift::ShiftType::LSR, 32 - i);
           builder->appendShift(InstOp::ASR, ret, ret_temp,
                                std::make_shared<Operand>(i));
@@ -128,10 +130,37 @@ std::shared_ptr<Operand> GenerateDiv(std::shared_ptr<BinaryInstruction> inst,
         }
         temp <<= 1;
       }
+
+      // div const
+      // seems to be a negative optimization?
+#ifdef DIV_CONST
+      u_int32_t d = const_val->m_int_val;
+      u_int64_t n = (1 << 31) - ((1 << 31) % d) - 1;
+      u_int64_t p = 32;
+      while (((u_int64_t)1 << p) <= n * (d - ((u_int64_t)1 << p) % d)) {
+        p++;
+      }
+      u_int64_t m
+          = (((u_int64_t)1 << p) + (u_int64_t)d - ((u_int64_t)1 << p) % d)
+            / (u_int64_t)d;
+      auto magic_num = std::make_shared<Operand>(OperandType::VREG);
+      builder->appendMOV(magic_num, (int)m);
+      auto mul_ret = std::make_shared<Operand>(OperandType::VREG);
+      if (m >= 0x80000000)
+        builder->appendMUL(InstOp::SMMLA, mul_ret, magic_num, operand1,
+                           operand1);
+      else
+        builder->appendMUL(InstOp::SMMUL, mul_ret, magic_num, operand1);
+      auto temp_reg = std::make_shared<Operand>(OperandType::VREG);
+      builder->appendShift(InstOp::ASR, temp_reg, mul_ret,
+                           std::make_shared<Operand>((int)(p - 32)));
+      auto ret_inst = builder->appendAS(InstOp::ADD, ret, temp_reg, operand1);
+      ret_inst->m_shift = std::make_unique<Shift>(Shift::ShiftType::LSR, 31);
+      return ret;
+#endif
     }
   }
 
-  auto operand1 = builder->getOperand(val1);
   auto operand2 = builder->getOperand(val2);
 
   if (!is_int) ret->m_is_float = true;
@@ -146,37 +175,37 @@ std::shared_ptr<Operand> GenerateMod(std::shared_ptr<BinaryInstruction> inst,
   auto ret = builder->getOperand(inst);
   auto devidend = builder->getOperand(val1);
 
-  // if (val2->m_type.IsConst()) {
-  //   assert(val2->m_type.IsBasicInt());
-  //   auto const_val = std::dynamic_pointer_cast<Constant>(val2);
-  //   if (const_val->m_int_val == 1) {
-  //     builder->appendMOV(ret, 0);
-  //     return ret;
-  //   }
-  //   int temp = 2;
-  //   for (int i = 1; i < 32; i++) {
-  //     if (temp == const_val->m_int_val) {
-  //       int and_val = temp - 1;
-  //       std::shared_ptr<Operand> and_reg;
-  //       if (Operand::immCheck(and_val)) {
-  //         and_reg = std::make_shared<Operand>(and_val);
-  //       } else {
-  //         and_reg = std::make_shared<Operand>(OperandType::VREG);
-  //         builder->appendMOV(and_reg, and_val);
-  //       }
-  //       auto and_inst = builder->appendBIT(InstOp::AND, ret, devidend, and_reg);
-  //       and_inst->m_set_flag = true;
-  //       auto cmp_inst = builder->appendCT(InstOp::CMP, devidend,
-  //                                         std::make_shared<Operand>(0));
-  //       cmp_inst->m_cond = CondType::NE;
-  //       auto sub_inst = builder->appendAS(InstOp::SUB, ret, ret,
-  //                                         std::make_shared<Operand>(temp));
-  //       sub_inst->m_cond = CondType::MI;
-  //       return ret;
-  //     }
-  //     temp <<= 1;
-  //   }
-  // }
+  if (val2->m_type.IsConst()) {
+    assert(val2->m_type.IsBasicInt());
+    auto const_val = std::dynamic_pointer_cast<Constant>(val2);
+    if (const_val->m_int_val == 1) {
+      builder->appendMOV(ret, 0);
+      return ret;
+    }
+    int temp = 2;
+    for (int i = 1; i < 32; i++) {
+      if (temp == const_val->m_int_val) {
+        int and_val = temp - 1;
+        std::shared_ptr<Operand> and_reg;
+        if (Operand::immCheck(and_val)) {
+          and_reg = std::make_shared<Operand>(and_val);
+        } else {
+          and_reg = std::make_shared<Operand>(OperandType::VREG);
+          builder->appendMOV(and_reg, and_val);
+        }
+        auto and_inst = builder->appendBIT(InstOp::AND, ret, devidend, and_reg);
+        and_inst->m_set_flag = true;
+        auto cmp_inst = builder->appendCT(InstOp::CMP, devidend,
+                                          std::make_shared<Operand>(0));
+        cmp_inst->m_cond = CondType::NE;
+        auto sub_inst = builder->appendAS(InstOp::SUB, ret, ret,
+                                          std::make_shared<Operand>(temp));
+        sub_inst->m_cond = CondType::MI;
+        return ret;
+      }
+      temp <<= 1;
+    }
+  }
 
   auto devisor = builder->getOperand(val2);
 
@@ -202,7 +231,7 @@ std::shared_ptr<Operand> GenerateCMP(std::shared_ptr<BinaryInstruction> inst,
   auto operand1 = builder->getOperand(inst->m_lhs_val_use->getValue());
   std::shared_ptr<Operand> operand2;
 
-    // vcmp allow op2 to be constant 0.0
+  // vcmp allow op2 to be constant 0.0
   if (!is_int) {
     auto float_val
         = std::dynamic_pointer_cast<Constant>(inst->m_rhs_val_use->getValue());
@@ -462,9 +491,13 @@ std::shared_ptr<Operand> GenerateGetElementPtr(
       if (first) {
         first = false;
         var_offs_op = std::make_shared<Operand>(OperandType::VREG);
-        auto mov = builder->appendMOV(
-            std::make_shared<Operand>(OperandType::VREG), attribute);
-        builder->appendMUL(InstOp::MUL, var_offs_op, var_offs, mov->m_dest);
+        if (attribute == 1) {
+          builder->appendMOV(var_offs_op, var_offs);
+        } else {
+          auto mov = builder->appendMOV(
+              std::make_shared<Operand>(OperandType::VREG), attribute);
+          builder->appendMUL(InstOp::MUL, var_offs_op, var_offs, mov->m_dest);
+        }
       } else {
         auto mov = builder->appendMOV(
             std::make_shared<Operand>(OperandType::VREG), attribute);
@@ -514,17 +547,6 @@ std::shared_ptr<Operand> GenerateLoad(std::shared_ptr<LoadInstruction> inst,
                                       std::shared_ptr<ASM_Builder> builder) {
   auto addr = inst->m_addr->getValue();
   std::shared_ptr<Operand> ret;
-
-  // check if addr is in the memory map
-  // but we have to check value map in case the ret is already used
-  // in a phi instruction before the cur block
-  if (builder->m_memory_map.find(addr) != builder->m_memory_map.end()
-      && builder->m_value_map.find(inst) == builder->m_value_map.end()) {
-    ret = builder->m_memory_map[addr];
-    builder->m_value_map.insert({inst, ret});
-    return ret;
-  }
-
   ret = builder->getOperand(inst);
   builder->appendLDR(ret, getAddr(addr, builder), std::make_shared<Operand>(0));
   return ret;
@@ -536,13 +558,6 @@ std::shared_ptr<Operand> GenerateStore(std::shared_ptr<StoreInstruction> inst,
   auto val = inst->m_val->getValue();
   auto src = builder->getOperand(val);
   builder->appendSTR(src, getAddr(addr, builder), std::make_shared<Operand>(0));
-
-  // record the last constant
-  if (val->m_type.IsConst())
-    builder->m_memory_map[addr] = src;
-  else
-    builder->m_memory_map.erase(addr);
-
   return nullptr;
 }
 

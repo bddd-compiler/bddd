@@ -1,31 +1,14 @@
-#include "asm/asm-register.h"
 #include "asm/asm.h"
 
-void ASM_BasicBlock::appendSuccessor(std::shared_ptr<ASM_BasicBlock> succ) {
-  m_successors.push_back(succ);
-}
-
-void ASM_BasicBlock::appendPredecessor(std::shared_ptr<ASM_BasicBlock> pred) {
-  m_predecessors.push_back(pred);
-}
-
-std::vector<std::shared_ptr<ASM_BasicBlock>> ASM_BasicBlock::getSuccessors() {
-  return m_successors;
-}
-
-std::vector<std::shared_ptr<ASM_BasicBlock>> ASM_BasicBlock::getPredecessors() {
-  return m_predecessors;
-}
-
-void RegisterAllocator::LivenessAnalysis() {
+void ASM_Function::LivenessAnalysis(RegType reg_type) {
   // calculate def and use set of all blocks
-  for (auto& b : m_cur_func->m_blocks) {
+  for (auto& b : m_blocks) {
     b->m_def.clear();
     b->m_use.clear();
     for (auto& i : b->m_insts) {
       if (i->m_is_deleted) continue;
-      std::unordered_set<OpPtr> defs, uses;
-      if (m_reg_type == RegType::R) {
+      std::unordered_set<std::shared_ptr<Operand>> defs, uses;
+      if (reg_type == RegType::R) {
         defs = i->m_def;
         uses = i->m_use;
       } else {
@@ -52,8 +35,7 @@ void RegisterAllocator::LivenessAnalysis() {
   bool end;
   do {
     end = true;
-    for (auto iter = m_cur_func->m_blocks.rbegin();
-         iter != m_cur_func->m_blocks.rend(); iter++) {
+    for (auto iter = m_blocks.rbegin(); iter != m_blocks.rend(); iter++) {
       auto b = *iter;
 
       // record in'[b] and out'[b]
