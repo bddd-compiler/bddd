@@ -127,6 +127,7 @@ void removeUnreachableBlock(std::shared_ptr<ASM_Module> module) {
 }
 
 void combineInstruction(std::shared_ptr<ASM_Module> module) {
+  int cnt = 0;
   for (auto& func : module->m_funcs) {
     for (auto& block : func->m_blocks) {
       std::unordered_map<std::shared_ptr<Operand>,
@@ -154,18 +155,19 @@ void combineInstruction(std::shared_ptr<ASM_Module> module) {
             if (auto mul = std::dynamic_pointer_cast<MULInst>(def_inst)) {
               inst = combineMULToADD(mul, i);
               inst->m_block = block;
-              std::cout << "combine mul to add" << std::endl;
+              cnt++;
             }
             if (auto shift = std::dynamic_pointer_cast<ShiftInst>(def_inst)) {
               inst = combineShiftToADD(shift, i);
               inst->m_block = block;
-              std::cout << "combine shift to add" << std::endl;
+              cnt++;
             }
           }
         }
       }
     }
   }
+  std::cerr << "[debug] combine shift/mul inst to add x" << cnt << std::endl;
 }
 
 std::shared_ptr<ASM_Instruction> combineMULToADD(std::shared_ptr<MULInst> mul,
@@ -236,7 +238,7 @@ void optimizeTemp(std::shared_ptr<ASM_Module> module, bool optimization) {
   removeUnreachableBlock(module);
 
   if (optimization) {
-    // combineInstruction(module);
+    combineInstruction(module);
     eliminateDeadInstruction(module);
   }
 }
