@@ -19,8 +19,8 @@ void UpdateLoopDetails(std::shared_ptr<Loop> loop) {
       loop->m_latches.insert(pred);
     }
   }
-  assert(!loop->m_preheaders.empty());
-  assert(!loop->m_latches.empty());
+  // assert(!loop->m_preheaders.empty());
+  // assert(!loop->m_latches.empty());
 }
 void UpdateLoopDetails(std::shared_ptr<BasicBlock> bb) {
   for (auto &loop : bb->m_loops) {
@@ -200,13 +200,65 @@ bool SimplifyLoop(std::shared_ptr<Loop> lp, std::shared_ptr<Function> func) {
   return true;
 }
 
+bool CreateUniqueLatch(std::shared_ptr<Loop> lp,
+                       std::shared_ptr<Function> func) {
+  std::vector<std::shared_ptr<Loop>> worklist;
+  worklist.push_back(lp);
+  for (int i = 0; i < worklist.size(); ++i) {
+    auto l = worklist[i];
+    worklist.insert(worklist.end(), l->m_sub_loops.begin(),
+                    l->m_sub_loops.end());
+  }
+  while (!worklist.empty()) {
+    auto l = worklist.back();
+    worklist.pop_back();
+    //
+    if (l->m_latches.size() > 1) {
+      // insert a new latch
+      // old_latch ->
+      // old_latch -> new_latch -> header
+      // old_latch ->
+
+      auto it = std::find(func->m_bb_list.begin(), func->m_bb_list.end(),
+                          l->m_header);
+      assert(it != func->m_bb_list.end());
+      ++it;
+      auto new_latch = AddMiddleBasicBlock(l, func, "new_latch", it,
+                                           l->m_latches, l->m_header, true);
+
+      l->m_latches.clear();
+      l->m_latches.insert(new_latch);
+      std::cerr << "[debug] add a new latch" << std::endl;
+      assert(l->m_latches.size() == 1);
+    }
+
+    if (l->m_preheaders.size() > 1) {
+      // insert a new preheader
+      // old_preheader ->
+      // old_preheader -> new_preheader -> header
+      // old_preheader ->
+
+      auto it = std::find(func->m_bb_list.begin(), func->m_bb_list.end(),
+                          l->m_header);
+      auto new_preheader = AddMiddleBasicBlock(
+          l, func, "new_preheader", it, l->m_preheaders, l->m_header, false);
+      l->m_preheaders.clear();
+      l->m_preheaders.insert(new_preheader);
+      std::cerr << "[debug] add a new preheader" << std::endl;
+      assert(l->m_preheaders.size() == 1);
+    }
+  }
+  return true;
+}
+
 bool SimplifyLoopRecursively(std::shared_ptr<Loop> loop,
                              std::shared_ptr<Function> func) {
   // depth first
   for (auto &sub_loop : loop->m_sub_loops) {
     SimplifyLoopRecursively(sub_loop, func);
   }
-  SimplifyLoop(loop, func);
+  // SimplifyLoop(loop, func);
+  CreateUniqueLatch(loop, func);
   return false;
 }
 

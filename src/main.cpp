@@ -101,13 +101,11 @@ int main(int argc, char *argv[]) {
   pass_manager->FunctionInliningPass();
   pass_manager->LoadStoreOptimizationPass();
   pass_manager->LoopUnrollingPass();
+  pass_manager->LoopSimplifyPass();
+  pass_manager->StrengthReductionPass();
+  pass_manager->InstrCombiningPass();
   pass_manager->GVNPass();
   pass_manager->GCMPass();
-
-  if (optimization) {
-    pass_manager->InstrCombiningPass();
-    pass_manager->LoopSimplifyPass();
-  }
 
   if (ir_path) {
     std::ofstream ofs(ir_path);

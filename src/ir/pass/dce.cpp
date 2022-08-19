@@ -79,4 +79,6 @@ void DeadCodeElimination(std::shared_ptr<Function> func) {
   if (cnt) {
     std::cerr << "[debug] dce x" << cnt << std::endl;
   }
+
+  // TODO: some ununsed value still cannot be removed
 }

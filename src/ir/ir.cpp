@@ -234,8 +234,12 @@ void BasicBlock::ReplacePredecessorsBy(
 void BasicBlock::ReplacePredecessorsBy(
     std::unordered_set<std::shared_ptr<BasicBlock>> old_blocks,
     std::shared_ptr<BasicBlock> new_block) {
+  // old_block
+  // old_block this_block => new_block this_block
+  // old_block
   // if phi's incoming values from old_blocks are not unified, create a
   // corresponding phi instruction in new_block, and use it instead
+  assert(old_blocks.find(new_block) == old_blocks.end());
   for (auto& old_block : old_blocks) {
     m_predecessors.erase(old_block);
   }
@@ -243,37 +247,39 @@ void BasicBlock::ReplacePredecessorsBy(
   for (auto& instr : m_instr_list) {
     if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
       bool same = true;
+      bool first = true;
       std::shared_ptr<Value> val = nullptr;
       for (auto& old_block : old_blocks) {
         auto use = phi->m_contents[old_block];
-        auto current_val = use ? use->getValue() : nullptr;
-        if (val == nullptr) {
-          val = current_val;
-        } else if (val != current_val) {
+        auto use_val = use ? use->getValue() : nullptr;
+        if (first) {
+          first = false;
+          val = use_val;
+        } else if (use_val != val) {
           same = false;
           break;
         }
       }
-      // assert(val != nullptr);
       if (same) {
+        assert(val != nullptr);
         for (auto& old_block : old_blocks) {
           phi->RemoveByBasicBlock(old_block);
         }
         phi->AddPhiOperand(new_block, val);
       } else {
         auto new_phi = std::make_shared<PhiInstruction>(phi->m_type, new_block);
-        auto it = new_block->m_instr_list.begin();
-        for (; it != new_block->m_instr_list.end(); ++it) {
-          if ((*it)->m_op != IROp::PHI) {
-            break;
-          }
-        }
-        new_block->m_instr_list.insert(it, new_phi);
+        new_block->PushFrontInstruction(new_phi);
+        // auto it = new_block->m_instr_list.begin();
+        // for (; it != new_block->m_instr_list.end(); ++it) {
+        //   if ((*it)->m_op != IROp::PHI) {
+        //     break;
+        //   }
+        // }
+        // new_block->m_instr_list.insert(it, new_phi);
         for (auto& old_block : old_blocks) {
           auto use = phi->m_contents[old_block];
-          auto val = use ? use->getValue() : nullptr;
+          new_phi->AddPhiOperand(old_block, use ? use->getValue() : nullptr);
           phi->RemoveByBasicBlock(old_block);
-          new_phi->AddPhiOperand(old_block, val);
         }
         phi->AddPhiOperand(new_block, new_phi);
       }
