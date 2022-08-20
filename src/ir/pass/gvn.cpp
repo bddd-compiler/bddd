@@ -21,20 +21,6 @@ bool IsCommutative(IROp op) {
   }
 }
 
-bool IsFCmp(IROp op) {
-  switch (op) {
-    case IROp::F_EQ:
-    case IROp::F_NE:
-    case IROp::F_GT:
-    case IROp::F_GE:
-    case IROp::F_LT:
-    case IROp::F_LE:
-      return true;
-    default:
-      return false;
-  }
-}
-
 std::vector<std::pair<std::shared_ptr<Value>, std::shared_ptr<Value>>> g_vns;
 std::unordered_map<std::shared_ptr<Value>, size_t> g_idx;
 

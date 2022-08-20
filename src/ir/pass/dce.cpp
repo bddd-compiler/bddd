@@ -15,7 +15,7 @@ void dfs(std::shared_ptr<BasicBlock> bb,
   po_bb_list.push_back(bb);
 }
 
-void DeadCodeElimination(std::shared_ptr<Function> func) {
+bool DeadCodeElimination(std::shared_ptr<Function> func) {
   std::vector<std::shared_ptr<BasicBlock>> po_bb_list;
   for (auto &bb : func->m_bb_list) {
     bb->m_visited = false;
@@ -74,11 +74,27 @@ void DeadCodeElimination(std::shared_ptr<Function> func) {
       bb->RemoveInstruction(instr);
       cnt++;
     }
+    std::vector<std::shared_ptr<Instruction>> instrs;
+    for (auto &bb : func->m_bb_list) {
+      instrs.clear();
+      for (auto &instr : bb->m_instr_list) {
+        instrs.push_back(instr);
+      }
+      for (auto &instr : instrs) {
+        if (std::dynamic_pointer_cast<BinaryInstruction>(instr)) {
+          if (instr->m_use_list.empty()) {
+            bb->RemoveInstruction(instr);
+            changed = true;
+            cnt++;
+          }
+        }
+      }
+    }
     if (!changed) break;
   }
   if (cnt) {
     std::cerr << "[debug] dce x" << cnt << std::endl;
+    return true;
   }
-
-  // TODO: some ununsed value still cannot be removed
+  return false;
 }

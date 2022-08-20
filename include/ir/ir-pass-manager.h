@@ -6,14 +6,16 @@
 // auxiliary
 void ComputeDominanceRelationship(std::shared_ptr<Function> function);
 void ComputeDominanceFrontier(std::shared_ptr<Function> function);
-void RemoveUnusedBasicBlocks(std::shared_ptr<Function> func);
-void RemoveTrivialPhis(std::shared_ptr<Function> func);
-void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func);
-void RemoveTrivialBasicBlocks(std::shared_ptr<Function> func);
+bool RemoveUnusedBasicBlocks(std::shared_ptr<Function> func);
+bool RemoveTrivialPhis(std::shared_ptr<Function> func);
+bool ReplaceTrivialBranchByJump(std::shared_ptr<Function> func);
+bool RemoveTrivialBasicBlocks(std::shared_ptr<Function> func);
 void ComputeLoopRelationship(std::shared_ptr<Function> func);
-void DeadCodeElimination(std::shared_ptr<Function> func);
+bool DeadCodeElimination(std::shared_ptr<Function> func);
 void RemoveUnusedFunctions(std::unique_ptr<Module> &module);
 void UpdatePredecessors(std::shared_ptr<Function> func);
+
+void BasicOptimization(std::shared_ptr<Function> func);
 
 class IRPassManager {
 public:

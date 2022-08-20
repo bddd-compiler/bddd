@@ -311,8 +311,6 @@ void IRPassManager::StrengthReductionPass() {
     for (auto &loop : func->m_loops) {
       StrengthReduction(loop, m_builder);
     }
-    DeadCodeElimination(func);
-    ReplaceTrivialBranchByJump(func);
-    RemoveTrivialBasicBlocks(func);
+    BasicOptimization(func);
   }
 }

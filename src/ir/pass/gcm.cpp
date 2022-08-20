@@ -694,10 +694,7 @@ void IRPassManager::GCMPass() {
 
     assert(!func->m_bb_list.empty());
     RunGCM(func, m_builder);
-    ReplaceTrivialBranchByJump(func);
-    RemoveUnusedBasicBlocks(func);
-    RemoveTrivialPhis(func);
-    RemoveTrivialBasicBlocks(func);
+    BasicOptimization(func);
   }
   // RemoveUnusedFunctions(m_builder->m_module);
 }
