@@ -430,6 +430,7 @@ std::shared_ptr<Operand> GenerateBranch(std::shared_ptr<BranchInstruction> inst,
   assert(cond != CondType::NONE);
   if (builder->m_cur_block->m_status_load_inst) {
     builder->m_cur_block->insert(builder->m_cur_block->m_status_load_inst);
+    builder->m_cur_block->m_status_load_inst = nullptr;
   }
   builder->appendB(true_block, cond);
   builder->m_cur_block->m_branch_pos
@@ -646,12 +647,24 @@ std::shared_ptr<Operand> GenerateBitCast(
 std::shared_ptr<Operand> GenerateZExt(std::shared_ptr<ZExtInstruction> inst,
                                       std::shared_ptr<ASM_Builder> builder) {
   auto src_val = inst->m_val->getValue();
+  auto ret = builder->getOperand(inst);
+  if (src_val->m_type.IsConst()) {
+    int i32 = std::dynamic_pointer_cast<Constant>(src_val)->Evaluate().IntVal();
+    builder->appendMOV(ret, i32);
+    return ret;
+  }
   auto inst_cond = std::dynamic_pointer_cast<BinaryInstruction>(src_val);
   bool is_not = false;
   while (inst_cond->m_op == IROp::XOR) {
     is_not = !is_not;
-    inst_cond = std::dynamic_pointer_cast<BinaryInstruction>(
-        inst_cond->m_lhs_val_use->getValue());
+    auto lhs = inst_cond->m_lhs_val_use->getValue();
+    inst_cond = std::dynamic_pointer_cast<BinaryInstruction>(lhs);
+    if (!inst_cond) {
+      int i32 = std::dynamic_pointer_cast<Constant>(lhs)->Evaluate().IntVal();
+      i32 ^= is_not;
+      builder->appendMOV(ret, i32);
+      return ret;
+    }
   }
   CondType cond = GetCondFromIR(inst_cond->m_op);
   if (is_not) {
@@ -660,8 +673,8 @@ std::shared_ptr<Operand> GenerateZExt(std::shared_ptr<ZExtInstruction> inst,
   assert(cond != CondType::NONE);
   if (builder->m_cur_block->m_status_load_inst) {
     builder->m_cur_block->insert(builder->m_cur_block->m_status_load_inst);
+    builder->m_cur_block->m_status_load_inst = nullptr;
   }
-  auto ret = builder->getOperand(inst);
   auto mov_true = builder->appendMOV(ret, 1);
   auto mov_false = builder->appendMOV(ret, 0);
   mov_true->m_cond = cond;
