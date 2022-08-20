@@ -396,12 +396,12 @@ std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
 
   // if the function has return value, save to r0
   std::shared_ptr<Operand> ret;
-  if (return_type == VarType::INT || return_type == VarType::FLOAT) {
+  if (return_type != VarType::VOID) {
     ret = builder->getOperand(inst);
-    if (inst->m_func_name == "getfloat")
-      builder->appendMOV(ret, Operand::getSReg(SReg::S0));
-    else
+    if (return_type == VarType::INT)
       builder->appendMOV(ret, Operand::getRReg(RReg::R0));
+    else
+      builder->appendMOV(ret, Operand::getSReg(SReg::S0));
   }
 
   return ret;
@@ -451,13 +451,16 @@ std::shared_ptr<Operand> GenerateJump(std::shared_ptr<JumpInstruction> inst,
 std::shared_ptr<Operand> GenerateReturn(std::shared_ptr<ReturnInstruction> inst,
                                         std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<Value> ret_val;
+  std::shared_ptr<Operand> ret_reg;
   if (inst->m_ret && inst->m_ret->getValue()) {
     ret_val = inst->m_ret->getValue();
-    builder->appendMOV(Operand::getRReg(RReg::R0),
-                       builder->getOperand(ret_val, true, false));
+    if (ret_val->m_type.IsBasicInt())
+      ret_reg = Operand::getRReg(RReg::R0);
+    else
+      ret_reg = Operand::getSReg(SReg::S0);
+    builder->appendMOV(ret_reg, builder->getOperand(ret_val, true, false));
   }
   auto b = builder->appendB(builder->m_cur_func->m_rblock, CondType::NONE);
-  if (ret_val) b->addUse(Operand::getRReg(RReg::R0));
   return nullptr;
 }
 
