@@ -18,7 +18,7 @@ void UpdatePredecessors(std::shared_ptr<Function> func) {
 }
 
 // predecessors info is unavailable
-void RemoveUnusedBasicBlocks(std::shared_ptr<Function> func) {
+bool RemoveUnusedBasicBlocks(std::shared_ptr<Function> func) {
   int cnt = 0;
   std::vector<std::shared_ptr<BasicBlock>> unused_bbs;
   while (true) {
@@ -87,12 +87,14 @@ void RemoveUnusedBasicBlocks(std::shared_ptr<Function> func) {
               << "removed " << unused_bbs.size() << " unused blocks"
               << std::endl;
     unused_bbs.clear();
+    return true;
   }
+  return false;
 }
 
 // empty phi instructions may appear after GVN
 // phi instructions with all undef is not "empty", but should be empty
-void RemoveTrivialPhis(std::shared_ptr<Function> func) {
+bool RemoveTrivialPhis(std::shared_ptr<Function> func) {
   // should not be a loop
   int cnt = 0;
   while (true) {
@@ -157,10 +159,12 @@ void RemoveTrivialPhis(std::shared_ptr<Function> func) {
   if (cnt > 1) {
     std::cerr << "[debug] "
               << "remove trivial phis x" << cnt - 1 << std::endl;
+    return true;
   }
+  return false;
 }
 
-void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
+bool ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
   int cnt = 0;
   while (true) {
     ++cnt;
@@ -170,11 +174,45 @@ void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
       auto last_instr = bb->LastInstruction();
       if (auto br_instr
           = std::dynamic_pointer_cast<BranchInstruction>(last_instr)) {
-        if (br_instr->m_cond->getValue()->m_type.IsConst()) {
-          auto c = std::dynamic_pointer_cast<Constant>(
-              br_instr->m_cond->getValue());
+        auto cond = br_instr->m_cond->getValue();
+        bool deterministic = false;
+        bool flag;  // undetermined yet
+        if (cond->m_type.IsConst()) {
+          deterministic = true;
+          auto c = std::dynamic_pointer_cast<Constant>(cond);
+          flag = c->Evaluate().IsNotZero();
+        } else if (auto binary
+                   = std::dynamic_pointer_cast<BinaryInstruction>(cond)) {
+          if (binary->m_lhs_val_use->getValue()
+              == binary->m_rhs_val_use->getValue()) {
+            switch (binary->m_op) {
+              case IROp::I_SGE:
+              case IROp::I_SLE:
+              case IROp::I_EQ:
+              case IROp::F_EQ:
+              case IROp::F_GE:
+              case IROp::F_LE:
+                deterministic = true;
+                flag = true;
+                break;
+              case IROp::I_SGT:
+              case IROp::I_SLT:
+              case IROp::I_NE:
+              case IROp::F_NE:
+              case IROp::F_GT:
+              case IROp::F_LT:
+              case IROp::XOR:
+                deterministic = true;
+                flag = false;
+                break;
+              default:
+                break;
+            }
+          }
+        }
+        if (deterministic) {
           std::shared_ptr<BasicBlock> target_block = nullptr;
-          if (c->Evaluate().IsNotZero()) {
+          if (flag) {
             // go to true_block
             // delete bb -> false_block
             br_instr->m_false_block->RemovePredecessor(bb);
@@ -188,7 +226,8 @@ void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
           assert(target_block != nullptr);
           changed = true;
           auto jump_instr = std::make_shared<JumpInstruction>(target_block, bb);
-          bb->m_instr_list.pop_back();
+          bb->RemoveInstruction(br_instr);
+          // bb->m_instr_list.pop_back();
           bb->PushBackInstruction(jump_instr);
         }
       }
@@ -198,11 +237,13 @@ void ReplaceTrivialBranchByJump(std::shared_ptr<Function> func) {
   if (cnt > 1) {
     std::cerr << "[debug] "
               << "replace trivial branch by jump x" << cnt - 1 << std::endl;
+    return true;
   }
+  return false;
 }
 
 // remove trivial bb with only jump instruction
-void RemoveTrivialBasicBlocks(std::shared_ptr<Function> func) {
+bool RemoveTrivialBasicBlocks(std::shared_ptr<Function> func) {
   int cnt = 0;
   while (true) {
     ++cnt;
@@ -273,7 +314,9 @@ void RemoveTrivialBasicBlocks(std::shared_ptr<Function> func) {
   if (cnt > 1) {
     std::cerr << "[debug] "
               << "remove trivial basic block x" << cnt - 1 << std::endl;
+    return true;
   }
+  return false;
 }
 
 void RemoveUnusedFunctions(std::unique_ptr<Module> &module) {
@@ -313,5 +356,17 @@ void RemoveUnusedFunctions(std::unique_ptr<Module> &module) {
     } else {
       ++it;
     }
+  }
+}
+
+void BasicOptimization(std::shared_ptr<Function> func) {
+  while (true) {
+    bool changed = false;
+    changed |= ReplaceTrivialBranchByJump(func);
+    changed |= DeadCodeElimination(func);
+    changed |= RemoveUnusedBasicBlocks(func);
+    changed |= RemoveTrivialPhis(func);
+    changed |= RemoveTrivialBasicBlocks(func);
+    if (!changed) break;
   }
 }

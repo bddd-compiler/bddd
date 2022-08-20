@@ -144,9 +144,94 @@ bool CombineBinaryInstr(std::shared_ptr<BinaryInstruction> binary_instr,
     user_use = binary_val->AddUse(user_instr);
     user_const_use = builder->GetIntConstant(temp)->AddUse(user_instr);
     return true;
-  } else {
-    return false;  // not considered yet
   }
+
+  /*
+    if ((first_op == IROp::F_ADD && second_op == IROp::F_ADD)
+        || (first_op == IROp::F_SUB && second_op == IROp::F_SUB)) {
+      // x + 1.0 + 2.0
+      // x + (1.0 + 2.0)
+
+      // x - 1.0 - 2.0
+      // x - (1.0 + 2.0)
+      float a = first_val.FloatVal();
+      float b = second_val.FloatVal();
+      if ((a < 0.0) == (b < 0.0)
+          && std::abs(b) > std::numeric_limits<float>::max() - std::abs(a)) {
+        return false;
+      }
+      float temp = a + b;
+      user_use->getValue()->KillUse(user_use);
+      user_const->KillUse(user_const_use);
+      user_use = binary_val->AddUse(user_instr);
+      user_const_use = builder->GetFloatConstant(temp)->AddUse(user_instr);
+      return true;
+    } else if ((first_op == IROp::F_MUL && second_op == IROp::F_MUL)
+               || (first_op == IROp::F_DIV && second_op == IROp::F_DIV)) {
+      // x * 2 * 3
+      // x * (2 * 3)
+
+      // x / 2 / 3
+      // x / (2 * 3)
+      float a = first_val.FloatVal();
+      float b = second_val.FloatVal();
+      if (std::abs(b) > std::numeric_limits<float>::max() / std::abs(a)) {
+        return false;
+      }
+      float temp = a * b;
+      user_use->getValue()->KillUse(user_use);
+      user_const->KillUse(user_const_use);
+      user_use = binary_val->AddUse(user_instr);
+      user_const_use = builder->GetFloatConstant(temp)->AddUse(user_instr);
+      return true;
+    } else if ((first_op == IROp::F_ADD && second_op == IROp::F_SUB)
+               || (first_op == IROp::F_SUB && second_op == IROp::F_ADD)) {
+      // x + a - b
+      // x - (b - a)
+
+      // x - a + b
+      // x + (b - a)
+      float a = first_val.FloatVal();
+      float b = second_val.FloatVal();
+      if ((a < 0.0) == (b >= 0.0)
+          && std::abs(b) > std::numeric_limits<float>::max() - std::abs(a)) {
+        return false;
+      }
+      float temp = b - a;
+      user_use->getValue()->KillUse(user_use);
+      user_const->KillUse(user_const_use);
+      user_use = binary_val->AddUse(user_instr);
+      if (temp >= 0) {
+        user_const_use = builder->GetFloatConstant(temp)->AddUse(user_instr);
+      } else {
+        if (user_instr->m_op == IROp::F_ADD) {
+          user_instr->m_op = IROp::F_SUB;
+        } else {
+          assert(user_instr->m_op == IROp::F_SUB);
+          user_instr->m_op = IROp::F_ADD;
+        }
+        user_const_use = builder->GetFloatConstant(-temp)->AddUse(user_instr);
+      }
+      return true;
+    } else if ((first_op == IROp::F_MUL && second_op == IROp::F_DIV)
+               || (first_op == IROp::F_DIV && second_op == IROp::F_MUL)) {
+      // x * a / b
+      // x / (b / a)
+
+      // x / a * b
+      // x * (b / a)
+      if (first_val.FloatVal() == 0.0) return false;
+      float a = first_val.FloatVal();
+      float b = second_val.FloatVal();
+      float temp = b / a;  // 暂时不考虑这里的溢出问题
+      user_use->getValue()->KillUse(user_use);
+      user_const->KillUse(user_const_use);
+      user_use = binary_val->AddUse(user_instr);
+      user_const_use = builder->GetFloatConstant(temp)->AddUse(user_instr);
+      return true;
+    }
+  */
+  return false;
 }
 
 void IRPassManager::InstrCombiningPass() {

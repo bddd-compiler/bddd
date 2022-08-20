@@ -35,6 +35,7 @@ bool StrengthReduction(std::shared_ptr<Loop> loop,
         };
 
   // 首先找到basic induction variable
+  std::vector<std::shared_ptr<PhiInstruction>> basic_ivs;
   for (auto &instr : loop->m_header->m_instr_list) {
     if (auto phi = std::dynamic_pointer_cast<PhiInstruction>(instr)) {
       if (!phi->m_type.IsBasicInt()) {
@@ -54,6 +55,7 @@ bool StrengthReduction(std::shared_ptr<Loop> loop,
             ivs[phi] = std::make_tuple(phi, 1, 0);
             iv_init_vals[phi] = phi->GetValue(preheader);
             strides[phi] = sign * c->Evaluate().IntVal();
+            basic_ivs.push_back(phi);
           } else if (binary->m_rhs_val_use->getValue()->m_type.IsConst()
                      && binary->m_lhs_val_use->getValue() == phi) {
             auto c = std::dynamic_pointer_cast<Constant>(
@@ -61,6 +63,7 @@ bool StrengthReduction(std::shared_ptr<Loop> loop,
             ivs[phi] = std::make_tuple(phi, 1, 0);
             iv_init_vals[phi] = phi->GetValue(preheader);
             strides[phi] = sign * c->Evaluate().IntVal();
+            basic_ivs.push_back(phi);
           } else {
             std::cerr << "[debug] not basic induction variable" << std::endl;
           }
@@ -157,11 +160,12 @@ bool StrengthReduction(std::shared_ptr<Loop> loop,
       }
     }
   }
-  std::cerr << "for strength reduction of " << loop << ":" << std::endl;
-  for (auto [j, tuple] : ivs) {
-    auto [i, a, b] = tuple;
-    std::cerr << j << ": [" << i << ", " << a << ", " << b << "]" << std::endl;
-  }
+  // std::cerr << "for strength reduction of " << loop << ":" << std::endl;
+  // for (auto [j, tuple] : ivs) {
+  //   auto [i, a, b] = tuple;
+  //   std::cerr << j << ": [" << i << ", " << a << ", " << b << "]" <<
+  //   std::endl;
+  // }
 
   // work now
   auto preheader_it = preheader->m_instr_list.begin();
@@ -172,7 +176,6 @@ bool StrengthReduction(std::shared_ptr<Loop> loop,
   for (; latch_it != latch->m_instr_list.end(); ++latch_it) {
     if ((*latch_it)->m_op != IROp::PHI) break;
   }
-  // new instructions just insert before preheader_it
   for (auto [j, tuple] : ivs) {
     auto [i, a, b] = tuple;
     if (j == i) continue;  // skip basic induction vars
@@ -227,6 +230,78 @@ bool StrengthReduction(std::shared_ptr<Loop> loop,
     auto j_bb = j_instr->m_bb;
     j_bb->RemoveInstruction(j_instr);
   }
+  for (auto &bb : loop->m_bbs) {
+    std::vector<std::shared_ptr<GetElementPtrInstruction>> geps;
+    for (auto &instr : bb->m_instr_list) {
+      if (auto gep
+          = std::dynamic_pointer_cast<GetElementPtrInstruction>(instr)) {
+        geps.push_back(gep);
+      }
+    }
+    for (auto &gep : geps) {
+      auto gep_bb = gep->m_bb;
+      for (auto &basic_iv : basic_ivs) {
+        // common subexpression for geps
+        if (gep->m_indices.size() <= 2) continue;
+        auto pos_it = gep->m_indices.begin();
+        for (; pos_it != gep->m_indices.end(); ++pos_it) {
+          if ((*pos_it)->getValue() == basic_iv) {
+            break;
+          }
+        }
+        if (pos_it == gep->m_indices.end()) continue;
+        ++pos_it;
+        if (pos_it != gep->m_indices.end()) {
+          auto zero = builder->GetIntConstant(0);
+          assert(gep->m_indices.front()->getValue() == zero);
+          std::vector<std::shared_ptr<Value>> gep1_indices;
+          std::vector<std::shared_ptr<Value>> gep2_indices;
+          gep1_indices.push_back(zero);
+          for (auto it = std::next(gep->m_indices.begin()); it != pos_it;
+               ++it) {
+            gep1_indices.push_back((*it)->getValue());
+          }
+          gep2_indices.push_back(zero);
+          for (auto it = pos_it; it != gep->m_indices.end(); ++it) {
+            gep2_indices.push_back((*it)->getValue());
+          }
+
+          auto addr = gep->m_addr->getValue();
+          // create like IRBuilder does
+          auto gep1 = std::make_shared<GetElementPtrInstruction>(gep_bb);
+          gep1->m_addr = addr->AddUse(gep1);
+          for (auto &index : gep1_indices) {
+            gep1->m_indices.push_back(index->AddUse(gep1));
+          }
+          gep1->m_type.Set(addr->m_type.m_base_type, true);
+          gep1->m_type.m_dimensions.clear();
+          for (size_t i = gep1->m_indices.size() - 1;
+               i < addr->m_type.m_dimensions.size(); ++i) {
+            gep1->m_type.m_dimensions.push_back(addr->m_type.m_dimensions[i]);
+          }
+          gep_bb->InsertFrontInstruction(gep, gep1);
+          // similarly
+          auto gep2 = std::make_shared<GetElementPtrInstruction>(gep_bb);
+          gep2->m_addr = gep1->AddUse(gep2);
+          for (auto &index : gep2_indices) {
+            gep2->m_indices.push_back(index->AddUse(gep2));
+          }
+          gep2->m_type.Set(addr->m_type.m_base_type, true);
+          gep2->m_type.m_dimensions.clear();
+          for (size_t i = gep1->m_indices.size() + gep2->m_indices.size() - 2;
+               i < addr->m_type.m_dimensions.size(); ++i) {
+            gep2->m_type.m_dimensions.push_back(addr->m_type.m_dimensions[i]);
+          }
+          assert(gep2->m_type.m_dimensions.size()
+                 == gep->m_type.m_dimensions.size());
+          gep_bb->InsertFrontInstruction(gep, gep2);
+          gep->ReplaceUseBy(gep2);
+          gep_bb->RemoveInstruction(gep);
+          break;
+        }
+      }
+    }
+  }
   return true;
 }
 
@@ -236,8 +311,6 @@ void IRPassManager::StrengthReductionPass() {
     for (auto &loop : func->m_loops) {
       StrengthReduction(loop, m_builder);
     }
-    DeadCodeElimination(func);
-    ReplaceTrivialBranchByJump(func);
-    RemoveTrivialBasicBlocks(func);
+    BasicOptimization(func);
   }
 }
