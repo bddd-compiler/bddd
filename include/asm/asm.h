@@ -75,8 +75,6 @@ enum class InstOp {
   STR,
   ADR,
   MOV,
-  MSR,
-  MRS,
   PUSH,
   POP,
   // branch instructions
@@ -118,8 +116,6 @@ enum class InstOp {
   VDIV,
   VNEG,
   VCMP,
-  VMSR,
-  VMRS,
   VLDR,
   VSTR,
   VPUSH,
@@ -169,7 +165,6 @@ public:
   std::string m_name;
   RReg m_rreg;
   SReg m_sreg;
-  std::string m_special_reg;
 
   bool m_is_float;
   int m_int_val;
@@ -186,9 +181,6 @@ public:
 
   Operand(float val)
       : m_op_type(OperandType::IMM), m_float_val(val), m_is_float(true) {}
-
-  Operand(std::string reg)
-      : m_op_type(OperandType::SPECIAL_REG), m_special_reg(reg) {}
 
   std::string getName();
 
@@ -270,8 +262,6 @@ public:
   void exportASM(std::ofstream& ofs);
 };
 
-class MRSInst;
-
 class ASM_BasicBlock : public std::enable_shared_from_this<ASM_BasicBlock> {
 public:
   static int block_id;
@@ -279,7 +269,6 @@ public:
   std::list<std::shared_ptr<ASM_Instruction>> m_insts;
   std::list<std::shared_ptr<ASM_Instruction>>::iterator m_branch_pos;
   std::list<std::shared_ptr<ASM_Instruction>> m_mov_filled_list;
-  std::shared_ptr<MRSInst> m_status_load_inst;
 
   int m_loop_depth;
 
@@ -293,8 +282,7 @@ public:
   ASM_BasicBlock(int depth = 0)
       : m_loop_depth(depth),
         m_branch_pos(m_insts.end()),
-        m_label(".L" + std::to_string(block_id++)),
-        m_status_load_inst(nullptr) {}
+        m_label(".L" + std::to_string(block_id++)) {}
 
   void insert(std::shared_ptr<ASM_Instruction> inst);
 
@@ -445,25 +433,6 @@ public:
   MOVInst(std::shared_ptr<Operand> dest, float imm);
 
   MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src);
-
-  void exportASM(std::ofstream& ofs) override;
-
-  void replaceDef(std::shared_ptr<Operand> newOp,
-                  std::shared_ptr<Operand> oldOp) override;
-
-  void replaceUse(std::shared_ptr<Operand> newOp,
-                  std::shared_ptr<Operand> oldOp) override;
-};
-
-// MRS MSR VMRS VMSR
-class MRSInst : public ASM_Instruction {
-public:
-  std::shared_ptr<Operand> m_dest;
-  std::shared_ptr<Operand> m_src;
-
-  MRSInst(std::string reg, std::shared_ptr<Operand> src);
-
-  MRSInst(std::shared_ptr<Operand> dest, std::string reg);
 
   void exportASM(std::ofstream& ofs) override;
 

@@ -78,13 +78,6 @@ public:
   std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest,
                                      std::shared_ptr<Operand> src);
 
-  // appendMRS
-  std::shared_ptr<MRSInst> appendMRS(std::string reg,
-                                     std::shared_ptr<Operand> src);
-
-  std::shared_ptr<MRSInst> appendMRS(std::shared_ptr<Operand> dest,
-                                     std::string reg);
-
   // appendB
   std::shared_ptr<BInst> appendB(std::shared_ptr<ASM_BasicBlock> block,
                                  CondType cond);

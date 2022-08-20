@@ -218,8 +218,6 @@ std::string Operand::getName() {
       return getRegName();
     case OperandType::VREG:
       return getVRegName();
-    case OperandType::SPECIAL_REG:
-      return m_special_reg;
   }
   return "";  // unreachable, just write to avoid warning
 }
@@ -347,10 +345,6 @@ std::string ASM_Instruction::getOpName() {
       return "ADR";
     case InstOp::MOV:
       return "MOV";
-    case InstOp::MSR:
-      return "MSR";
-    case InstOp::MRS:
-      return "MRS";
     case InstOp::PUSH:
       return "PUSH";
     case InstOp::POP:
@@ -421,10 +415,6 @@ std::string ASM_Instruction::getOpName() {
       return "VNEG";
     case InstOp::VCMP:
       return "VCMP";
-    case InstOp::VMSR:
-      return "VMSR";
-    case InstOp::VMRS:
-      return "VMRS";
     case InstOp::VLDR:
       return "VLDR";
     case InstOp::VSTR:
@@ -619,38 +609,6 @@ MOVInst::MOVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> src) {
 
   addDef(dest);
   addUse(src);
-}
-
-MRSInst::MRSInst(std::string reg, std::shared_ptr<Operand> src) {
-  if (reg == "APSR") {
-    m_op = InstOp::MSR;
-    m_dest = std::make_shared<Operand>("APSR_NZCVQG");
-  } else if (reg == "FPSCR") {
-    m_op = InstOp::VMSR;
-    m_dest = std::make_shared<Operand>("FPSCR");
-  } else
-    assert(false);
-
-  m_cond = CondType::NONE;
-  m_src = src;
-
-  addUse(m_src);
-}
-
-MRSInst::MRSInst(std::shared_ptr<Operand> dest, std::string reg) {
-  if (reg == "APSR") {
-    m_op = InstOp::MRS;
-    m_src = std::make_shared<Operand>("APSR");
-  } else if (reg == "FPSCR") {
-    m_op = InstOp::VMRS;
-    m_src = std::make_shared<Operand>("FPSCR");
-  } else
-    assert(false);
-
-  m_cond = CondType::NONE;
-  m_dest = dest;
-
-  addDef(m_dest);
 }
 
 PInst::PInst(InstOp op) {

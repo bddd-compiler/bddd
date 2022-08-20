@@ -154,24 +154,6 @@ void MOVInst::replaceUse(std::shared_ptr<Operand> newOp,
   addUse(newOp);
 }
 
-void MRSInst::replaceDef(std::shared_ptr<Operand> newOp,
-                         std::shared_ptr<Operand> oldOp) {
-  assert(m_dest == oldOp);
-  m_dest = newOp;
-  m_def.erase(oldOp);
-  m_f_def.erase(oldOp);
-  addDef(newOp);
-}
-
-void MRSInst::replaceUse(std::shared_ptr<Operand> newOp,
-                         std::shared_ptr<Operand> oldOp) {
-  assert(m_src == oldOp);
-  m_src = newOp;
-  m_use.erase(oldOp);
-  m_f_use.erase(oldOp);
-  addUse(newOp);
-}
-
 void PInst::replaceDef(std::shared_ptr<Operand> newOp,
                        std::shared_ptr<Operand> oldOp) {
   assert(false);

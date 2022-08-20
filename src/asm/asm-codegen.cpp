@@ -428,10 +428,6 @@ std::shared_ptr<Operand> GenerateBranch(std::shared_ptr<BranchInstruction> inst,
     cond = ASM_Instruction::getOppositeCond(cond);
   }
   assert(cond != CondType::NONE);
-  if (builder->m_cur_block->m_status_load_inst) {
-    builder->m_cur_block->insert(builder->m_cur_block->m_status_load_inst);
-    builder->m_cur_block->m_status_load_inst = nullptr;
-  }
   builder->appendB(true_block, cond);
   builder->m_cur_block->m_branch_pos
       = std::prev(builder->m_cur_block->m_insts.end());
@@ -670,10 +666,6 @@ std::shared_ptr<Operand> GenerateZExt(std::shared_ptr<ZExtInstruction> inst,
     cond = ASM_Instruction::getOppositeCond(cond);
   }
   assert(cond != CondType::NONE);
-  if (builder->m_cur_block->m_status_load_inst) {
-    builder->m_cur_block->insert(builder->m_cur_block->m_status_load_inst);
-    builder->m_cur_block->m_status_load_inst = nullptr;
-  }
   auto mov_true = builder->appendMOV(ret, 1);
   auto mov_false = builder->appendMOV(ret, 0);
   mov_true->m_cond = cond;
