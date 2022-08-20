@@ -677,6 +677,9 @@ void RegisterAllocator::RewriteProgram() {
             if (next_inst->m_use.find(v) != next_inst->m_use.end()
                 || next_inst->m_f_use.find(v) != next_inst->m_f_use.end()) {
               next_inst->replaceUse(newOp, v);
+              if (newOp->m_is_float && next_inst->m_op == InstOp::MOV) {
+                next_inst->m_op = InstOp::VMOV;
+              }
             }
           }
         }
