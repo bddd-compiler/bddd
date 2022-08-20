@@ -433,6 +433,8 @@ std::string ASM_Instruction::getOpName() {
       return "VPUSH";
     case InstOp::VPOP:
       return "VPOP";
+    case InstOp::VCVT:
+      return "VCVT";
   }
   return "";
 }
@@ -452,6 +454,13 @@ std::string ASM_Instruction::getOpSuffixName() {
     case InstOp::VLDR:
     case InstOp::VSTR:
       return ".32";
+    case InstOp::VCVT:
+      switch (std::dynamic_pointer_cast<VCVTInst>(shared_from_this())->m_type) {
+        case VCVTInst::ConvertType::F2I:
+          return ".S32.F32";
+        case VCVTInst::ConvertType::I2F:
+          return ".F32.S32";
+      }
     default:
       break;
   }
@@ -749,6 +758,19 @@ SDIVInst::SDIVInst(std::shared_ptr<Operand> dest,
   addDef(dest);
   addUse(devidend);
   addUse(devisor);
+}
+
+VCVTInst::VCVTInst(ConvertType type, std::shared_ptr<Operand> dest,
+                   std::shared_ptr<Operand> src) {
+  assert(dest->getRegType() == RegType::S && src->getRegType() == RegType::S);
+  m_op = InstOp::VCVT;
+  m_cond = CondType::NONE;
+  m_type = type;
+  m_dest = dest;
+  m_src = src;
+
+  addDef(dest);
+  addUse(src);
 }
 
 BITInst::BITInst(InstOp op, std::shared_ptr<Operand> dest,

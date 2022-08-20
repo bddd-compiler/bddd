@@ -118,6 +118,10 @@ public:
                                        std::shared_ptr<Operand> devidend,
                                        std::shared_ptr<Operand> devisor);
 
+  std::shared_ptr<VCVTInst> appendVCVT(VCVTInst::ConvertType type,
+                                       std::shared_ptr<Operand> dest,
+                                       std::shared_ptr<Operand> src);
+
   // appendBIT
   std::shared_ptr<BITInst> appendBIT(InstOp op, std::shared_ptr<Operand> dest,
                                      std::shared_ptr<Operand> operand1,

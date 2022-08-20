@@ -609,8 +609,7 @@ std::shared_ptr<Operand> GeneratePhi(std::shared_ptr<PhiInstruction> inst,
   // we need to store the temp result to make sure all PHI instruction execute
   // in parallel  (XXX)
 #if 1
-  auto tmp = std::make_shared<Operand>(OperandType::VREG);
-  tmp->m_is_float = inst->m_type.IsBasicFloat();
+  auto tmp = std::make_shared<Operand>(OperandType::VREG, inst->m_type.IsBasicFloat());
   auto ret = builder->getOperand(inst);
   builder->appendMOV(ret, tmp);
   for (auto &[ir_block, value] : inst->m_contents) {
@@ -689,9 +688,8 @@ std::shared_ptr<Operand> GenerateSIToFP(std::shared_ptr<SIToFPInstruction> inst,
   auto ret = builder->getOperand(inst);
   ret->m_is_float = true;
 
-  builder->appendMOV(Operand::getRReg(RReg::R0), src);
-  builder->appendCALL(VarType::FLOAT, "__aeabi_i2f", 1);
-  builder->appendMOV(ret, Operand::getRReg(RReg::R0));
+  builder->appendMOV(ret, src);
+  builder->appendVCVT(VCVTInst::ConvertType::I2F, ret, ret);
   return ret;
 }
 
@@ -701,9 +699,9 @@ std::shared_ptr<Operand> GenerateFPToSI(std::shared_ptr<FPToSIInstruction> inst,
   auto src = builder->getOperand(src_val);
   auto ret = builder->getOperand(inst);
 
-  builder->appendMOV(Operand::getRReg(RReg::R0), src);
-  builder->appendCALL(VarType::FLOAT, "__aeabi_f2iz", 1);
-  builder->appendMOV(ret, Operand::getRReg(RReg::R0));
+  auto temp_sreg = std::make_shared<Operand>(OperandType::VREG, true);
+  builder->appendVCVT(VCVTInst::ConvertType::F2I, temp_sreg, src);
+  builder->appendMOV(ret, temp_sreg);
   return ret;
 }
 

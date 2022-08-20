@@ -278,6 +278,14 @@ std::shared_ptr<SDIVInst> ASM_Builder::appendSDIV(
   return sdiv;
 }
 
+std::shared_ptr<VCVTInst> ASM_Builder::appendVCVT(VCVTInst::ConvertType type,
+                                       std::shared_ptr<Operand> dest,
+                                       std::shared_ptr<Operand> src) {
+  auto vcvt = std::make_shared<VCVTInst>(type, dest, src);
+  m_cur_block->insert(vcvt);
+  return vcvt;
+}
+
 // appendBIT
 std::shared_ptr<BITInst> ASM_Builder::appendBIT(
     InstOp op, std::shared_ptr<Operand> dest, std::shared_ptr<Operand> operand1,

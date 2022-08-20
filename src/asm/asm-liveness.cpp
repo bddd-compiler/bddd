@@ -286,6 +286,22 @@ void SDIVInst::replaceUse(std::shared_ptr<Operand> newOp,
   addUse(newOp);
 }
 
+void VCVTInst::replaceDef(std::shared_ptr<Operand> newOp,
+                          std::shared_ptr<Operand> oldOp) {
+  assert(m_dest = oldOp);
+  m_dest = newOp;
+  m_f_def.erase(oldOp);
+  addDef(newOp);
+}
+
+void VCVTInst::replaceUse(std::shared_ptr<Operand> newOp,
+                          std::shared_ptr<Operand> oldOp) {
+  assert(m_src = oldOp);
+  m_src = newOp;
+  m_f_use.erase(oldOp);
+  addUse(newOp);
+}
+
 void BITInst::replaceDef(std::shared_ptr<Operand> newOp,
                          std::shared_ptr<Operand> oldOp) {
   assert(m_dest == oldOp);

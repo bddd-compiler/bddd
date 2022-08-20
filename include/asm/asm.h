@@ -123,27 +123,29 @@ enum class InstOp {
   VLDR,
   VSTR,
   VPUSH,
-  VPOP
+  VPOP,
+  // convert between integer and float
+  VCVT
 };
 
 enum class OperandType { SPECIAL_REG, REG, VREG, IMM };
 
-enum class CondType { 
-  NONE,     //  Any
-  EQ,       //  Z == 1
-  NE,       //  Z == 0
-  CS,       //  C == 1
-  CC,       //  C == 0
-  MI,       //  N == 1
-  PL,       //  N == 0
-  VS,       //  V == 1
-  VC,       //  V == 0
-  HI,       //  C == 1 and Z == 0
-  LS,       //  C == 0 or Z == 1
-  GE,       //  N == V
-  LT,       //  N != V
-  GT,       //  Z == 0 and N == V
-  LE        //  Z == 1 or N != V
+enum class CondType {
+  NONE,  //  Any
+  EQ,    //  Z == 1
+  NE,    //  Z == 0
+  CS,    //  C == 1
+  CC,    //  C == 0
+  MI,    //  N == 1
+  PL,    //  N == 0
+  VS,    //  V == 1
+  VC,    //  V == 0
+  HI,    //  C == 1 and Z == 0
+  LS,    //  C == 0 or Z == 1
+  GE,    //  N == V
+  LT,    //  N != V
+  GT,    //  Z == 0 and N == V
+  LE     //  Z == 1 or N != V
 };
 
 enum class MOVType { REG, IMM };
@@ -167,7 +169,6 @@ public:
   std::string m_name;
   RReg m_rreg;
   SReg m_sreg;
-  RegType m_reg_type;
   std::string m_special_reg;
 
   bool m_is_float;
@@ -344,7 +345,7 @@ public:
   void exportASM(std::ofstream& ofs);
 };
 
-class ASM_Instruction {
+class ASM_Instruction : public std::enable_shared_from_this<ASM_Instruction> {
 public:
   InstOp m_op;
   CondType m_cond;
@@ -361,7 +362,10 @@ public:
   std::unordered_set<std::shared_ptr<Operand>> m_f_use;
 
   ASM_Instruction()
-      : m_set_flag(false), m_params_offset(0), m_is_mov(false), m_is_deleted(false) {}
+      : m_set_flag(false),
+        m_params_offset(0),
+        m_is_mov(false),
+        m_is_deleted(false) {}
 
   std::string getOpName();
 
@@ -590,6 +594,25 @@ public:
 
   SDIVInst(std::shared_ptr<Operand> dest, std::shared_ptr<Operand> devidend,
            std::shared_ptr<Operand> devisor);
+
+  void exportASM(std::ofstream& ofs) override;
+
+  void replaceDef(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+
+  void replaceUse(std::shared_ptr<Operand> newOp,
+                  std::shared_ptr<Operand> oldOp) override;
+};
+
+class VCVTInst : public ASM_Instruction {
+public:
+  enum class ConvertType { I2F, F2I } m_type;
+
+  std::shared_ptr<Operand> m_dest;
+  std::shared_ptr<Operand> m_src;
+
+  VCVTInst(ConvertType type, std::shared_ptr<Operand> dest,
+           std::shared_ptr<Operand> src);
 
   void exportASM(std::ofstream& ofs) override;
 

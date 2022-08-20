@@ -264,6 +264,11 @@ void SDIVInst::exportASM(std::ofstream& ofs) {
       << m_devisor->getName() << std::endl;
 }
 
+void VCVTInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
+  ofs << m_dest->getName() << ", " << m_src->getName() << std::endl;
+}
+
 void BITInst::exportASM(std::ofstream& ofs) {
   exportInstHead(ofs);
   ofs << m_dest->getName() << ", " << m_operand1->getName();
