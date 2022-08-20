@@ -83,6 +83,20 @@ bool DeadCodeElimination(std::shared_ptr<Function> func) {
       for (auto &instr : instrs) {
         if (std::dynamic_pointer_cast<BinaryInstruction>(instr)) {
           if (instr->m_use_list.empty()) {
+            // remove useless orphan binary instruction
+            bb->RemoveInstruction(instr);
+            changed = true;
+            cnt++;
+          }
+        } else if (std::dynamic_pointer_cast<PhiInstruction>(instr)) {
+          bool no_other_use = true;
+          for (auto &use : instr->m_use_list) {
+            if (use->getUser() != instr) {
+              no_other_use = false;
+            }
+          }
+          if (no_other_use) {
+            // remove useless phi
             bb->RemoveInstruction(instr);
             changed = true;
             cnt++;
