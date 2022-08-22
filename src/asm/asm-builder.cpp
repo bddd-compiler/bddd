@@ -200,21 +200,6 @@ std::shared_ptr<MOVInst> ASM_Builder::appendMOV(std::shared_ptr<Operand> dest,
   return mov;
 }
 
-// appendMRS
-std::shared_ptr<MRSInst> ASM_Builder::appendMRS(std::string reg,
-                                                std::shared_ptr<Operand> src) {
-  auto msr = std::make_shared<MRSInst>(reg, src);
-  m_cur_block->insert(msr);
-  return msr;
-}
-
-std::shared_ptr<MRSInst> ASM_Builder::appendMRS(std::shared_ptr<Operand> dest,
-                                                std::string reg) {
-  auto mrs = std::make_shared<MRSInst>(dest, reg);
-  m_cur_block->insert(mrs);
-  return mrs;
-}
-
 // appendB
 std::shared_ptr<BInst> ASM_Builder::appendB(
     std::shared_ptr<ASM_BasicBlock> block, CondType cond) {
@@ -278,6 +263,14 @@ std::shared_ptr<SDIVInst> ASM_Builder::appendSDIV(
   return sdiv;
 }
 
+std::shared_ptr<VCVTInst> ASM_Builder::appendVCVT(VCVTInst::ConvertType type,
+                                       std::shared_ptr<Operand> dest,
+                                       std::shared_ptr<Operand> src) {
+  auto vcvt = std::make_shared<VCVTInst>(type, dest, src);
+  m_cur_block->insert(vcvt);
+  return vcvt;
+}
+
 // appendBIT
 std::shared_ptr<BITInst> ASM_Builder::appendBIT(
     InstOp op, std::shared_ptr<Operand> dest, std::shared_ptr<Operand> operand1,
@@ -301,12 +294,6 @@ std::shared_ptr<CTInst> ASM_Builder::appendCT(
     std::shared_ptr<Operand> operand2) {
   auto ct = std::make_shared<CTInst>(op, operand1, operand2);
   m_cur_block->insert(ct);
-  if (op == InstOp::VCMP) {
-    auto temp_reg = std::make_shared<Operand>(OperandType::VREG);
-    appendMRS(temp_reg, "FPSCR");
-    m_cur_block->m_status_load_inst
-        = std::make_shared<MRSInst>("APSR", temp_reg);
-  }
   return ct;
 }
 

@@ -184,11 +184,6 @@ void MOVInst::exportASM(std::ofstream& ofs) {
   ofs << m_dest->getName() << ", " << m_src->getName() << std::endl;
 }
 
-void MRSInst::exportASM(std::ofstream& ofs) {
-  exportInstHead(ofs);
-  ofs << m_dest->getName() << ", " << m_src->getName() << std::endl;
-}
-
 void PInst::exportASM(std::ofstream& ofs) {
   if (m_regs.empty()) return;
   exportInstHead(ofs);
@@ -264,6 +259,11 @@ void SDIVInst::exportASM(std::ofstream& ofs) {
       << m_devisor->getName() << std::endl;
 }
 
+void VCVTInst::exportASM(std::ofstream& ofs) {
+  exportInstHead(ofs);
+  ofs << m_dest->getName() << ", " << m_src->getName() << std::endl;
+}
+
 void BITInst::exportASM(std::ofstream& ofs) {
   exportInstHead(ofs);
   ofs << m_dest->getName() << ", " << m_operand1->getName();
@@ -285,6 +285,10 @@ void CTInst::exportASM(std::ofstream& ofs) {
     m_shift->exportASM(ofs);
   }
   ofs << std::endl;
+  // load status after vcmp
+  if (m_op == InstOp::VCMP) {
+    ofs << "\tVMRS APSR_nzcv, FPSCR" << std::endl;  // equivalent to "FMSTAT"
+  }
 }
 
 void POOLInst::exportASM(std::ofstream& ofs) {

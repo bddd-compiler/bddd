@@ -78,13 +78,6 @@ public:
   std::shared_ptr<MOVInst> appendMOV(std::shared_ptr<Operand> dest,
                                      std::shared_ptr<Operand> src);
 
-  // appendMRS
-  std::shared_ptr<MRSInst> appendMRS(std::string reg,
-                                     std::shared_ptr<Operand> src);
-
-  std::shared_ptr<MRSInst> appendMRS(std::shared_ptr<Operand> dest,
-                                     std::string reg);
-
   // appendB
   std::shared_ptr<BInst> appendB(std::shared_ptr<ASM_BasicBlock> block,
                                  CondType cond);
@@ -117,6 +110,10 @@ public:
   std::shared_ptr<SDIVInst> appendSDIV(std::shared_ptr<Operand> dest,
                                        std::shared_ptr<Operand> devidend,
                                        std::shared_ptr<Operand> devisor);
+
+  std::shared_ptr<VCVTInst> appendVCVT(VCVTInst::ConvertType type,
+                                       std::shared_ptr<Operand> dest,
+                                       std::shared_ptr<Operand> src);
 
   // appendBIT
   std::shared_ptr<BITInst> appendBIT(InstOp op, std::shared_ptr<Operand> dest,

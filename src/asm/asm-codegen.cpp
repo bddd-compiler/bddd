@@ -396,12 +396,12 @@ std::shared_ptr<Operand> GenerateCall(std::shared_ptr<CallInstruction> inst,
 
   // if the function has return value, save to r0
   std::shared_ptr<Operand> ret;
-  if (return_type == VarType::INT || return_type == VarType::FLOAT) {
+  if (return_type != VarType::VOID) {
     ret = builder->getOperand(inst);
-    if (inst->m_func_name == "getfloat")
-      builder->appendMOV(ret, Operand::getSReg(SReg::S0));
-    else
+    if (return_type == VarType::INT)
       builder->appendMOV(ret, Operand::getRReg(RReg::R0));
+    else
+      builder->appendMOV(ret, Operand::getSReg(SReg::S0));
   }
 
   return ret;
@@ -428,9 +428,6 @@ std::shared_ptr<Operand> GenerateBranch(std::shared_ptr<BranchInstruction> inst,
     cond = ASM_Instruction::getOppositeCond(cond);
   }
   assert(cond != CondType::NONE);
-  if (builder->m_cur_block->m_status_load_inst) {
-    builder->m_cur_block->insert(builder->m_cur_block->m_status_load_inst);
-  }
   builder->appendB(true_block, cond);
   builder->m_cur_block->m_branch_pos
       = std::prev(builder->m_cur_block->m_insts.end());
@@ -451,13 +448,16 @@ std::shared_ptr<Operand> GenerateJump(std::shared_ptr<JumpInstruction> inst,
 std::shared_ptr<Operand> GenerateReturn(std::shared_ptr<ReturnInstruction> inst,
                                         std::shared_ptr<ASM_Builder> builder) {
   std::shared_ptr<Value> ret_val;
+  std::shared_ptr<Operand> ret_reg;
   if (inst->m_ret && inst->m_ret->getValue()) {
     ret_val = inst->m_ret->getValue();
-    builder->appendMOV(Operand::getRReg(RReg::R0),
-                       builder->getOperand(ret_val, true, false));
+    if (ret_val->m_type.IsBasicInt())
+      ret_reg = Operand::getRReg(RReg::R0);
+    else
+      ret_reg = Operand::getSReg(SReg::S0);
+    builder->appendMOV(ret_reg, builder->getOperand(ret_val, true, false));
   }
   auto b = builder->appendB(builder->m_cur_func->m_rblock, CondType::NONE);
-  if (ret_val) b->addUse(Operand::getRReg(RReg::R0));
   return nullptr;
 }
 
@@ -605,8 +605,7 @@ std::shared_ptr<Operand> GeneratePhi(std::shared_ptr<PhiInstruction> inst,
   // we need to store the temp result to make sure all PHI instruction execute
   // in parallel  (XXX)
 #if 1
-  auto tmp = std::make_shared<Operand>(OperandType::VREG);
-  tmp->m_is_float = inst->m_type.IsBasicFloat();
+  auto tmp = std::make_shared<Operand>(OperandType::VREG, inst->m_type.IsBasicFloat());
   auto ret = builder->getOperand(inst);
   builder->appendMOV(ret, tmp);
   for (auto &[ir_block, value] : inst->m_contents) {
@@ -643,22 +642,30 @@ std::shared_ptr<Operand> GenerateBitCast(
 std::shared_ptr<Operand> GenerateZExt(std::shared_ptr<ZExtInstruction> inst,
                                       std::shared_ptr<ASM_Builder> builder) {
   auto src_val = inst->m_val->getValue();
+  auto ret = builder->getOperand(inst);
+  if (src_val->m_type.IsConst()) {
+    int i32 = std::dynamic_pointer_cast<Constant>(src_val)->Evaluate().IntVal();
+    builder->appendMOV(ret, i32);
+    return ret;
+  }
   auto inst_cond = std::dynamic_pointer_cast<BinaryInstruction>(src_val);
   bool is_not = false;
   while (inst_cond->m_op == IROp::XOR) {
     is_not = !is_not;
-    inst_cond = std::dynamic_pointer_cast<BinaryInstruction>(
-        inst_cond->m_lhs_val_use->getValue());
+    auto lhs = inst_cond->m_lhs_val_use->getValue();
+    inst_cond = std::dynamic_pointer_cast<BinaryInstruction>(lhs);
+    if (!inst_cond) {
+      int i32 = std::dynamic_pointer_cast<Constant>(lhs)->Evaluate().IntVal();
+      i32 ^= is_not;
+      builder->appendMOV(ret, i32);
+      return ret;
+    }
   }
   CondType cond = GetCondFromIR(inst_cond->m_op);
   if (is_not) {
     cond = ASM_Instruction::getOppositeCond(cond);
   }
   assert(cond != CondType::NONE);
-  if (builder->m_cur_block->m_status_load_inst) {
-    builder->m_cur_block->insert(builder->m_cur_block->m_status_load_inst);
-  }
-  auto ret = builder->getOperand(inst);
   auto mov_true = builder->appendMOV(ret, 1);
   auto mov_false = builder->appendMOV(ret, 0);
   mov_true->m_cond = cond;
@@ -673,9 +680,8 @@ std::shared_ptr<Operand> GenerateSIToFP(std::shared_ptr<SIToFPInstruction> inst,
   auto ret = builder->getOperand(inst);
   ret->m_is_float = true;
 
-  builder->appendMOV(Operand::getRReg(RReg::R0), src);
-  builder->appendCALL(VarType::FLOAT, "__aeabi_i2f", 1);
-  builder->appendMOV(ret, Operand::getRReg(RReg::R0));
+  builder->appendMOV(ret, src);
+  builder->appendVCVT(VCVTInst::ConvertType::I2F, ret, ret);
   return ret;
 }
 
@@ -685,9 +691,9 @@ std::shared_ptr<Operand> GenerateFPToSI(std::shared_ptr<FPToSIInstruction> inst,
   auto src = builder->getOperand(src_val);
   auto ret = builder->getOperand(inst);
 
-  builder->appendMOV(Operand::getRReg(RReg::R0), src);
-  builder->appendCALL(VarType::FLOAT, "__aeabi_f2iz", 1);
-  builder->appendMOV(ret, Operand::getRReg(RReg::R0));
+  auto temp_sreg = std::make_shared<Operand>(OperandType::VREG, true);
+  builder->appendVCVT(VCVTInst::ConvertType::F2I, temp_sreg, src);
+  builder->appendMOV(ret, temp_sreg);
   return ret;
 }
 

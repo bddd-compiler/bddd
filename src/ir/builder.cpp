@@ -388,8 +388,6 @@ std::shared_ptr<CallInstruction> IRBuilder::CreateCallInstruction(
     if (val->m_type.m_dimensions.size()
             > function->m_args[i]->m_type.m_dimensions.size()
         && val->m_type.m_num_star == function->m_args[i]->m_type.m_num_star) {
-      assert(val->m_type.m_dimensions.size()
-             == function->m_args[i]->m_type.m_dimensions.size() + 1);
       std::vector<std::shared_ptr<Value>> gep_params(
           val->m_type.m_dimensions.size() + 1
               - function->m_args[i]->m_type.m_dimensions.size(),
