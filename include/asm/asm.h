@@ -124,7 +124,7 @@ enum class InstOp {
   VCVT
 };
 
-enum class OperandType { SPECIAL_REG, REG, VREG, IMM };
+enum class OperandType { REG, VREG, IMM };
 
 enum class CondType {
   NONE,  //  Any
@@ -149,6 +149,8 @@ enum class MOVType { REG, IMM };
 enum class RegType { R, S };
 
 CondType GetCondFromIR(IROp op);
+
+CondType getOppositeCond(CondType cond);
 
 class ASM_Instruction;
 
@@ -360,8 +362,6 @@ public:
   std::string getOpSuffixName();
 
   std::string getCondName();
-
-  static CondType getOppositeCond(CondType cond);
 
   void exportInstHead(std::ofstream& ofs);
 

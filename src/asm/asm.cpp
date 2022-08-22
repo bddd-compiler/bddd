@@ -3,25 +3,67 @@
 CondType GetCondFromIR(IROp op) {
   switch (op) {
     case IROp::I_SGE:
+      return CondType::GE;
     case IROp::F_GE:
       return CondType::GE;
     case IROp::I_SGT:
+      return CondType::GT;
     case IROp::F_GT:
       return CondType::GT;
     case IROp::I_SLE:
-    case IROp::F_LE:
       return CondType::LE;
+    case IROp::F_LE:
+      return CondType::LS;
     case IROp::I_SLT:
-    case IROp::F_LT:
       return CondType::LT;
+    case IROp::F_LT:
+      return CondType::MI;
     case IROp::I_EQ:
+      return CondType::EQ;
     case IROp::F_EQ:
       return CondType::EQ;
     case IROp::I_NE:
+      return CondType::NE;
     case IROp::F_NE:
       return CondType::NE;
     default:
       break;
+  }
+  return CondType::NONE;
+}
+
+CondType getOppositeCond(CondType cond) {
+  switch (cond) {
+    case CondType::EQ:
+      return CondType::NE;
+    case CondType::NE:
+      return CondType::EQ;
+    case CondType::CS:
+      return CondType::CC;
+    case CondType::CC:
+      return CondType::CS;
+    case CondType::MI:
+      return CondType::PL;
+    case CondType::PL:
+      return CondType::MI;
+    case CondType::VS:
+      return CondType::VC;
+    case CondType::VC:
+      return CondType::VS;
+    case CondType::HI:
+      return CondType::LS;
+    case CondType::LS:
+      return CondType::HI;
+    case CondType::GE:
+      return CondType::LT;
+    case CondType::LT:
+      return CondType::GE;
+    case CondType::GT:
+      return CondType::LE;
+    case CondType::LE:
+      return CondType::GT;
+    case CondType::NONE:
+      return CondType::NONE;
   }
   return CondType::NONE;
 }
@@ -491,42 +533,6 @@ std::string ASM_Instruction::getCondName() {
       return "";
   }
   return "";
-}
-
-CondType ASM_Instruction::getOppositeCond(CondType cond) {
-  switch (cond) {
-    case CondType::EQ:
-      return CondType::NE;
-    case CondType::NE:
-      return CondType::EQ;
-    case CondType::CS:
-      return CondType::CC;
-    case CondType::CC:
-      return CondType::CS;
-    case CondType::MI:
-      return CondType::PL;
-    case CondType::PL:
-      return CondType::MI;
-    case CondType::VS:
-      return CondType::VC;
-    case CondType::VC:
-      return CondType::VS;
-    case CondType::HI:
-      return CondType::LS;
-    case CondType::LS:
-      return CondType::HI;
-    case CondType::GE:
-      return CondType::LT;
-    case CondType::LT:
-      return CondType::GE;
-    case CondType::GT:
-      return CondType::LE;
-    case CondType::LE:
-      return CondType::GT;
-    case CondType::NONE:
-      return CondType::NONE;
-  }
-  return CondType::NONE;
 }
 
 LDRInst::LDRInst(std::shared_ptr<Operand> dest, std::string label) {

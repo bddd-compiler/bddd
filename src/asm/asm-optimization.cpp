@@ -41,7 +41,7 @@ void eliminateRedundantJump(std::shared_ptr<ASM_Module> module) {
       auto iter = block->m_branch_pos;
       auto inst = std::dynamic_pointer_cast<BInst>(*iter);
       if (inst->m_target == *std::next(b_iter)) {
-        CondType cond = ASM_Instruction::getOppositeCond(inst->m_cond);
+        CondType cond = getOppositeCond(inst->m_cond);
         iter = block->m_insts.erase(iter);
         block->m_branch_pos = iter;
         if (iter != block->m_insts.end()) {

@@ -425,7 +425,7 @@ std::shared_ptr<Operand> GenerateBranch(std::shared_ptr<BranchInstruction> inst,
   }
   CondType cond = GetCondFromIR(inst_cond->m_op);
   if (is_not) {
-    cond = ASM_Instruction::getOppositeCond(cond);
+    cond = getOppositeCond(cond);
   }
   assert(cond != CondType::NONE);
   builder->appendB(true_block, cond);
@@ -663,13 +663,13 @@ std::shared_ptr<Operand> GenerateZExt(std::shared_ptr<ZExtInstruction> inst,
   }
   CondType cond = GetCondFromIR(inst_cond->m_op);
   if (is_not) {
-    cond = ASM_Instruction::getOppositeCond(cond);
+    cond = getOppositeCond(cond);
   }
   assert(cond != CondType::NONE);
   auto mov_true = builder->appendMOV(ret, 1);
   auto mov_false = builder->appendMOV(ret, 0);
   mov_true->m_cond = cond;
-  mov_false->m_cond = ASM_Instruction::getOppositeCond(cond);
+  mov_false->m_cond = getOppositeCond(cond);
   return ret;
 }
 
